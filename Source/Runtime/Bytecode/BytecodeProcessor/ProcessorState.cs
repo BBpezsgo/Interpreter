@@ -587,6 +587,11 @@ public ref partial struct ProcessorState
         }
     }
 
+    public unsafe void Push<T>(T data) where T : unmanaged
+    {
+        Push(new ReadOnlySpan<byte>(&data, sizeof(T)));
+    }
+
     public Span<byte> Pop(int size)
     {
         if (Registers.StackPointer >= Memory.Length ||

@@ -170,7 +170,7 @@ public static class GeneralExtensions
             if (!string.IsNullOrWhiteSpace(line))
             {
                 stringBuilder.Append(indent);
-                stringBuilder.Append(value);
+                stringBuilder.Append(line);
             }
             stringBuilder.AppendLine();
         }

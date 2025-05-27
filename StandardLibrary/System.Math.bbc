@@ -143,6 +143,20 @@ export f32 Max(f32 a, f32 b)
     return b;
 }
 
+export int Clamp(int value, int min, int max)
+{
+    if (value < min) { return min; }
+    elseif (value > max) { return max; }
+    else { return value; }
+}
+
+export f32 Clamp(f32 value, f32 min, f32 max)
+{
+    if (value < min) { return min; }
+    elseif (value > max) { return max; }
+    else { return value; }
+}
+
 /*
 // https://www.geeksforgeeks.org/c-program-to-find-square-root-of-a-given-number/
 float Sqrt(int number)

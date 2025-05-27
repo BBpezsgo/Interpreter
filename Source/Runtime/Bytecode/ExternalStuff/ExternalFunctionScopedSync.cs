@@ -23,6 +23,7 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
 #else
     public ExternalFunctionScopedSyncCallback Callback { get; }
 #endif
+    public bool MSILPointerMarshal { get; }
 
     readonly string? IExternalFunction.Name => null;
 
@@ -35,7 +36,8 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
         int id,
         int parametersSize,
         int returnValueSize,
-        nint scope)
+        nint scope,
+        bool msilPointerMarshal = default)
     {
 #if UNITY_BURST
         _callback = (nint)callback;
@@ -46,6 +48,7 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
         ParametersSize = parametersSize;
         ReturnValueSize = returnValueSize;
         Scope = scope;
+        MSILPointerMarshal = msilPointerMarshal;
     }
 
     // This required by my Unity-DOTS project!!!!

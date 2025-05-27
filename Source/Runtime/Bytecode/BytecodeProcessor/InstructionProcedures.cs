@@ -1,5 +1,7 @@
 #define _UNITY_PROFILER
 
+using System.Runtime.CompilerServices;
+
 namespace LanguageCore.Runtime;
 
 public ref partial struct ProcessorState
@@ -596,6 +598,14 @@ public ref partial struct ProcessorState
             if (scopedExternalFunction.Id != functionId) continue;
 
             Span<byte> _parameters = Memory.Slice(Registers.StackPointer, scopedExternalFunction.ParametersSize);
+            nint scope = scopedExternalFunction.Scope;
+
+            if (scopedExternalFunction.MSILPointerMarshal)
+            {
+                // TODO: Unity burst compatibility
+                if (scope != 0) throw new RuntimeException($"Invalid MSIL marshal function (the scope must be null)");
+                scope = (nint)Unsafe.AsPointer(ref Memory[0]);
+            }
 
             if (scopedExternalFunction.ReturnValueSize > 0)
             {
@@ -603,7 +613,7 @@ public ref partial struct ProcessorState
                 fixed (byte* _parametersPtr = _parameters)
                 fixed (byte* returnValuePtr = returnValue)
                 {
-                    scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, (nint)returnValuePtr);
+                    scopedExternalFunction.Callback(scope, (nint)_parametersPtr, (nint)returnValuePtr);
                 }
                 Push(returnValue);
             }
@@ -611,7 +621,7 @@ public ref partial struct ProcessorState
             {
                 fixed (byte* _parametersPtr = _parameters)
                 {
-                    scopedExternalFunction.Callback(scopedExternalFunction.Scope, (nint)_parametersPtr, default);
+                    scopedExternalFunction.Callback(scope, (nint)_parametersPtr, default);
                 }
             }
 

@@ -204,7 +204,7 @@ public readonly struct CompiledDebugInformation
         for (int i = 0; i < sourceCodeLocations.Length; i++)
         {
             SourceCodeLocation _sourceLocation = sourceCodeLocations[i];
-            if (_sourceLocation.Instructions.End + 1 == instruction)
+            if (_sourceLocation.Contains(instruction - 1))
             {
                 sourceLocation = new SourceCodeLocation()
                 {

@@ -113,6 +113,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         else if (type == typeof(float)) { il.Emit(OpCodes.Ldind_R4); return true; }
         else if (type == typeof(double)) { il.Emit(OpCodes.Ldind_R8); return true; }
         else if (type == typeof(nint)) { il.Emit(OpCodes.Ldind_I); return true; }
+        else if (type == typeof(nuint)) { il.Emit(OpCodes.Ldind_I); return true; }
         else if (!type.IsPrimitive && type.IsValueType && !type.IsEnum) { il.Emit(OpCodes.Ldobj, type); return true; }
         else
         {
@@ -137,6 +138,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
         else if (type == typeof(double)) { il.Emit(OpCodes.Stind_R8); return true; }
         else if (type == typeof(void)) { return true; }
         else if (!type.IsPrimitive && type.IsValueType && !type.IsEnum) { il.Emit(OpCodes.Stobj, type); return true; }
+        else if (type == typeof(nint)) { il.Emit(OpCodes.Stind_I); return true; }
+        else if (type == typeof(nuint)) { il.Emit(OpCodes.Stind_I); return true; }
         else
         {
             Debugger.Break();

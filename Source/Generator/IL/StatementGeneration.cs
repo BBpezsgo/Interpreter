@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using LanguageCore.Compiler;
 using LanguageCore.IL.Reflection;
+using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.IL.Generator;
@@ -17,7 +18,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     readonly ModuleBuilder Module;
 
     readonly bool GenerateText = true;
-    readonly List<string>? Builders;
+    public readonly List<string>? Builders;
 
     void GenerateDeallocator(CompiledCleanup cleanup, ILProxy il, ref bool successful)
     {
@@ -531,7 +532,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (!EmitFunction(statement.Function, out DynamicMethod? function))
         {
-            Diagnostics.Add(Diagnostic.Internal($"Failed to emit function \"{statement.Function}\"", statement));
+            Diagnostics.Add(Diagnostic.InternalNoBreak($"Failed to emit function \"{statement.Function}\"", statement));
             successful = false;
             return;
         }
@@ -569,7 +570,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 successful = false;
                 return;
             }
-
+            case ExternalFunctionStub:
+                Diagnostics.Add(Diagnostic.CriticalNoBreak($"Can't call an external function stub", statement));
+                successful = false;
+                return;
             default:
                 Diagnostics.Add(Diagnostic.CriticalNoBreak($"{statement.Function.GetType()} external functions not supported", statement));
                 successful = false;
@@ -677,10 +681,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case CompiledFieldGetter:
                 break;
             default:
-                Debugger.Break();
                 Diagnostics.Add(Diagnostic.CriticalNoBreak($"Unsafe!!!", statement));
                 successful = false;
-                return;
+                break;
         }
 
         EmitStatement(statement.AddressValue, il, ref successful);
@@ -716,7 +719,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 break;
             default:
                 Debugger.Break();
-                Diagnostics.Add(Diagnostic.CriticalNoBreak($"Unsafe!!!", statement));
+                Diagnostics.Add(Diagnostic.Critical($"Unsafe!!!", statement));
                 successful = false;
                 return;
         }
@@ -916,9 +919,43 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     successful = false;
                 }
                 break;
+            case CompiledIndexGetter v:
+                if (v.Base.Type.Is(out PointerType? basePointerType) &&
+                    basePointerType.To.Is(out ArrayType? baseArrayType))
+                {
+                    if (baseArrayType.Of.SameAs(BuiltinType.Char))
+                    {
+                        Diagnostics.Add(Diagnostic.Internal($"Nah", statement));
+                        successful = false;
+                        break;
+                    }
+
+                    if (!ToType(baseArrayType.Of, out Type? elementType, out PossibleDiagnostic? typeError))
+                    {
+                        Diagnostics.Add(typeError.ToError(v.Base));
+                        successful = false;
+                        break;
+                    }
+
+                    EmitStatement(v.Base, il, ref successful);
+                    EmitStatement(v.Index, il, ref successful);
+                    il.Emit(OpCodes.Ldelema, elementType);
+
+                    break;
+                }
+
+                if (v.Base.Type.Is<ArrayType>())
+                {
+                    EmitInlineArrayElementRef(v.Base, v.Index, il, ref successful);
+                    break;
+                }
+
+                Diagnostics.Add(Diagnostic.Critical($"This should be an array", v.Base));
+                successful = false;
+                break;
             default:
                 Debugger.Break();
-                Diagnostics.Add(Diagnostic.CriticalNoBreak($"Can't get the address of \"{statement.Of}\" ({statement.Of.GetType().Name})", statement.Of));
+                Diagnostics.Add(Diagnostic.Critical($"Can't get the address of \"{statement.Of}\" ({statement.Of.GetType().Name})", statement.Of));
                 successful = false;
                 break;
         }
@@ -1129,6 +1166,68 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
+        if (statement.Value.Type.Is(out PointerType? fromTypeP) &&
+            statement.Type.Is(out PointerType? toTypeP))
+        {
+            if (ToType(fromTypeP, out Type? fromTypePT, out _) &&
+                ToType(toTypeP, out Type? toTypePT, out _) &&
+                IsUnmanaged(fromTypePT) &&
+                IsUnmanaged(toTypePT))
+            {
+                EmitStatement(statement.Value, il, ref successful);
+                Diagnostics.Add(Diagnostic.Warning($"Be careful! (casting {statement.Value.Type} to {statement.Type})", statement));
+                return;
+            }
+        }
+
+        if (statement.Value is CompiledEvaluatedValue fromValue &&
+            statement.Type.Is(out toTypeP))
+        {
+            if (CompiledValue.IsZero(fromValue.Value))
+            {
+                il.Emit(OpCodes.Ldnull);
+                return;
+            }
+
+            if (ToType(toTypeP, out Type? toTypePT, out _) &&
+                IsUnmanaged(toTypePT))
+            {
+                EmitStatement(statement.Value, il, ref successful);
+                il.Emit(OpCodes.Ldnull);
+                Diagnostics.Add(Diagnostic.Warning($"Be careful! (casting {statement.Value.Type} to {statement.Type})", statement));
+                return;
+            }
+        }
+
+        if (statement.Value.Type.SameAs(BuiltinType.I32) &&
+            statement.Type.Is(out toTypeP))
+        {
+            if (ToType(toTypeP, out Type? toTypePT, out _) &&
+                IsUnmanaged(toTypePT))
+            {
+                EmitStatement(statement.Value, il, ref successful);
+                il.Emit(OpCodes.Conv_I);
+                Diagnostics.Add(Diagnostic.Warning($"Be careful! (casting {statement.Value.Type} to {statement.Type})", statement));
+                return;
+            }
+        }
+
+        if (statement.Value.Type.SameAs(statement.Type))
+        {
+            EmitStatement(statement.Value, il, ref successful);
+            return;
+        }
+
+        if (statement.Value.Type.Is(out BuiltinType? fromTypeB) &&
+            statement.Type.Is(out BuiltinType? toTypeB) &&
+            fromTypeB.GetBitWidth(this, out BitWidth fromTypeBW, out _) &&
+            toTypeB.GetBitWidth(this, out BitWidth toTypeBW, out _) &&
+            fromTypeBW == toTypeBW)
+        {
+            EmitStatement(statement.Value, il, ref successful);
+            return;
+        }
+
         EmitStatement(statement.Value, il, ref successful);
         Diagnostics.Add(Diagnostic.Internal($"Fake type casts are unsafe (tried to cast {statement.Value.Type} to {statement.Type})", statement));
         successful = false;
@@ -1268,7 +1367,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             {
                 il.Emit(OpCodes.Dup);
                 Debugger.Break();
-                Diagnostics.Add(Diagnostic.InternalNoBreak($"Not supported :(", statement));
+                Diagnostics.Add(Diagnostic.Internal($"Not supported :(", statement));
                 successful = false;
                 return;
             }
@@ -1354,7 +1453,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
             }
 
-            if (!ToType(baseArrayType.Of, out Type? elementType, out PossibleDiagnostic? typeError))
+            if (!ToType(baseArrayType.Of, out _, out PossibleDiagnostic? typeError))
             {
                 Diagnostics.Add(typeError.ToError(statement.Base));
                 successful = false;
@@ -1362,8 +1461,28 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
 
             EmitStatement(statement.Base, il, ref successful);
+            il.Emit(OpCodes.Conv_U);
+
             EmitStatement(statement.Index, il, ref successful);
-            il.Emit(OpCodes.Ldelem, elementType);
+            il.Emit(OpCodes.Conv_I);
+
+            if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
+            {
+                Diagnostics.Add(typeError.ToError(statement.Base));
+                successful = false;
+                return;
+            }
+            EmitValue(elementSize, il);
+
+            il.Emit(OpCodes.Mul);
+            il.Emit(OpCodes.Add);
+
+            if (!LoadIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
+            {
+                Diagnostics.Add(loadIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
 
             // Diagnostics.Add(Diagnostic.Internal($"I will have to revisit this ...", statement));
             return;
@@ -1371,8 +1490,15 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (statement.Base.Type.Is(out baseArrayType))
         {
-            Diagnostics.Add(Diagnostic.Internal($"Inline arrays are not supported", statement.Base));
-            successful = false;
+            EmitInlineArrayElementRef(statement.Base, statement.Index, il, ref successful);
+
+            if (!LoadIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
+            {
+                Diagnostics.Add(loadIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
+
             return;
         }
 
@@ -1398,8 +1524,24 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
+        if (statement.Base.Type.Is(out baseArrayType))
+        {
+            EmitInlineArrayElementRef(statement.Base, statement.Index, il, ref successful);
+
+            EmitStatement(statement.Value, il, ref successful);
+
+            if (!StoreIndirect(baseArrayType.Of, il, out PossibleDiagnostic? storeIndirectError))
+            {
+                Diagnostics.Add(storeIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
+
+            return;
+        }
+
         Debugger.Break();
-        Diagnostics.Add(Diagnostic.CriticalNoBreak($"Unimplemented index setter {statement.Base.Type}[{statement.Index.Type}]", statement));
+        Diagnostics.Add(Diagnostic.Critical($"Unimplemented index setter {statement.Base.Type}[{statement.Index.Type}]", statement));
         successful = false;
     }
     void EmitStatement(FunctionAddressGetter statement, ILProxy il, ref bool successful)
@@ -1476,6 +1618,45 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
+    void EmitInlineArrayElementRef(CompiledStatementWithValue @base, CompiledStatementWithValue index, ILProxy il, ref bool successful)
+    {
+        if (!@base.Type.Is(out ArrayType? baseArrayType))
+        {
+            successful = false;
+            return;
+        }
+
+        if (!ToType(baseArrayType, out _, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(@base));
+            successful = false;
+            return;
+        }
+
+        EmitStatement(new CompiledAddressGetter()
+        {
+            Of = @base,
+            Location = @base.Location,
+            SaveValue = true,
+            Type = new PointerType(@base.Type),
+        }, il, ref successful);
+        il.Emit(OpCodes.Conv_U);
+
+        EmitStatement(index, il, ref successful);
+        il.Emit(OpCodes.Conv_I);
+
+        if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
+        {
+            Diagnostics.Add(typeError.ToError(@base));
+            successful = false;
+            return;
+        }
+        EmitValue(elementSize, il);
+
+        il.Emit(OpCodes.Mul);
+        il.Emit(OpCodes.Add);
+    }
+
     bool ToType(ImmutableArray<GeneralType> types, [NotNullWhen(true)] out Type[]? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         result = new Type[types.Length];
@@ -1498,7 +1679,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
         FunctionType v => ToType(v, out result, out error),
         _ => throw new UnreachableException(),
     };
-    bool ToType(PointerType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+
+    static bool ToType(PointerType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
 
@@ -1512,8 +1694,44 @@ public partial class CodeGeneratorForIL : CodeGenerator
         result = typeof(nint);
         return true;
     }
+    static bool ToType(BuiltinType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = null;
+        result = type.Type switch
+        {
+            BasicType.Void => typeof(void),
+            BasicType.U8 => typeof(byte),
+            BasicType.I8 => typeof(sbyte),
+            BasicType.U16 => typeof(ushort),
+            BasicType.I16 => typeof(short),
+            BasicType.U32 => typeof(uint),
+            BasicType.I32 => typeof(int),
+            BasicType.F32 => typeof(float),
+            BasicType.U64 => typeof(ulong),
+            BasicType.I64 => typeof(long),
+            BasicType.Any => throw new NotImplementedException(),
+            _ => throw new UnreachableException(),
+        };
+        return true;
+    }
+    static bool ToType(FunctionType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = null;
+        result = typeof(nint);
+        return true;
+    }
 
-    readonly List<(StructType Type, Type Value)> GeneratedTypes = new();
+    static bool IsUnmanaged(Type t)
+    {
+        if (t.IsPrimitive || t.IsPointer || t.IsEnum) return true;
+        if (t.IsGenericType || !t.IsValueType) return false;
+        return t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .All(x => IsUnmanaged(x.FieldType));
+    }
+
+    readonly List<(StructType Type, Type Value)> GeneratedStructTypes = new();
+    readonly List<(ArrayType Type, Type Value)> GeneratedInlineArrayTypes = new();
+
     string GenerateTypeId(GeneralType type)
     {
         StringBuilder res = new();
@@ -1577,7 +1795,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         error = null;
 
-        result = GeneratedTypes.FirstOrDefault(v => v.Type.Equals(type) && Utils.SequenceEquals(v.Type.TypeArguments, type.TypeArguments, (a, b) => a.Equals(b))).Value;
+        result = GeneratedStructTypes.FirstOrDefault(v => v.Type.Equals(type) && Utils.SequenceEquals(v.Type.TypeArguments, type.TypeArguments, (a, b) => a.Equals(b))).Value;
         if (result is not null) return true;
 
         if (!type.AllGenericsDefined())
@@ -1633,39 +1851,73 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         result = builder.CreateType();
-        GeneratedTypes.Add((type, result));
-        return true;
-    }
-    bool ToType(BuiltinType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        error = null;
-        result = type.Type switch
-        {
-            BasicType.Void => typeof(void),
-            BasicType.U8 => typeof(byte),
-            BasicType.I8 => typeof(sbyte),
-            BasicType.U16 => typeof(ushort),
-            BasicType.I16 => typeof(short),
-            BasicType.U32 => typeof(uint),
-            BasicType.I32 => typeof(int),
-            BasicType.F32 => typeof(float),
-            BasicType.U64 => typeof(ulong),
-            BasicType.I64 => typeof(long),
-            BasicType.Any => throw new NotImplementedException(),
-            _ => throw new UnreachableException(),
-        };
+        GeneratedStructTypes.Add((type, result));
         return true;
     }
     bool ToType(ArrayType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        error = new PossibleDiagnostic($"Inline arrays not supported", false);
-        result = null;
-        return false;
-    }
-    bool ToType(FunctionType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
+        if (type.Length is not CompiledEvaluatedValue _length)
+        {
+            error = new PossibleDiagnostic($"The array's length must be a constant", false);
+            result = null;
+            return false;
+        }
+
+        if (_length.Value.Type == RuntimeType.F32 || _length.Value <= 0)
+        {
+            error = new PossibleDiagnostic($"Invalid array length");
+            result = null;
+            return false;
+        }
+
         error = null;
-        result = typeof(nint);
+
+        result = GeneratedInlineArrayTypes.FirstOrDefault(v => v.Type.Equals(type)).Value;
+        if (result is not null) return true;
+
+        string id = GenerateTypeId(type);
+
+        if (!FindSize(type.Of, out int elementSize, out error))
+        {
+            return false;
+        }
+
+        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), elementSize * (int)_length.Value);
+
+        StringBuilder? stringBuilder = GenerateText ? new() : null;
+
+        if (stringBuilder is not null)
+        {
+            stringBuilder.AppendLine($"struct {id}");
+            stringBuilder.AppendLine($"{{");
+        }
+
+        ConstructorBuilder constructor = builder.DefineConstructor(
+            MethodAttributes.Public |
+            MethodAttributes.SpecialName |
+            MethodAttributes.RTSpecialName,
+            CallingConventions.Standard,
+            Array.Empty<Type>());
+        ConstructorInfo conObj = typeof(object).GetConstructor(Array.Empty<Type>())!;
+
+        ILProxy il = new(constructor.GetILGenerator(), GenerateText);
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, conObj);
+        il.Emit(OpCodes.Ret);
+
+        if (stringBuilder is not null)
+        {
+            stringBuilder.AppendLine($"  public {id}()");
+            stringBuilder.AppendLine($"  {{");
+            stringBuilder.AppendIndented("    ", il.ToString());
+            stringBuilder.AppendLine($"  }}");
+            stringBuilder.AppendLine($"}}");
+
+            Builders?.Add(stringBuilder.ToString());
+        }
+
+        result = builder.CreateType();
+        GeneratedInlineArrayTypes.Add((type, result));
         return true;
     }
 
@@ -1836,13 +2088,27 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         marshaled = null;
 
-        if (function.Function.ParameterTypes.Append(function.Function.Type).Any(ScanForPointer))
+        if (function.Function is IHaveAttributes attributes &&
+            attributes.Attributes.Any(v => v.Identifier.Content == "MSILIncompatible"))
         {
             return false;
         }
 
         if (!EmitFunction(function.Function, out DynamicMethod? builder)) return false;
         if (!WrapWithMarshaling(builder, out DynamicMethod? marshaledBuilder)) return false;
+        for (int i = 0; i < function.Function.Parameters.Count; i++)
+        {
+            if (ScanForPointer(function.Function.ParameterTypes[i]))
+            {
+                Diagnostics.Add(Diagnostic.Warning($"Marshaling pointers is unsafe", ((FunctionThingDefinition)function.Function).Parameters[i].Type));
+                return false;
+            }
+        }
+        if (ScanForPointer(function.Function.Type))
+        {
+            Diagnostics.Add(Diagnostic.Warning($"Marshaling pointers is unsafe", function.Function is FunctionDefinition v ? v.Type.Location : new Location(((FunctionThingDefinition)function.Function).Identifier.Position, function.Function.File)));
+            return false;
+        }
 
         marshaled = (ExternalFunctionScopedSyncCallback)marshaledBuilder.CreateDelegate(typeof(ExternalFunctionScopedSyncCallback));
 
@@ -1860,6 +2126,69 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
 
     readonly Dictionary<object, DynamicMethod> _marshalCache = new();
+
+    static bool IsPointer(Type type) => type.IsPointer || type == typeof(nint) || type == typeof(nuint);
+
+    enum MarshalDirection
+    {
+        VmToMsil,
+        MsilToVm,
+    }
+
+    static Type MarshalType(Type type, MarshalDirection direction)
+    {
+        switch (direction)
+        {
+            case MarshalDirection.VmToMsil:
+                if (IsPointer(type))
+                {
+                    return typeof(nint);
+                }
+
+                return type;
+            case MarshalDirection.MsilToVm:
+                if (IsPointer(type))
+                {
+                    return typeof(int);
+                }
+
+                return type;
+            default:
+                return type;
+        }
+    }
+
+    static void EmitValueMarshal(ILProxy il, Type type, MarshalDirection direction)
+    {
+        if (IsPointer(type))
+        {
+            if (direction == MarshalDirection.VmToMsil)
+            {
+                il.Emit(OpCodes.Conv_I);
+            }
+
+            Label zeroLabel = il.DefineLabel();
+
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Brfalse_S, zeroLabel);
+
+            il.Emit(OpCodes.Ldarg_0);
+            il.Emit(direction switch
+            {
+                MarshalDirection.VmToMsil => OpCodes.Add,
+                MarshalDirection.MsilToVm => OpCodes.Sub,
+                _ => throw new UnreachableException(),
+            });
+
+            il.MarkLabel(zeroLabel);
+
+            if (direction == MarshalDirection.MsilToVm)
+            {
+                il.Emit(OpCodes.Conv_I4);
+            }
+        }
+    }
+
     bool WrapWithMarshaling(DynamicMethod method, [NotNullWhen(true)] out DynamicMethod? marshaled)
     {
         if (_marshalCache.TryGetValue(method, out marshaled)) return true;
@@ -1870,18 +2199,19 @@ public partial class CodeGeneratorForIL : CodeGenerator
             new Type[] { typeof(nint), typeof(nint), typeof(nint) },
             Module);
 
-        (Type type, int size)[] parameters =
+        (Type Type, Type MarshaledType, int Size)[] parameters =
             method.GetParameters()
-            .Select(v => (v.ParameterType, GetManagedSize(v.ParameterType)))
+            .Select(v => (v.ParameterType, MarshalType(v.ParameterType, MarshalDirection.MsilToVm)))
+            .Select(v => (v.ParameterType, v.Item2, GetManagedSize(v.Item2)))
             .ToArray();
-        int parametersSize = parameters.Aggregate(0, (a, b) => a + b.size);
+        int parametersSize = parameters.Aggregate(0, (a, b) => a + b.Size);
 
         ILProxy il = new(marshaled.GetILGenerator(), GenerateText);
         if (method.ReturnType != typeof(void)) il.Emit(OpCodes.Ldarg_2);
 
         for (int i = 0; i < parameters.Length; i++)
         {
-            (Type parameterType, int parameterSize) = parameters[i];
+            (Type parameterType, Type marshaledType, int parameterSize) = parameters[i];
 
             parametersSize -= parameterSize;
 
@@ -1893,19 +2223,27 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 il.Emit(OpCodes.Add);
             }
 
-            if (!LoadIndirect(parameterType, il, out PossibleDiagnostic? error1))
+            if (!LoadIndirect(marshaledType, il, out PossibleDiagnostic? error1))
             {
                 Diagnostics.Add(DiagnosticWithoutContext.Error(error1.Message));
                 return false;
             }
+
+            EmitValueMarshal(il, parameterType, MarshalDirection.VmToMsil);
         }
 
         il.Emit(OpCodes.Call, method);
 
-        if (!StoreIndirect(method.ReturnType, il, out PossibleDiagnostic? error2))
+        if (method.ReturnType != typeof(void))
         {
-            Diagnostics.Add(DiagnosticWithoutContext.Error(error2.Message));
-            return false;
+            EmitValueMarshal(il, method.ReturnType, MarshalDirection.MsilToVm);
+
+            Type marshaledType = MarshalType(method.ReturnType, MarshalDirection.MsilToVm);
+            if (!StoreIndirect(marshaledType, il, out PossibleDiagnostic? error2))
+            {
+                Diagnostics.Add(DiagnosticWithoutContext.Error(error2.Message));
+                return false;
+            }
         }
 
         il.Emit(OpCodes.Ret);
@@ -1913,14 +2251,14 @@ public partial class CodeGeneratorForIL : CodeGenerator
         if (Builders is not null)
         {
             StringBuilder stringBuilder = new();
-            stringBuilder.AppendLine($"{method}");
+            stringBuilder.AppendLine($"{marshaled}");
             stringBuilder.AppendLine($"{{");
             stringBuilder.AppendIndented("  ", il.ToString());
             stringBuilder.AppendLine($"}}");
             Builders.Add(stringBuilder.ToString());
         }
 
-        if (!CheckCode(method))
+        if (!CheckCode(marshaled))
         {
             Diagnostics.Add(DiagnosticWithoutContext.Error("Failed to generate valid MSIL"));
             return false;

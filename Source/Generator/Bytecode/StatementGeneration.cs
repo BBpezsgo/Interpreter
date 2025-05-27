@@ -546,8 +546,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 ILGenerator.Diagnostics.Clear();
                 if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method) &&
-                    !ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error) &&
-                    !ILGenerator.Diagnostics.Has(DiagnosticsLevel.Warning))
+                    !ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
                 {
                     int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
                     int parametersSize = f.Function.ParameterTypes.Aggregate(0, (a, b) => a + b.GetSize(this));
@@ -557,9 +556,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if UNITY_BURST
                     UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code !!!");
                     IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
-                    unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0); }
+                    unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, true); }
 #else
-                    externFunc = new(method, id, parametersSize, returnValueSize, 0);
+                    Debug.WriteLine($"Function {method.Method} compiled into machine code !!!");
+                    externFunc = new(method, id, parametersSize, returnValueSize, 0, true);
 #endif
                     GeneratedUnmanagedFunctions.Add((externFunc, method));
 

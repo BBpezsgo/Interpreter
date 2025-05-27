@@ -24,6 +24,7 @@ if ((!#BRAINFUCK) && (!#IL))
     *(0 as BlockHeader*) = (BlockHeader)HeapSize;
 }
 
+[MSILIncompatible]
 export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
 {
     BlockHeader header = *headerPtr;
@@ -39,16 +40,19 @@ export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
     }
 }
 
+[MSILIncompatible]
 export inline void SetHeaderUsed(BlockHeader* headerPtr, int size)
 {
     *headerPtr = (BlockHeader)size + StatusFlag;
 }
 
+[MSILIncompatible]
 export inline void SetHeaderFree(BlockHeader* headerPtr, int size)
 {
     *headerPtr = (BlockHeader)size;
 }
 
+[MSILIncompatible]
 bool JoinFreeBlocks()
 {
     BlockHeader* headerPointer = 0 as BlockHeader*;
@@ -84,6 +88,7 @@ bool JoinFreeBlocks()
 
 [Expose("alloc")]
 [Builtin("alloc")]
+[MSILIncompatible]
 export any* Alloc(int sizeNeed)
 {
 #if IL
@@ -136,6 +141,7 @@ export any* Alloc(int sizeNeed)
 }
 
 [Builtin("free")]
+[MSILIncompatible]
 export void Dealloc(any* pointer)
 {
     BlockHeader* headerPtr = (pointer as int - HeaderSize) as BlockHeader*;

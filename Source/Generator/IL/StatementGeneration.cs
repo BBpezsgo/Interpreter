@@ -1472,10 +1472,17 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 successful = false;
                 return;
             }
-            EmitValue(elementSize, il);
+            if (elementSize != 1)
+            {
+                EmitValue(elementSize, il);
 
-            il.Emit(OpCodes.Mul);
-            il.Emit(OpCodes.Add);
+                il.Emit(OpCodes.Mul);
+                il.Emit(OpCodes.Add);
+            }
+            else
+            {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+            }
 
             if (!LoadIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
             {
@@ -1510,7 +1517,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         if (statement.Base.Type.Is(out PointerType? basePointerType) &&
             basePointerType.To.Is(out ArrayType? baseArrayType))
         {
-            if (!ToType(baseArrayType.Of, out Type? elementType, out PossibleDiagnostic? typeError))
+            if (!ToType(baseArrayType.Of, out _, out PossibleDiagnostic? typeError))
             {
                 Diagnostics.Add(typeError.ToError(statement.Base));
                 successful = false;
@@ -1518,9 +1525,38 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
 
             EmitStatement(statement.Base, il, ref successful);
+            il.Emit(OpCodes.Conv_U);
+
             EmitStatement(statement.Index, il, ref successful);
+            il.Emit(OpCodes.Conv_I);
+
+            if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
+            {
+                Diagnostics.Add(typeError.ToError(statement.Base));
+                successful = false;
+                return;
+            }
+            if (elementSize != 1)
+            {
+                EmitValue(elementSize, il);
+
+                il.Emit(OpCodes.Mul);
+                il.Emit(OpCodes.Add);
+            }
+            else
+            {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+            }
+
             EmitStatement(statement.Value, il, ref successful);
-            il.Emit(OpCodes.Stelem, elementType);
+
+            if (!StoreIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
+            {
+                Diagnostics.Add(loadIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
+
             return;
         }
 
@@ -1651,10 +1687,17 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
             return;
         }
-        EmitValue(elementSize, il);
+        if (elementSize != 1)
+        {
+            EmitValue(elementSize, il);
 
-        il.Emit(OpCodes.Mul);
-        il.Emit(OpCodes.Add);
+            il.Emit(OpCodes.Mul);
+            il.Emit(OpCodes.Add);
+        }
+        else
+        {
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", @base));
+        }
     }
 
     bool ToType(ImmutableArray<GeneralType> types, [NotNullWhen(true)] out Type[]? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -2072,37 +2115,32 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return true;
     }
 
-    public static bool ScanForPointer(GeneralType type) => type switch
+    public static bool ScanForPointer(GeneralType type, Stack<GeneralType>? stack = null)
     {
-        BuiltinType => false,
-        PointerType => true,
-        AliasType v => ScanForPointer(v.Value),
-        StructType v => v.Struct.Fields.Any(field => ScanForPointer(GeneralType.InsertTypeParameters(field.Type, v.TypeArguments) ?? field.Type)),
-        ArrayType v => ScanForPointer(v.Of),
-        FunctionType => true,
-        GenericType => true,
-        _ => throw new UnreachableException(),
-    };
+        stack ??= new();
+        if (stack.Any(v => v.Equals(type))) return true;
+        using StackAuto<GeneralType> _ = stack.PushAuto(type);
 
-    public static bool ScanForPointer(Type type)
-    {
-        if (IsPointer(type))
+        return type switch
         {
-            return true;
-        }
-        else if (type.IsPrimitive)
-        {
-            return false;
-        }
-        else
-        {
-            throw null!;
-        }
+            BuiltinType => false,
+            PointerType => true,
+            AliasType v => ScanForPointer(v.Value),
+            StructType v => v.Struct.Fields.Any(field => ScanForPointer(GeneralType.InsertTypeParameters(field.Type, v.TypeArguments) ?? field.Type)),
+            ArrayType v => ScanForPointer(v.Of),
+            FunctionType => true,
+            GenericType => true,
+            _ => throw new UnreachableException(),
+        };
     }
 
-    static bool CheckMarshalSafety(GeneralType type, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool CheckMarshalSafety(GeneralType type, [NotNullWhen(false)] out PossibleDiagnostic? error, Stack<GeneralType>? stack = null)
     {
         error = null;
+
+        stack ??= new();
+        if (stack.Any(v => v.Equals(type))) return true;
+        using StackAuto<GeneralType> _ = stack.PushAuto(type);
 
         if (type is GenericType)
         {
@@ -2247,11 +2285,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             {
                 il.Emit(OpCodes.Conv_I4);
             }
-        }
-        else if (ScanForPointer(type))
-        {
-            error = new PossibleDiagnostic($"Can't marshal nested pointers");
-            return false;
         }
 
         if (direction == MarshalDirection.MsilToVm)

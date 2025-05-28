@@ -2084,6 +2084,55 @@ public partial class CodeGeneratorForIL : CodeGenerator
         _ => throw new UnreachableException(),
     };
 
+    public static bool ScanForPointer(Type type)
+    {
+        if (IsPointer(type))
+        {
+            return true;
+        }
+        else if (type.IsPrimitive)
+        {
+            return false;
+        }
+        else
+        {
+            throw null!;
+        }
+    }
+
+    static bool CheckMarshalSafety(GeneralType type, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = null;
+
+        if (type is GenericType)
+        {
+            error = new PossibleDiagnostic($"Can't marshal a generic type (like wtf bro what is this fr)");
+            return false;
+        }
+
+        if (type is FunctionType)
+        {
+            error = new PossibleDiagnostic($"Can't marshal a function pointer fr");
+            return false;
+        }
+
+        if (type switch
+        {
+            BuiltinType => false,
+            PointerType v => ScanForPointer(v.To), // Top-level pointers are okay
+            AliasType v => ScanForPointer(v.Value),
+            StructType v => v.Struct.Fields.Any(field => ScanForPointer(GeneralType.InsertTypeParameters(field.Type, v.TypeArguments) ?? field.Type)),
+            ArrayType v => ScanForPointer(v.Of),
+            _ => throw new UnreachableException(),
+        })
+        {
+            error = new PossibleDiagnostic($"Can't marshal nested pointers");
+            return false;
+        }
+
+        return true;
+    }
+
     public unsafe bool GenerateImplMarshaled(CompiledFunction function, [NotNullWhen(true)] out ExternalFunctionScopedSyncCallback? marshaled)
     {
         marshaled = null;
@@ -2096,17 +2145,18 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (!EmitFunction(function.Function, out DynamicMethod? builder)) return false;
         if (!WrapWithMarshaling(builder, out DynamicMethod? marshaledBuilder)) return false;
+
         for (int i = 0; i < function.Function.Parameters.Count; i++)
         {
-            if (ScanForPointer(function.Function.ParameterTypes[i]))
+            if (!CheckMarshalSafety(function.Function.ParameterTypes[i], out PossibleDiagnostic? safetyError1))
             {
-                Diagnostics.Add(Diagnostic.Warning($"Marshaling pointers is unsafe", ((FunctionThingDefinition)function.Function).Parameters[i].Type));
+                Diagnostics.Add(safetyError1.ToError(((FunctionThingDefinition)function.Function).Parameters[i].Type));
                 return false;
             }
         }
-        if (ScanForPointer(function.Function.Type))
+        if (!CheckMarshalSafety(function.Function.Type, out PossibleDiagnostic? safetyError2))
         {
-            Diagnostics.Add(Diagnostic.Warning($"Marshaling pointers is unsafe", function.Function is FunctionDefinition v ? v.Type.Location : new Location(((FunctionThingDefinition)function.Function).Identifier.Position, function.Function.File)));
+            Diagnostics.Add(safetyError2.ToError(function.Function is FunctionDefinition v ? v.Type.Location : new Location(((FunctionThingDefinition)function.Function).Identifier.Position, function.Function.File)));
             return false;
         }
 
@@ -2158,8 +2208,19 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
-    static void EmitValueMarshal(ILProxy il, Type type, MarshalDirection direction)
+    static bool EmitValueMarshal(ILProxy il, Type type, MarshalDirection direction, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        error = null;
+
+        if (direction == MarshalDirection.VmToMsil)
+        {
+            Type marshaledType = MarshalType(type, MarshalDirection.MsilToVm);
+            if (!LoadIndirect(marshaledType, il, out error))
+            {
+                return false;
+            }
+        }
+
         if (IsPointer(type))
         {
             if (direction == MarshalDirection.VmToMsil)
@@ -2187,6 +2248,22 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 il.Emit(OpCodes.Conv_I4);
             }
         }
+        else if (ScanForPointer(type))
+        {
+            error = new PossibleDiagnostic($"Can't marshal nested pointers");
+            return false;
+        }
+
+        if (direction == MarshalDirection.MsilToVm)
+        {
+            Type marshaledType = MarshalType(type, MarshalDirection.MsilToVm);
+            if (!StoreIndirect(marshaledType, il, out error))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     bool WrapWithMarshaling(DynamicMethod method, [NotNullWhen(true)] out DynamicMethod? marshaled)
@@ -2199,10 +2276,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
             new Type[] { typeof(nint), typeof(nint), typeof(nint) },
             Module);
 
-        (Type Type, Type MarshaledType, int Size)[] parameters =
+        (Type Type, int Size)[] parameters =
             method.GetParameters()
             .Select(v => (v.ParameterType, MarshalType(v.ParameterType, MarshalDirection.MsilToVm)))
-            .Select(v => (v.ParameterType, v.Item2, GetManagedSize(v.Item2)))
+            .Select(v => (v.ParameterType, GetManagedSize(v.Item2)))
             .ToArray();
         int parametersSize = parameters.Aggregate(0, (a, b) => a + b.Size);
 
@@ -2211,7 +2288,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         for (int i = 0; i < parameters.Length; i++)
         {
-            (Type parameterType, Type marshaledType, int parameterSize) = parameters[i];
+            (Type parameterType, int parameterSize) = parameters[i];
 
             parametersSize -= parameterSize;
 
@@ -2223,23 +2300,18 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 il.Emit(OpCodes.Add);
             }
 
-            if (!LoadIndirect(marshaledType, il, out PossibleDiagnostic? error1))
+            if (!EmitValueMarshal(il, parameterType, MarshalDirection.VmToMsil, out PossibleDiagnostic? error1))
             {
                 Diagnostics.Add(DiagnosticWithoutContext.Error(error1.Message));
                 return false;
             }
-
-            EmitValueMarshal(il, parameterType, MarshalDirection.VmToMsil);
         }
 
         il.Emit(OpCodes.Call, method);
 
         if (method.ReturnType != typeof(void))
         {
-            EmitValueMarshal(il, method.ReturnType, MarshalDirection.MsilToVm);
-
-            Type marshaledType = MarshalType(method.ReturnType, MarshalDirection.MsilToVm);
-            if (!StoreIndirect(marshaledType, il, out PossibleDiagnostic? error2))
+            if (!EmitValueMarshal(il, method.ReturnType, MarshalDirection.MsilToVm, out PossibleDiagnostic? error2))
             {
                 Diagnostics.Add(DiagnosticWithoutContext.Error(error2.Message));
                 return false;

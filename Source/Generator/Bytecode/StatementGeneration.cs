@@ -545,9 +545,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (f is not null)
             {
                 ILGenerator.Diagnostics.Clear();
-                if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method) &&
-                    !ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
+                if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method))
                 {
+                    if (ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
+                    {
+                        Debugger.Break();
+                        goto anyway;
+                    }
+
                     int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
                     int parametersSize = f.Function.ParameterTypes.Aggregate(0, (a, b) => a + b.GetSize(this));
                     int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
@@ -576,8 +581,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     Diagnostics.Add(Diagnostic.OptimizationNotice($"Function \"{f.Function}\" compiled into MSIL", caller));
 
+                    Diagnostics.AddRange(ILGenerator.Diagnostics);
+
                     ILGenerator.Diagnostics.Clear();
                     return;
+                anyway:;
                 }
                 ILGenerator.Diagnostics.Clear();
             }

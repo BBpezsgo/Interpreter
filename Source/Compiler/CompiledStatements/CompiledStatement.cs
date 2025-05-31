@@ -46,7 +46,7 @@ public class CompiledBlock : CompiledStatement
         : new CompiledBlock()
         {
             Location = statement.Location,
-            Statements = ImmutableArray.Create<CompiledStatement>(statement),
+            Statements = ImmutableArray.Create(statement),
         };
 
     public override string Stringify(int depth = 0)
@@ -266,7 +266,7 @@ public class CompiledFunctionCall : CompiledStatementWithValue
         CompiledOperatorDefinition v => v.Identifier.Content,
         CompiledGeneralFunctionDefinition v => v.Identifier.Content,
         CompiledConstructorDefinition v => v.Type.ToString(),
-        _ => "???",
+        _ => throw new UnreachableException(),
     }}({string.Join(", ", Arguments.Select(v => v.Stringify(depth + 1)))})";
 
     public override string ToString() => $"{Function switch
@@ -275,7 +275,7 @@ public class CompiledFunctionCall : CompiledStatementWithValue
         CompiledOperatorDefinition v => v.Identifier.Content,
         CompiledGeneralFunctionDefinition v => v.Identifier.Content,
         CompiledConstructorDefinition v => v.Type.ToString(),
-        _ => "???",
+        _ => throw new UnreachableException(),
     }}({string.Join(", ", Arguments.Select(v => v.ToString()))})";
 }
 
@@ -285,23 +285,27 @@ public class CompiledExternalFunctionCall : CompiledStatementWithValue
     public required ICompiledFunctionDefinition Declaration { get; init; }
     public required ImmutableArray<CompiledPassedArgument> Arguments { get; init; }
 
-    public override string Stringify(int depth = 0) => $"{Function switch
+    unsafe string FunctionToString() => Function switch
     {
         CompiledFunctionDefinition v => v.Identifier.Content,
         CompiledOperatorDefinition v => v.Identifier.Content,
         CompiledGeneralFunctionDefinition v => v.Identifier.Content,
         CompiledConstructorDefinition v => v.Type.ToString(),
-        _ => "???",
-    }}({string.Join(", ", Arguments.Select(v => v.Stringify(depth + 1)))})";
+        ExternalFunctionSync v => v.UnmarshaledCallback.Method.Name ?? v.Name ?? v.Id.ToString(),
+        ExternalFunctionAsync v => v.Name ?? v.Id.ToString(),
+        ExternalFunctionManaged v => v.Method.ToString() ?? v.Name ?? v.Id.ToString(),
+#if UNITY_BURST
+        ExternalFunctionScopedSync v => Callback.ToString() ?? v.Id.ToString(),
+#else
+        ExternalFunctionScopedSync v => v.Callback.Method.Name ?? v.Id.ToString(),
+#endif
+        ExternalFunctionStub v => v.Name ?? v.Id.ToString(),
+        _ => throw new NotImplementedException(),
+    };
 
-    public override string ToString() => $"{Function switch
-    {
-        CompiledFunctionDefinition v => v.Identifier.Content,
-        CompiledOperatorDefinition v => v.Identifier.Content,
-        CompiledGeneralFunctionDefinition v => v.Identifier.Content,
-        CompiledConstructorDefinition v => v.Type.ToString(),
-        _ => "???",
-    }}({string.Join(", ", Arguments.Select(v => v.ToString()))})";
+    public override string Stringify(int depth = 0) => $"{FunctionToString()}({string.Join(", ", Arguments.Select(v => v.Stringify(depth + 1)))})";
+
+    public override string ToString() => $"{FunctionToString()}({string.Join(", ", Arguments.Select(v => v.ToString()))})";
 }
 
 public class CompiledSizeof : CompiledStatementWithValue

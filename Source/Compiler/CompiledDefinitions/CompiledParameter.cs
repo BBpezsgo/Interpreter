@@ -8,6 +8,8 @@ public class CompiledParameter : ParameterDefinition,
 {
     public new GeneralType Type { get; }
     public int Index { get; }
+    public HashSet<CompiledParameterGetter> Getters { get; } = new();
+    public HashSet<CompiledParameterSetter> Setters { get; } = new();
 
     public bool IsAnonymous => Index == -1;
 

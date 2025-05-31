@@ -122,7 +122,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(deallocator.InstructionOffset, cleanup.Location);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunctionDefinition>(jumpInstruction, false, cleanup.Location, deallocator)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(jumpInstruction, false, cleanup.Location, deallocator)); }
 
         if (deallocator.ReturnSomething)
         {
@@ -165,7 +165,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(cleanup.Destructor.InstructionOffset, cleanup.Location);
 
         if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedGeneralFunctionOffsets.Add(new UndefinedOffset<CompiledGeneralFunctionDefinition>(jumpInstruction, false, cleanup.Location, cleanup.Destructor)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(jumpInstruction, false, cleanup.Location, cleanup.Destructor)); }
 
         if (deallocateableType.Is<PointerType>())
         {
@@ -341,10 +341,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledInstructionLabelDeclaration instructionLabel)
     {
-        GeneratedInstructionLabels[instructionLabel] = new()
+        foreach (ControlFlowFrame v in ReturnInstructions) v.IsSkipping = false;
+        foreach (ControlFlowFrame v in BreakInstructions) v.IsSkipping = false;
+
+        if (!GeneratedInstructionLabels.TryGetValue(instructionLabel, out GeneratedInstructionLabel? generatedInstructionLabel))
         {
-            InstructionOffset = GeneratedCode.Count,
-        };
+            generatedInstructionLabel = GeneratedInstructionLabels[instructionLabel] = new()
+            {
+                InstructionOffset = GeneratedCode.Count,
+            };
+        }
+        generatedInstructionLabel.InstructionOffset = GeneratedCode.Count;
     }
     void GenerateCodeForStatement(CompiledReturn keywordCall)
     {
@@ -390,7 +397,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
         }
 
-        ReturnInstructions.Last.Add(GeneratedCode.Count);
+        ReturnInstructions.Last.Offsets.Add(GeneratedCode.Count);
+        ReturnInstructions.Last.IsSkipping = true;
         AddInstruction(Opcode.Jump, 0);
 
         AddComment("}");
@@ -431,7 +439,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        BreakInstructions.Last.Add(GeneratedCode.Count);
+        BreakInstructions.Last.Offsets.Add(GeneratedCode.Count);
+        ReturnInstructions.Last.IsSkipping = true;
         AddInstruction(Opcode.Jump, 0);
     }
     void GenerateCodeForStatement(CompiledDelete compiledDelete)
@@ -608,23 +617,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (caller.Function.InstructionOffset == InvalidFunctionAddress)
         {
-            switch (caller.Function)
-            {
-                case CompiledFunctionDefinition v:
-                    UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
-                    break;
-                case CompiledOperatorDefinition v:
-                    UndefinedOperatorFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
-                    break;
-                case CompiledConstructorDefinition v:
-                    UndefinedConstructorOffsets.Add(new(jumpInstruction, false, caller, v));
-                    break;
-                case CompiledGeneralFunctionDefinition v:
-                    UndefinedGeneralFunctionOffsets.Add(new(jumpInstruction, false, caller, v));
-                    break;
-                default:
-                    throw new NotImplementedException();
-            }
+            UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, caller.Function));
         }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
@@ -1026,7 +1019,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledFunctionDefinition? compiledFunction = variable.Function;
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset<CompiledFunctionDefinition>(GeneratedCode.Count, true, variable, compiledFunction)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(GeneratedCode.Count, true, variable, compiledFunction)); }
 
         Push(compiledFunction.InstructionOffset);
     }
@@ -1038,7 +1031,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 InstructionOffset = InvalidFunctionAddress,
             };
-            UndefinedInstructionLabels.Add(new UndefinedOffset<GeneratedInstructionLabel>(GeneratedCode.Count, true, variable, instructionLabel));
+            UndefinedInstructionLabels.Add(new UndefinedOffset(GeneratedCode.Count, true, variable, instructionLabel));
         }
 
         Push(instructionLabel.InstructionOffset);
@@ -1083,14 +1076,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         List<int> conditionFalseAddresses = new();
         GenerateCodeForCondition(whileLoop.Condition, conditionFalseAddresses);
 
-        BreakInstructions.Push(new List<int>());
+        BreakInstructions.Push(new ControlFlowFrame());
 
         GenerateCodeForStatement(block, true);
 
         AddComment("Jump Back");
         AddInstruction(Opcode.Jump, conditionOffset - GeneratedCode.Count);
 
-        FinishJumpInstructions(BreakInstructions.Last);
+        ReturnInstructions.Last.IsSkipping = false;
+
+        FinishJumpInstructions(BreakInstructions.Last.Offsets);
 
         foreach (int v in conditionFalseAddresses)
         { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
@@ -1116,7 +1111,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         List<int> conditionFalseAddresses = new();
         GenerateCodeForCondition(forLoop.Condition, conditionFalseAddresses);
 
-        BreakInstructions.Push(new List<int>());
+        BreakInstructions.Push(new ControlFlowFrame());
 
         GenerateCodeForStatement(forLoop.Body);
 
@@ -1126,10 +1121,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Jump back");
         AddInstruction(Opcode.Jump, conditionOffsetFor - GeneratedCode.Count);
 
+        ReturnInstructions.Last.IsSkipping = false;
+
         foreach (int v in conditionFalseAddresses)
         { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
 
-        FinishJumpInstructions(BreakInstructions.Pop());
+        FinishJumpInstructions(BreakInstructions.Pop().Offsets);
 
         OnScopeExit(forLoop.Location.Position.After(), forLoop.Location.File, scope);
 
@@ -1180,6 +1177,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 break;
             }
         }
+
+        ReturnInstructions.Last.IsSkipping = false;
 
         foreach (int item in jumpOutInstructions)
         {
@@ -1244,7 +1243,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = Call(compiledFunction.InstructionOffset, constructorCall);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedConstructorOffsets.Add(new UndefinedOffset<CompiledConstructorDefinition>(jumpInstruction, false, constructorCall, compiledFunction)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(jumpInstruction, false, constructorCall, compiledFunction)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1523,24 +1522,23 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledBlock block, bool ignoreScope = false)
     {
-        if (ignoreScope)
-        {
-            AddComment("Statements {");
-            for (int i = 0; i < block.Statements.Length; i++)
-            { GenerateCodeForStatement(block.Statements[i]); }
-            AddComment("}");
-
-            return;
-        }
-
-        CompiledScope scope = OnScopeEnter(block, false);
+        CompiledScope scope = ignoreScope ? default : OnScopeEnter(block, false);
 
         AddComment("Statements {");
-        for (int i = 0; i < block.Statements.Length; i++)
-        { GenerateCodeForStatement(block.Statements[i]); }
+        foreach (CompiledStatement v in block.Statements)
+        {
+            if (((ReturnInstructions.Count > 0 && ReturnInstructions.Last.IsSkipping) ||
+                (BreakInstructions.Count > 0 && BreakInstructions.Last.IsSkipping)) &&
+                !StatementCompiler.Visit(v).Any(v => v is CompiledInstructionLabelDeclaration))
+            {
+                continue;
+            }
+
+            GenerateCodeForStatement(v);
+        }
         AddComment("}");
 
-        OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
+        if (!ignoreScope) OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
     }
     void GenerateCodeForStatement(CompiledStatement statement, GeneralType? expectedType = null, bool resolveReference = true)
     {
@@ -2124,9 +2122,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    bool GenerateCodeForFunction(ICompiledFunctionDefinition function, CompiledBlock body)
+    void GenerateCodeForFunction(ICompiledFunctionDefinition function, CompiledBlock body)
     {
+        if (!GeneratedFunctions.Add(function)) return;
+
         function.InstructionOffset = GeneratedCode.Count;
+        for (int i = UndefinedFunctionOffsets.Count - 1; i >= 0; i--)
+        {
+            UndefinedOffset item = UndefinedFunctionOffsets[i];
+            if (item.Called != function) continue;
+            item.Apply(GeneratedCode);
+            UndefinedFunctionOffsets.RemoveAt(i);
+        }
 
         CurrentContext = function as IDefinition;
         InFunction = true;
@@ -2149,7 +2156,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (body is null)
         {
             Diagnostics.Add(Diagnostic.Critical($"Function \"{((FunctionThingDefinition)function).ToReadable()}\" does not have a body", (FunctionThingDefinition)function));
-            return default;
+            return;
         }
 
         CompiledScope scope = OnScopeEnter(body, true);
@@ -2213,7 +2220,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CurrentScopeDebug.Last.Stack.Add(debugInfo);
         }
 
-        ReturnInstructions.Push(new List<int>());
+        ReturnInstructions.Push(new ControlFlowFrame());
 
         AddComment("Statements {");
         GenerateCodeForStatement(body, true);
@@ -2223,7 +2230,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnScopeExit(body.Location.Position.After(), body.Location.File, scope);
 
-        FinishJumpInstructions(ReturnInstructions.Last);
+        FinishJumpInstructions(ReturnInstructions.Last.Offsets);
         ReturnInstructions.Pop();
 
         AddComment("Return");
@@ -2253,7 +2260,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentContext = null;
         InFunction = false;
-        return true;
     }
 
     void GenerateCodeForTopLevelStatements(ImmutableArray<CompiledStatement> statements)
@@ -2289,7 +2295,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
 
         CurrentContext = null;
-        ReturnInstructions.Push(new List<int>());
+        ReturnInstructions.Push(new ControlFlowFrame());
 
         CurrentReturnType = ExitCodeType;
 
@@ -2298,8 +2304,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { GenerateCodeForStatement(statement); }
         AddComment("}");
 
-        FinishJumpInstructions(ReturnInstructions.Last);
-        ReturnInstructions.Pop();
+        FinishJumpInstructions(ReturnInstructions.Pop().Offsets);
 
         CurrentReturnType = null;
 
@@ -2432,13 +2437,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in compilerResult.Functions)
         {
-            GenerateCodeForFunction(function, body);
+            if (function is IExposeable exposeable && exposeable.ExposedFunctionName is not null)
+            { GenerateCodeForFunction(function, body); }
         }
 
-        SetUndefinedFunctionOffsets(UndefinedFunctionOffsets, true);
-        SetUndefinedFunctionOffsets(UndefinedConstructorOffsets, true);
-        SetUndefinedFunctionOffsets(UndefinedOperatorFunctionOffsets, true);
-        SetUndefinedFunctionOffsets(UndefinedGeneralFunctionOffsets, true);
+        while (UndefinedFunctionOffsets.Count > 0)
+        {
+            foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in compilerResult.Functions)
+            {
+                if (UndefinedFunctionOffsets.Any(v => v.Called == function))
+                { GenerateCodeForFunction(function, body); }
+            }
+        }
+
         SetUndefinedFunctionOffsets(UndefinedInstructionLabels, true);
 
         // {

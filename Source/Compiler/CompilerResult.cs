@@ -51,6 +51,7 @@ public readonly struct CompilerResult
             res.Append(')');
             res.Append(body.Stringify(0));
             res.AppendLine();
+            res.AppendLine();
         }
 
         res.AppendLine("// Top level statements");

@@ -4627,7 +4627,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #endregion
 
-    ImmutableArray<CompiledStatement> ReduceStatements<TStatement>(ImmutableArray<TStatement> statements, bool forceDiscardValue = false)
+    static ImmutableArray<CompiledStatement> ReduceStatements<TStatement>(ImmutableArray<TStatement> statements, bool forceDiscardValue = false)
         where TStatement : CompiledStatement
     {
         ImmutableArray<CompiledStatement>.Builder result = ImmutableArray.CreateBuilder<CompiledStatement>();
@@ -4640,8 +4640,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return result.ToImmutable();
     }
 
-    ImmutableArray<CompiledStatement> ReduceStatements(CompiledStatement statement, bool forceDiscardValue = false)
+    static ImmutableArray<CompiledStatement> ReduceStatements(CompiledStatement statement, bool forceDiscardValue = false)
     {
+        if (statement is CompiledBlock compiledBlock)
+        {
+            if (!compiledBlock.Statements.Any(v => v is CompiledVariableDeclaration or CompiledInstructionLabelDeclaration))
+            {
+                return ReduceStatements(compiledBlock.Statements);
+            }
+        }
+
         if (statement is not CompiledStatementWithValue statementWithValue)
         {
             return ImmutableArray.Create(statement);
@@ -4652,53 +4660,35 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return ImmutableArray.Create(statement);
         }
 
-        switch (statementWithValue)
+        return statementWithValue switch
         {
-            case CompiledSizeof:
-                Diagnostics.Add(Diagnostic.Warning($"oh no", statement));
-                return ImmutableArray<CompiledStatement>.Empty;
-            case CompiledPassedArgument v:
-                return ReduceStatements(v.Value, true);
-            case CompiledBinaryOperatorCall v:
-                return
-                    ReduceStatements(v.Left, true)
-                    .AddRange(ReduceStatements(v.Right, true));
-            case CompiledUnaryOperatorCall v:
-                return ReduceStatements(v.Left, true);
-            case CompiledIndexGetter v:
-                return
-                    ReduceStatements(v.Base, true)
-                    .AddRange(ReduceStatements(v.Index, true));
-            case CompiledAddressGetter v:
-                return ReduceStatements(v.Of, true);
-            case CompiledPointer v:
-                return ReduceStatements(v.To, true);
-            case CompiledConstructorCall v:
-                return ReduceStatements(v.Arguments, true);
-            case CompiledTypeCast v:
-                return ReduceStatements(v.Value, true);
-            case CompiledFakeTypeCast v:
-                return ReduceStatements(v.Value, true);
-            case CompiledStatementWithValueThatActuallyDoesntHaveValue v:
-                return ReduceStatements(v.Statement);
+            CompiledPassedArgument v => ReduceStatements(v.Value, true),
+            CompiledBinaryOperatorCall v => ReduceStatements(v.Left, true).AddRange(ReduceStatements(v.Right, true)),
+            CompiledUnaryOperatorCall v => ReduceStatements(v.Left, true),
+            CompiledIndexGetter v => ReduceStatements(v.Base, true).AddRange(ReduceStatements(v.Index, true)),
+            CompiledAddressGetter v => ReduceStatements(v.Of, true),
+            CompiledPointer v => ReduceStatements(v.To, true),
+            CompiledConstructorCall v => ReduceStatements(v.Arguments, true),
+            CompiledTypeCast v => ReduceStatements(v.Value, true),
+            CompiledFakeTypeCast v => ReduceStatements(v.Value, true),
+            CompiledStatementWithValueThatActuallyDoesntHaveValue v => ReduceStatements(v.Statement),
 
-            case CompiledRuntimeCall:
-            case CompiledFunctionCall:
-            case CompiledExternalFunctionCall:
-                return ImmutableArray.Create(statement);
+            CompiledRuntimeCall or
+            CompiledFunctionCall or
+            CompiledExternalFunctionCall => ImmutableArray.Create(statement),
 
-            case CompiledEvaluatedValue:
-            case RegisterGetter:
-            case CompiledVariableGetter:
-            case CompiledParameterGetter:
-            case FunctionAddressGetter:
-            case InstructionLabelAddressGetter:
-            case CompiledFieldGetter:
-            case CompiledStackAllocation:
-            case CompiledStringInstance:
-            case CompiledStackStringInstance:
-                return ImmutableArray<CompiledStatement>.Empty;
-            default: throw new NotImplementedException();
-        }
+            CompiledSizeof or
+            CompiledEvaluatedValue or
+            RegisterGetter or
+            CompiledVariableGetter or
+            CompiledParameterGetter or
+            FunctionAddressGetter or
+            InstructionLabelAddressGetter or
+            CompiledFieldGetter or
+            CompiledStackAllocation or
+            CompiledStringInstance or
+            CompiledStackStringInstance => ImmutableArray<CompiledStatement>.Empty,
+            _ => throw new NotImplementedException(),
+        };
     }
 }

@@ -131,6 +131,12 @@ class GeneratedVariable
     public bool IsInitialized { get; set; }
 }
 
+class ControlFlowFrame
+{
+    public List<int> Offsets { get; } = new();
+    public bool IsSkipping { get; set; }
+}
+
 public partial class CodeGeneratorForMain : CodeGenerator
 {
     public static readonly CompilerSettings DefaultCompilerSettings = new()
@@ -156,20 +162,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly List<(ExternalFunctionScopedSync Function, ExternalFunctionScopedSyncCallback Reference)> GeneratedUnmanagedFunctions = new();
     readonly Dictionary<CompiledInstructionLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
     readonly Dictionary<CompiledVariableDeclaration, GeneratedVariable> GeneratedVariables = new();
+    readonly HashSet<ICompiledFunctionDefinition> GeneratedFunctions = new();
 
     readonly Stack<CompiledScope> CleanupStack2;
     IDefinition? CurrentContext;
 
-    readonly Stack<List<int>> ReturnInstructions;
-    readonly Stack<List<int>> BreakInstructions;
+    readonly Stack<ControlFlowFrame> ReturnInstructions;
+    readonly Stack<ControlFlowFrame> BreakInstructions;
 
     readonly List<PreparationInstruction> GeneratedCode;
 
-    readonly List<UndefinedOffset<CompiledFunctionDefinition>> UndefinedFunctionOffsets;
-    readonly List<UndefinedOffset<CompiledOperatorDefinition>> UndefinedOperatorFunctionOffsets;
-    readonly List<UndefinedOffset<CompiledGeneralFunctionDefinition>> UndefinedGeneralFunctionOffsets;
-    readonly List<UndefinedOffset<CompiledConstructorDefinition>> UndefinedConstructorOffsets;
-    readonly List<UndefinedOffset<GeneratedInstructionLabel>> UndefinedInstructionLabels;
+    readonly List<UndefinedOffset> UndefinedFunctionOffsets;
+    readonly List<UndefinedOffset> UndefinedInstructionLabels;
 
     readonly RegisterUsage Registers;
 
@@ -224,9 +228,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions = new();
         BreakInstructions = new();
         UndefinedFunctionOffsets = new();
-        UndefinedOperatorFunctionOffsets = new();
-        UndefinedGeneralFunctionOffsets = new();
-        UndefinedConstructorOffsets = new();
         UndefinedInstructionLabels = new();
         Settings = settings;
         Registers = new();
@@ -241,10 +242,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         };
     }
 
-    void SetUndefinedFunctionOffsets<TFunction>(IEnumerable<UndefinedOffset<TFunction>> undefinedOffsets, bool addDiagnostics)
-        where TFunction : IHaveInstructionOffset
+    void SetUndefinedFunctionOffsets(IEnumerable<UndefinedOffset> undefinedOffsets, bool addDiagnostics)
     {
-        foreach (UndefinedOffset<TFunction> item in undefinedOffsets)
+        foreach (UndefinedOffset item in undefinedOffsets)
         {
             if (item.Called.InstructionOffset == InvalidFunctionAddress)
             {
@@ -270,8 +270,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 continue;
             }
 
-            int offset = item.IsAbsoluteAddress ? item.Called.InstructionOffset : item.Called.InstructionOffset - item.InstructionIndex;
-            GeneratedCode[item.InstructionIndex].Operand1 = offset;
+            item.Apply(GeneratedCode);
         }
     }
 

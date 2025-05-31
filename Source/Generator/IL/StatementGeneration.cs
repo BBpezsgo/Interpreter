@@ -15,6 +15,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     readonly Stack<Label> LoopLabels = new();
     readonly Dictionary<ICompiledFunctionDefinition, DynamicMethod> FunctionBuilders = new();
     readonly HashSet<ICompiledFunctionDefinition> EmittedFunctions = new();
+    readonly Dictionary<CompiledInstructionLabelDeclaration, Label> EmittedLabels = new();
     readonly ModuleBuilder Module;
 
     readonly bool GenerateText = true;
@@ -1611,6 +1612,30 @@ public partial class CodeGeneratorForIL : CodeGenerator
             il.Emit(OpCodes.Pop);
         }
     }
+    void EmitStatement(CompiledGoto statement, ILProxy il, ref bool successful)
+    {
+        if (statement.Value is InstructionLabelAddressGetter instructionLabelAddressGetter)
+        {
+            if (!EmittedLabels.TryGetValue(instructionLabelAddressGetter.InstructionLabel, out Label label))
+            {
+                label = EmittedLabels[instructionLabelAddressGetter.InstructionLabel] = il.DefineLabel();
+            }
+            il.Emit(OpCodes.Jmp, label);
+            return;
+        }
+        else
+        {
+            successful = false;
+        }
+    }
+    void EmitStatement(CompiledInstructionLabelDeclaration statement, ILProxy il, ref bool successful)
+    {
+        if (!EmittedLabels.TryGetValue(statement, out Label label))
+        {
+            return;
+        }
+        il.MarkLabel(label);
+    }
     void EmitStatement(CompiledStatement statement, ILProxy il, ref bool successful)
     {
         switch (statement)
@@ -1650,6 +1675,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case CompiledIndexSetter v: EmitStatement(v, il, ref successful); break;
             case FunctionAddressGetter v: EmitStatement(v, il, ref successful); break;
             case CompiledRuntimeCall v: EmitStatement(v, il, ref successful); break;
+            case CompiledGoto v: EmitStatement(v, il, ref successful); break;
+            case CompiledInstructionLabelDeclaration v: EmitStatement(v, il, ref successful); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }

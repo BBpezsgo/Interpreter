@@ -390,17 +390,13 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        if (!GetInstructionLabel(instructionLabel.Identifier.Content, out _, out _))
+        if (!GetInstructionLabel(instructionLabel.Identifier.Content, out CompiledInstructionLabelDeclaration? compiledInstructionLabelDeclaration, out _))
         {
             Diagnostics.Add(Diagnostic.Internal($"Instruction label \"{instructionLabel.Identifier.Content}\" not found. Possibly not compiled or some other internal errors (not your fault)", instructionLabel.Identifier));
             return false;
         }
 
-        compiledStatement = new CompiledInstructionLabelDeclaration()
-        {
-            Identifier = instructionLabel.Identifier.Content,
-            Location = instructionLabel.Location,
-        };
+        compiledStatement = compiledInstructionLabelDeclaration;
         return true;
     }
 
@@ -525,6 +521,8 @@ public partial class StatementCompiler
         //     Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{callee.ToReadable()}\": required {compiledFunction.ParameterCount} passed {arguments.Count}", caller));
         //     return false;
         // }
+
+        // TODO: A hint if the passed value is the same as the default value
 
         for (int i = 0; i < arguments.Count; i++)
         {
@@ -2371,7 +2369,6 @@ public partial class StatementCompiler
 
             field.CompiledType = fieldDefinition.Type;
             field.Reference = fieldDefinition;
-            fieldDefinition.References.AddReference(field);
 
             compiledStatement = new CompiledFieldGetter()
             {
@@ -2394,7 +2391,6 @@ public partial class StatementCompiler
 
         field.CompiledType = compiledField.Type;
         field.Reference = compiledField;
-        compiledField.References.AddReference(field);
 
         {
             compiledStatement = new CompiledFieldGetter()
@@ -2886,7 +2882,6 @@ public partial class StatementCompiler
 
             statementToSet.CompiledType = compiledField.Type;
             statementToSet.Reference = compiledField;
-            compiledField.References.AddReference(statementToSet);
 
             compiledStatement = new CompiledFieldSetter()
             {
@@ -2918,7 +2913,6 @@ public partial class StatementCompiler
 
             statementToSet.CompiledType = compiledField.Type;
             statementToSet.Reference = compiledField;
-            compiledField.References.AddReference(statementToSet);
 
             compiledStatement = new CompiledFieldSetter()
             {
@@ -3164,31 +3158,6 @@ public partial class StatementCompiler
 
         foreach (TypeInstance item in types)
         { yield return CompileType(item, file); }
-    }
-
-    #endregion
-
-    #region GenerateCodeForInstructionLabel
-
-    ImmutableArray<CompiledInstructionLabelDeclaration> PrecompileInstructionLabels(IEnumerable<Statement> statements)
-    {
-        ImmutableArray<CompiledInstructionLabelDeclaration>.Builder res = ImmutableArray.CreateBuilder<CompiledInstructionLabelDeclaration>();
-        foreach (Statement statement in statements)
-        {
-            if (statement is InstructionLabel instructionLabel)
-            {
-                if (GetInstructionLabel(instructionLabel.Identifier.Content, out _, out _) ||
-                    res.Any(v => v.Identifier == instructionLabel.Identifier.Content))
-                { Diagnostics.Add(Diagnostic.Warning($"Instruction label \"{instructionLabel.Identifier.Content}\" already defined", instructionLabel.Identifier)); }
-
-                res.Add(new CompiledInstructionLabelDeclaration()
-                {
-                    Identifier = instructionLabel.Identifier.Content,
-                    Location = instructionLabel.Location,
-                });
-            }
-        }
-        return res.ToImmutable();
     }
 
     #endregion

@@ -295,7 +295,7 @@ public class CompiledExternalFunctionCall : CompiledStatementWithValue
         ExternalFunctionAsync v => v.Name ?? v.Id.ToString(),
         ExternalFunctionManaged v => v.Method.ToString() ?? v.Name ?? v.Id.ToString(),
 #if UNITY_BURST
-        ExternalFunctionScopedSync v => Callback.ToString() ?? v.Id.ToString(),
+        ExternalFunctionScopedSync v => ((nint)v.Callback).ToString() ?? v.Id.ToString(),
 #else
         ExternalFunctionScopedSync v => v.Callback.Method.Name ?? v.Id.ToString(),
 #endif

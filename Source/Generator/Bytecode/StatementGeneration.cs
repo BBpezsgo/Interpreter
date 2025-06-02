@@ -1155,6 +1155,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 jumpOutInstructions.Add(GeneratedCode.Count);
                 AddInstruction(Opcode.Jump, 0);
 
+                ReturnInstructions.Last.IsSkipping = false;
+                if (BreakInstructions.Count > 0) BreakInstructions.Last.IsSkipping = false;
+
                 AddComment("}");
 
                 foreach (int falseJumpAddress in falseJumpAddresses)
@@ -1168,6 +1171,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 GenerateCodeForStatement(partElse.Body);
 
+                ReturnInstructions.Last.IsSkipping = false;
+                if (BreakInstructions.Count > 0) BreakInstructions.Last.IsSkipping = false;
+
                 AddComment("}");
 
                 break;
@@ -1177,8 +1183,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 break;
             }
         }
-
-        ReturnInstructions.Last.IsSkipping = false;
 
         foreach (int item in jumpOutInstructions)
         {
@@ -1527,7 +1531,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Statements {");
         foreach (CompiledStatement v in block.Statements)
         {
-            if (((ReturnInstructions.Count > 0 && ReturnInstructions.Last.IsSkipping) ||
+            if (!Settings.DontOptimize &&
+                ((ReturnInstructions.Count > 0 && ReturnInstructions.Last.IsSkipping) ||
                 (BreakInstructions.Count > 0 && BreakInstructions.Last.IsSkipping)) &&
                 !StatementCompiler.Visit(v).Any(v => v is CompiledInstructionLabelDeclaration))
             {

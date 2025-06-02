@@ -147,6 +147,11 @@ public partial class StatementCompiler
                 }
                 case AttributeConstants.ExposeIdentifier:
                 {
+                    if (attribute.Parameters.Length == 0)
+                    {
+                        break;
+                    }
+
                     if (attribute.Parameters.Length != 1)
                     {
                         Diagnostics.Add(Diagnostic.Error($"Wrong number of arguments passed to attribute \"{attribute.Identifier}\": required {1}, passed {attribute.Parameters.Length}", attribute));

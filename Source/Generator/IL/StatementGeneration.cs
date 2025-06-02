@@ -2215,13 +2215,13 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             if (!CheckMarshalSafety(function.Function.ParameterTypes[i], out PossibleDiagnostic? safetyError1))
             {
-                Diagnostics.Add(safetyError1.ToError(((FunctionThingDefinition)function.Function).Parameters[i].Type));
+                Diagnostics.Add(safetyError1.ToWarning(((FunctionThingDefinition)function.Function).Parameters[i].Type));
                 return false;
             }
         }
         if (!CheckMarshalSafety(function.Function.Type, out PossibleDiagnostic? safetyError2))
         {
-            Diagnostics.Add(safetyError2.ToError(function.Function is FunctionDefinition v ? v.Type.Location : new Location(((FunctionThingDefinition)function.Function).Identifier.Position, function.Function.File)));
+            Diagnostics.Add(safetyError2.ToWarning(function.Function is FunctionDefinition v ? v.Type.Location : new Location(((FunctionThingDefinition)function.Function).Identifier.Position, function.Function.File)));
             return false;
         }
 

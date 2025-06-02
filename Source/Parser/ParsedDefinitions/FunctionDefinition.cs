@@ -24,7 +24,10 @@ public class FunctionDefinition : FunctionThingDefinition,
     public bool IsBuiltin => Attributes.TryGetAttribute(AttributeConstants.BuiltinIdentifier, out _);
     public string? BuiltinFunctionName => Attributes.TryGetAttribute(AttributeConstants.BuiltinIdentifier, out AttributeUsage? attribute) && attribute.TryGetValue(out string? name) ? name : null;
 
-    public string? ExposedFunctionName => Attributes.TryGetAttribute(AttributeConstants.ExposeIdentifier, out AttributeUsage? attribute) && attribute.TryGetValue(out string? name) ? name : null;
+    public string? ExposedFunctionName =>
+        Attributes.TryGetAttribute(AttributeConstants.ExposeIdentifier, out AttributeUsage? attribute)
+            ? attribute.TryGetValue(out string? name) ? name : Identifier.Content
+            : null;
 
     public override bool IsTemplate
     {

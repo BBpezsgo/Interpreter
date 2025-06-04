@@ -566,25 +566,22 @@ public ref partial struct ProcessorState
         if (function is not null)
         {
             Span<byte> parameters = Memory.Slice(Registers.StackPointer, function.ParametersSize);
+            Span<byte> returnValue = Memory.Slice(Registers.StackPointer + function.ParametersSize, function.ReturnValueSize);
 
-            if (function is ExternalFunctionAsync managedFunction)
+            switch (function)
             {
-                PendingExternalFunction = managedFunction.Callback(
-                    ref this,
-                    parameters);
-            }
-            else if (function is ExternalFunctionSync simpleFunction)
-            {
-                if (function.ReturnValueSize > 0)
-                {
-                    Span<byte> returnValue = stackalloc byte[function.ReturnValueSize];
+                case ExternalFunctionAsync managedFunction:
+                    PendingExternalFunction = new PendingExternalFunction()
+                    {
+                        Checker = managedFunction.Callback(
+                            ref this,
+                            parameters),
+                        ReturnValue = returnValue,
+                    };
+                    break;
+                case ExternalFunctionSync simpleFunction:
                     simpleFunction.MarshaledCallback(parameters, returnValue);
-                    Push(returnValue);
-                }
-                else
-                {
-                    simpleFunction.MarshaledCallback(parameters, default);
-                }
+                    break;
             }
 
             Step();
@@ -597,7 +594,8 @@ public ref partial struct ProcessorState
             ref readonly ExternalFunctionScopedSync scopedExternalFunction = ref ScopedExternalFunctions[i];
             if (scopedExternalFunction.Id != functionId) continue;
 
-            Span<byte> _parameters = Memory.Slice(Registers.StackPointer, scopedExternalFunction.ParametersSize);
+            Span<byte> parameters = Memory.Slice(Registers.StackPointer, scopedExternalFunction.ParametersSize);
+            Span<byte> returnValue = Memory.Slice(Registers.StackPointer + scopedExternalFunction.ParametersSize, scopedExternalFunction.ReturnValueSize);
             nint scope = scopedExternalFunction.Scope;
 
             if (scopedExternalFunction.MSILPointerMarshal)
@@ -607,22 +605,10 @@ public ref partial struct ProcessorState
                 scope = (nint)Unsafe.AsPointer(ref Memory[0]);
             }
 
-            if (scopedExternalFunction.ReturnValueSize > 0)
+            fixed (byte* parametersPtr = parameters)
+            fixed (byte* returnValuePtr = returnValue)
             {
-                Span<byte> returnValue = stackalloc byte[scopedExternalFunction.ReturnValueSize];
-                fixed (byte* _parametersPtr = _parameters)
-                fixed (byte* returnValuePtr = returnValue)
-                {
-                    scopedExternalFunction.Callback(scope, (nint)_parametersPtr, (nint)returnValuePtr);
-                }
-                Push(returnValue);
-            }
-            else
-            {
-                fixed (byte* _parametersPtr = _parameters)
-                {
-                    scopedExternalFunction.Callback(scope, (nint)_parametersPtr, default);
-                }
+                scopedExternalFunction.Callback(scope, (nint)parametersPtr, (nint)returnValuePtr);
             }
 
             Step();

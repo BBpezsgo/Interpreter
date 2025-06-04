@@ -519,30 +519,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        int returnValueOffset = -caller.Function.ReturnValueSize;
-
         Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(caller.Arguments, caller.Declaration);
-        for (int i = 0; i < parameterCleanup.Count; i++)
-        { returnValueOffset -= parameterCleanup[i].TrashType.GetSize(this, Diagnostics, parameterCleanup[i]); }
 
         AddComment(" .:");
         AddInstruction(Opcode.CallExternal, caller.Function.Id);
 
-        if (caller.Function.ReturnValueSize > 0)
-        {
-            if (caller.SaveValue)
-            {
-                AddComment($" Store return value:");
-                PopTo(new AddressOffset(Register.StackPointer, -returnValueOffset), caller.Function.ReturnValueSize);
-            }
-            else
-            {
-                AddComment($" Clear return value:");
-                Pop(caller.Function.ReturnValueSize);
-            }
-        }
-
         GenerateCodeForParameterCleanup(parameterCleanup);
+
+        if (caller.Function.ReturnValueSize > 0 && !caller.SaveValue)
+        {
+            AddComment($" Clear return value:");
+            Pop(caller.Function.ReturnValueSize);
+        }
 
         AddComment("}");
     }

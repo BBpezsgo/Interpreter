@@ -50,14 +50,13 @@ public class IOHandler
             char? consumedKey = null;
             ioHandler._keyConsumer = (char key) => consumedKey = key;
             ioHandler.OnNeedInput.Invoke();
-            return (ref ProcessorState processor, out ReadOnlySpan<byte> returnValue) =>
+            return (ref ProcessorState processor, Span<byte> returnValue) =>
             {
                 if (consumedKey.HasValue)
                 {
-                    returnValue = consumedKey.Value.ToBytes();
+                    returnValue.Set(consumedKey.Value);
                     return true;
                 }
-                returnValue = ReadOnlySpan<byte>.Empty;
                 return false;
             };
         }, externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, 0, sizeof(char)));

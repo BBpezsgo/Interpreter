@@ -33,7 +33,7 @@ public ref partial struct ProcessorState
 
 #if !UNITY_BURST
     public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
-    ExternalFunctionAsyncReturnChecker? PendingExternalFunction;
+    PendingExternalFunction PendingExternalFunction;
 #endif
 
     public static ProcessorState Create(
@@ -71,7 +71,7 @@ public ref partial struct ProcessorState
         Code = code;
 #if !UNITY_BURST
         ExternalFunctions = externalFunctions;
-        PendingExternalFunction = null;
+        PendingExternalFunction = default;
 #endif
         ScopedExternalFunctions = scopedExternalFunctions;
         Crash = 0;
@@ -96,12 +96,11 @@ public ref partial struct ProcessorState
     public void Tick()
     {
 #if !UNITY_BURST
-        if (PendingExternalFunction != null)
+        if (PendingExternalFunction.Checker != null)
         {
-            if (PendingExternalFunction.Invoke(ref this, out ReadOnlySpan<byte> ret))
+            if (PendingExternalFunction.Checker.Invoke(ref this, PendingExternalFunction.ReturnValue))
             {
-                Push(ret);
-                PendingExternalFunction = null;
+                PendingExternalFunction = default;
             }
         }
 #endif

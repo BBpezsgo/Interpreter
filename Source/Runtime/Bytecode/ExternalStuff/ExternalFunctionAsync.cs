@@ -1,7 +1,13 @@
 namespace LanguageCore.Runtime;
 
 public delegate ExternalFunctionAsyncReturnChecker ExternalFunctionAsyncCallback(ref ProcessorState processor, ReadOnlySpan<byte> arguments);
-public delegate bool ExternalFunctionAsyncReturnChecker(ref ProcessorState processor, out ReadOnlySpan<byte> returnValue);
+public delegate bool ExternalFunctionAsyncReturnChecker(ref ProcessorState processor, Span<byte> returnValue);
+
+public ref struct PendingExternalFunction
+{
+    public ExternalFunctionAsyncReturnChecker Checker;
+    public Span<byte> ReturnValue;
+}
 
 public readonly struct ExternalFunctionAsync : IExternalFunction
 {

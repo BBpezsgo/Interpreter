@@ -155,6 +155,14 @@ public enum Opcode : byte
 
     /// <summary>
     /// <code>
+    /// Push(<paramref name="EXT"/>(Pop(), Pop(), ...))
+    /// </code>
+    /// </summary>
+    CallMSIL,
+    HotFuncEnd,
+
+    /// <summary>
+    /// <code>
     /// <see langword="crash"/> (*<see cref="char"/>)<paramref name="SRC"/>
     /// </code>
     /// </summary>

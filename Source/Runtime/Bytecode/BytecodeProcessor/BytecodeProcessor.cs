@@ -27,6 +27,8 @@ public class BytecodeProcessor
     UserCall? CurrentUserCall = null;
     bool CurrentlySyncUserCalling = false;
 
+    HotFunctions HotFunctions;
+
     public BytecodeProcessor(
         BytecodeInterpreterSettings settings,
         ImmutableArray<Instruction> program,
@@ -62,7 +64,10 @@ public class BytecodeProcessor
         ExternalFunctions.Values.AsSpan(),
 #endif
         ScopedExternalFunctions.AsSpan()
-    );
+    )
+    {
+        HotFunctions = HotFunctions,
+    };
 
     public unsafe bool Tick()
     {
@@ -94,6 +99,7 @@ public class BytecodeProcessor
             HandleUserCalls(ref state);
 
             Registers = state.Registers;
+            HotFunctions = state.HotFunctions;
 
             state.ThrowIfCrashed(DebugInformation);
             return !state.IsDone;

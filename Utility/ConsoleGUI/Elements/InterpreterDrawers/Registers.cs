@@ -48,6 +48,7 @@ public partial class InterpreterElement
                     break;
                 case Opcode.Call:
                 case Opcode.CallExternal:
+                case Opcode.CallMSIL:
                 case Opcode.Push:
                 case Opcode.Crash:
                     HandleSourceOperand(instruction.Operand1);

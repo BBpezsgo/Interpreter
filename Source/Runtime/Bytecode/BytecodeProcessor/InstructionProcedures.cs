@@ -1,6 +1,7 @@
 #define _UNITY_PROFILER
 
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace LanguageCore.Runtime;
 
@@ -598,7 +599,7 @@ public ref partial struct ProcessorState
             Span<byte> returnValue = Memory.Slice(Registers.StackPointer + scopedExternalFunction.ParametersSize, scopedExternalFunction.ReturnValueSize);
             nint scope = scopedExternalFunction.Scope;
 
-            if (scopedExternalFunction.MSILPointerMarshal)
+            if (scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILPointerMarshal))
             {
                 // TODO: Unity burst compatibility
                 if (scope != 0) throw new RuntimeException($"Invalid MSIL marshal function (the scope must be null)");
@@ -620,6 +621,95 @@ public ref partial struct ProcessorState
 #if !UNITY_BURST
         throw new RuntimeException($"Undefined external function \"{functionId}\"");
 #endif
+    }
+
+    unsafe void CALL_MSIL()
+    {
+#if UNITY_PROFILER
+        using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerExternal.Auto();
+#endif
+
+        int functionId = GetData(CurrentInstruction.Operand1);
+
+        for (int i = 0; i < ScopedExternalFunctions.Length; i++)
+        {
+            ref readonly ExternalFunctionScopedSync scopedExternalFunction = ref ScopedExternalFunctions[i];
+            if (scopedExternalFunction.Id != functionId) continue;
+
+            if (scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILSafe))
+            {
+                Span<byte> parameters = Memory.Slice(Registers.StackPointer, scopedExternalFunction.ParametersSize);
+                Span<byte> returnValue = Memory.Slice(Registers.StackPointer + scopedExternalFunction.ParametersSize, scopedExternalFunction.ReturnValueSize);
+                nint scope = scopedExternalFunction.Scope;
+
+                if (scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILPointerMarshal))
+                {
+                    // TODO: Unity burst compatibility
+                    if (scope != 0) throw new RuntimeException($"Invalid MSIL marshal function (the scope must be null)");
+                    scope = (nint)Unsafe.AsPointer(ref Memory[0]);
+                }
+
+                fixed (byte* parametersPtr = parameters)
+                fixed (byte* returnValuePtr = returnValue)
+                {
+                    scopedExternalFunction.Callback(scope, (nint)parametersPtr, (nint)returnValuePtr);
+                }
+
+                Push<byte>(1);
+            }
+            else
+            {
+                if (HotFunctions.CurrentHotFunctionDepth++ == 0)
+                {
+                    HotFunctions.HotFunctionStarted = HotFunctions.Cycle;
+                    HotFunctions.CurrentHotFunction = CurrentInstruction.Operand1.Int;
+                }
+
+                Push<byte>(0);
+            }
+
+            Step();
+            return;
+        }
+
+        Crash = functionId;
+        Signal = Signal.UndefinedExternalFunction;
+#if !UNITY_BURST
+        throw new RuntimeException($"Undefined MSIL function \"{functionId}\"");
+#endif
+    }
+
+    void HOT_FUNC_END()
+    {
+        if (--HotFunctions.CurrentHotFunctionDepth == 0)
+        {
+            if (HotFunctions.HotFunctionStarted == default) throw new InternalExceptionWithoutContext($"Invalid program");
+            if (HotFunctions.CurrentHotFunction != CurrentInstruction.Operand1.Int) throw new InternalExceptionWithoutContext($"Invalid program");
+
+            if (HotFunctions.Cycle > HotFunctions.HotFunctionStarted)
+            {
+                ulong elapsed = HotFunctions.Cycle - HotFunctions.HotFunctionStarted;
+                if (elapsed < 1000)
+                {
+                    for (int i = 0; i < ScopedExternalFunctions.Length; i++)
+                    {
+                        ref ExternalFunctionScopedSync scopedExternalFunction = ref MemoryMarshal.GetReference(ScopedExternalFunctions[i..]);
+                        if (scopedExternalFunction.Id != HotFunctions.CurrentHotFunction) continue;
+                        scopedExternalFunction.Flags |= ExternalFunctionScopedSyncFlags.MSILSafe;
+                        break;
+                    }
+                }
+                else
+                {
+                    throw new Exception($"{elapsed}");
+                }
+            }
+
+            HotFunctions.HotFunctionStarted = default;
+            HotFunctions.CurrentHotFunction = default;
+        }
+
+        Step();
     }
 
     #endregion

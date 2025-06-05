@@ -7,6 +7,14 @@ public delegate void ExternalFunctionUnity(nint scope, nint arguments, nint retu
 
 public delegate void ExternalFunctionScopedSyncCallback(nint scope, nint arguments, nint returnValue);
 
+[Flags]
+public enum ExternalFunctionScopedSyncFlags : byte
+{
+    None = 0,
+    MSILPointerMarshal = 1 << 1,
+    MSILSafe = 1 << 2,
+}
+
 public unsafe struct ExternalFunctionScopedSync : IExternalFunction
 {
     public int Id { get; }
@@ -23,7 +31,7 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
 #else
     public ExternalFunctionScopedSyncCallback Callback { get; }
 #endif
-    public bool MSILPointerMarshal { get; }
+    public ExternalFunctionScopedSyncFlags Flags { get; set; }
 
     readonly string? IExternalFunction.Name => null;
 
@@ -37,7 +45,7 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
         int parametersSize,
         int returnValueSize,
         nint scope,
-        bool msilPointerMarshal = default)
+        ExternalFunctionScopedSyncFlags flags = ExternalFunctionScopedSyncFlags.None)
     {
 #if UNITY_BURST
         _callback = (nint)callback;
@@ -48,7 +56,7 @@ public unsafe struct ExternalFunctionScopedSync : IExternalFunction
         ParametersSize = parametersSize;
         ReturnValueSize = returnValueSize;
         Scope = scope;
-        MSILPointerMarshal = msilPointerMarshal;
+        Flags = flags;
     }
 
     // This required by my Unity-DOTS project!!!!

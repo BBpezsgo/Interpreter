@@ -31,6 +31,8 @@ public ref partial struct ProcessorState
     public Signal Signal;
     public Registers Registers;
 
+    public HotFunctions HotFunctions;
+
 #if !UNITY_BURST
     public readonly ReadOnlySpan<IExternalFunction> ExternalFunctions;
     PendingExternalFunction PendingExternalFunction;
@@ -112,6 +114,7 @@ public ref partial struct ProcessorState
 
     public void Process()
     {
+        HotFunctions.Cycle++;
         switch (CurrentInstruction.Opcode)
         {
             case Opcode.NOP: break;
@@ -142,6 +145,8 @@ public ref partial struct ProcessorState
             case Opcode.Return: RETURN(); break;
 
             case Opcode.CallExternal: CALL_EXTERNAL(); break;
+            case Opcode.CallMSIL: CALL_MSIL(); break;
+            case Opcode.HotFuncEnd: HOT_FUNC_END(); break;
 
             case Opcode.MathAdd: MathAdd(); break;
             case Opcode.MathSub: MathSub(); break;

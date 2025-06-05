@@ -508,6 +508,51 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Pop(passedParameter.TrashType.GetSize(this, Diagnostics, passedParameter));
         }
     }
+    void GenerateCodeForFunctionCall_MSIL(CompiledExternalFunctionCall caller)
+    {
+        AddComment($"Call \"{((ISimpleReadable)caller.Declaration).ToReadable()}\" {{");
+
+        if (caller.Function.ReturnValueSize > 0 && caller.SaveValue)
+        {
+            AddComment($"Initial return value {{");
+            StackAlloc(caller.Function.ReturnValueSize, false);
+            AddComment($"}}");
+        }
+
+        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(caller.Arguments, caller.Declaration);
+
+        AddComment(" .:");
+
+        AddInstruction(Opcode.CallMSIL, caller.Function.Id);
+        int conditionalJumpInstruction;
+        using (RegisterUsage.Auto reg = Registers.GetFree())
+        {
+            PopTo(reg.Register8L);
+            AddInstruction(Opcode.Compare, reg.Register8L, 0);
+            conditionalJumpInstruction = GeneratedCode.Count;
+            AddInstruction(Opcode.JumpIfNotEqual, 0);
+        }
+
+        int jumpInstruction = Call(caller.Declaration.InstructionOffset, caller);
+
+        if (caller.Declaration.InstructionOffset == InvalidFunctionAddress)
+        {
+            UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, caller.Declaration));
+        }
+        AddInstruction(Opcode.HotFuncEnd, caller.Function.Id);
+
+        GeneratedCode[conditionalJumpInstruction].Operand1 = GeneratedCode.Count - conditionalJumpInstruction;
+
+        GenerateCodeForParameterCleanup(parameterCleanup);
+
+        if (caller.Function.ReturnValueSize > 0 && !caller.SaveValue)
+        {
+            AddComment($" Clear return value:");
+            Pop(caller.Function.ReturnValueSize);
+        }
+
+        AddComment("}");
+    }
     void GenerateCodeForFunctionCall_External(CompiledExternalFunctionCall caller)
     {
         AddComment($"Call \"{((ISimpleReadable)caller.Declaration).ToReadable()}\" {{");
@@ -558,14 +603,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if UNITY_BURST
                     UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code !!!");
                     IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
-                    unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, true); }
+                    unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
 #else
                     Debug.WriteLine($"Function {method.Method} compiled into machine code !!!");
-                    externFunc = new(method, id, parametersSize, returnValueSize, 0, true);
+                    externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
 #endif
                     GeneratedUnmanagedFunctions.Add((externFunc, method));
 
-                    GenerateCodeForFunctionCall_External(new()
+                    GenerateCodeForFunctionCall_MSIL(new()
                     {
                         Declaration = f.Function,
                         Function = externFunc,

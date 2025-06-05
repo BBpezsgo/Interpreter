@@ -24,6 +24,7 @@ public static class OpcodeExtensions
         Opcode.JumpIfLessOrEqual => 1,
         Opcode.Jump => 1,
         Opcode.CallExternal => 1,
+        Opcode.CallMSIL => 1,
         Opcode.Crash => 1,
         Opcode.Compare => 2,
         Opcode.CompareF => 2,

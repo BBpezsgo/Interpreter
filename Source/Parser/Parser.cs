@@ -2025,12 +2025,21 @@ public sealed class Parser
             }
             else if (ExpectOperator("[", out _))
             {
-                ExpectOneValue(out StatementWithValue? sizeValue);
+                if (ExpectOperator("]"))
+                {
+                    type = new TypeInstanceStackArray(type, null, File);
+                }
+                else if (ExpectExpression(out StatementWithValue? sizeValue))
+                {
+                    if (!ExpectOperator("]"))
+                    { return false; }
 
-                if (!ExpectOperator("]"))
-                { return false; }
-
-                type = new TypeInstanceStackArray(type, sizeValue, File);
+                    type = new TypeInstanceStackArray(type, sizeValue, File);
+                }
+                else
+                {
+                    return false;
+                }
             }
             else
             { break; }

@@ -40,12 +40,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 Name = "BBLangGeneratedAssembly",
             }, AssemblyBuilderAccess.RunAndCollect);
 
-            Type daType = typeof(DebuggableAttribute);
-            ConstructorInfo daCtor = daType.GetConstructor(new Type[] { typeof(DebuggableAttribute.DebuggingModes) })!;
-            CustomAttributeBuilder daBuilder = new(daCtor, new object[] {
-                DebuggableAttribute.DebuggingModes.DisableOptimizations |
-                DebuggableAttribute.DebuggingModes.Default });
-            assemBuilder.SetCustomAttribute(daBuilder);
+            // Type daType = typeof(DebuggableAttribute);
+            // ConstructorInfo daCtor = daType.GetConstructor(new Type[] { typeof(DebuggableAttribute.DebuggingModes) })!;
+            // CustomAttributeBuilder daBuilder = new(daCtor, new object[] {
+            //     DebuggableAttribute.DebuggingModes.DisableOptimizations |
+            //     DebuggableAttribute.DebuggingModes.Default });
+            // assemBuilder.SetCustomAttribute(daBuilder);
 
             module = assemBuilder.DefineDynamicModule("BBLangGeneratedModule");
         }

@@ -591,7 +591,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     if (ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
                     {
-                        Debugger.Break();
                         goto anyway;
                     }
 
@@ -629,6 +628,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 anyway:;
                 }
+                Diagnostics.Add(Diagnostic.Warning($"Failed to generate MSIL for function {f.Function}", caller, ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error).ToArray()));
                 ILGenerator.Diagnostics.Clear();
             }
         }

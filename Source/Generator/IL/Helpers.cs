@@ -132,6 +132,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         else if (type == typeof(short)) { il.Emit(OpCodes.Stind_I2); return true; }
         else if (type == typeof(sbyte)) { il.Emit(OpCodes.Stind_I1); return true; }
         else if (type == typeof(ulong)) { il.Emit(OpCodes.Stind_I8); return true; }
+        else if (type == typeof(uint)) { il.Emit(OpCodes.Stind_I4); return true; }
         else if (type == typeof(ushort)) { il.Emit(OpCodes.Stind_I2); return true; }
         else if (type == typeof(byte)) { il.Emit(OpCodes.Stind_I1); return true; }
         else if (type == typeof(float)) { il.Emit(OpCodes.Stind_R4); return true; }

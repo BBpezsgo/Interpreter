@@ -1136,6 +1136,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 }, il, ref successful);
                 return;
             }
+            else
+            {
+                Diagnostics.Add(Diagnostic.ErrorNoBreak($"Unrecognised allocation", allocatorCaller));
+                successful = false;
+                return;
+            }
         }
 
         if (statement.Type.SameAs(BuiltinType.I32) &&
@@ -1359,20 +1365,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
             EmitStatement(statement.Object, il, ref successful);
 
-            if (destination is not null)
-            {
-                StoreLocal(il, destination.LocalIndex);
-                LoadLocal(il, destination.LocalIndex);
-            }
-            else
-            {
-                il.Emit(OpCodes.Dup);
-                Debugger.Break();
-                Diagnostics.Add(Diagnostic.Internal($"Not supported :(", statement));
-                successful = false;
-                return;
-            }
+            destination ??= il.DeclareLocal(typeof(nint));
+            StoreLocal(il, destination.LocalIndex);
 
+            LoadLocal(il, destination.LocalIndex);
             for (int i = 0; i < statement.Arguments.Length; i++)
             {
                 EmitStatement(statement.Arguments[i].Value, il, ref successful);
@@ -1380,11 +1376,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
             il.Emit(OpCodes.Call, function);
 
-            if (!statement.SaveValue &&
-                function.ReturnType != typeof(void))
+            if (function.ReturnType != typeof(void))
             {
-                il.Emit(OpCodes.Pop);
+                il.Emit(OpCodes.Pop); // What???
             }
+
+            LoadLocal(il, destination.LocalIndex);
         }
     }
     void EmitStatement(CompiledStackAllocation statement, ILProxy il, ref bool successful, LocalBuilder? destination = null)
@@ -1433,26 +1430,56 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (statement.IsASCII)
         {
-            Diagnostics.Add(Diagnostic.Internal($"ASCII strings not supported", statement));
-            successful = false;
-        }
+            EmitValue(statement.Value.Length + 1, il);
+            il.Emit(OpCodes.Newarr, typeof(byte));
+            for (int i = 0; i < statement.Value.Length; i++)
+            {
+                il.Emit(OpCodes.Dup);
+                EmitValue(i, il);
+                EmitValue((byte)statement.Value[i], il);
+                il.Emit(OpCodes.Stelem_I1);
+            }
+            il.Emit(OpCodes.Dup);
+            EmitValue(statement.Value.Length, il);
+            EmitValue(0, il);
+            il.Emit(OpCodes.Stelem_I1);
 
-        il.Emit(OpCodes.Ldstr, statement.Value + "\0");
+            //Diagnostics.Add(Diagnostic.Internal($"ASCII strings not supported", statement));
+            //successful = false;
+        }
+        else
+        {
+            EmitValue(statement.Value.Length + 1, il);
+            il.Emit(OpCodes.Newarr, typeof(char));
+            for (int i = 0; i < statement.Value.Length; i++)
+            {
+                il.Emit(OpCodes.Dup);
+                EmitValue(i, il);
+                EmitValue(statement.Value[i], il);
+                il.Emit(OpCodes.Stelem_I2);
+            }
+            il.Emit(OpCodes.Dup);
+            EmitValue(statement.Value.Length, il);
+            EmitValue(0, il);
+            il.Emit(OpCodes.Stelem_I2);
+
+            //il.Emit(OpCodes.Ldstr, statement.Value + "\0");
+        }
     }
     void EmitStatement(CompiledIndexGetter statement, ILProxy il, ref bool successful)
     {
         if (statement.Base.Type.Is(out PointerType? basePointerType) &&
             basePointerType.To.Is(out ArrayType? baseArrayType))
         {
-            if (baseArrayType.Of.SameAs(BuiltinType.Char))
-            {
-                EmitStatement(statement.Base, il, ref successful);
-                EmitStatement(statement.Index, il, ref successful);
-                il.Emit(OpCodes.Callvirt, typeof(string).GetMethod("get_Chars", new Type[] { typeof(int) })!);
-
-                // Diagnostics.Add(Diagnostic.Internal($"I will have to revisit this ...", statement));
-                return;
-            }
+            //if (baseArrayType.Of.SameAs(BuiltinType.Char))
+            //{
+            //    EmitStatement(statement.Base, il, ref successful);
+            //    EmitStatement(statement.Index, il, ref successful);
+            //    il.Emit(OpCodes.Callvirt, typeof(string).GetMethod("get_Chars", new Type[] { typeof(int) })!);
+            //
+            //    //Diagnostics.Add(Diagnostic.Internal($"I will have to revisit this ...", statement));
+            //    return;
+            //}
 
             if (!ToType(baseArrayType.Of, out _, out PossibleDiagnostic? typeError))
             {
@@ -1754,12 +1781,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         error = null;
 
-        if (type.To.Is(out ArrayType? arrayType) &&
-            arrayType.Of.SameAs(BuiltinType.Char))
-        {
-            result = typeof(string);
-            return true;
-        }
+        //if (type.To.Is(out ArrayType? arrayType) &&
+        //    arrayType.Of.SameAs(BuiltinType.Char))
+        //{
+        //    result = typeof(string);
+        //    return true;
+        //}
 
         result = typeof(nint);
         return true;

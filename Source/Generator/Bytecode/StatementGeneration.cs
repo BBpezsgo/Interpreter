@@ -591,6 +591,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     if (ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
                     {
+                        ILGenerator.Diagnostics.Throw();
                         goto anyway;
                     }
 

@@ -18,7 +18,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     readonly Dictionary<CompiledInstructionLabelDeclaration, Label> EmittedLabels = new();
     readonly ModuleBuilder Module;
 
-    readonly bool GenerateText = true;
     public readonly List<string>? Builders;
 
     void GenerateDeallocator(CompiledCleanup cleanup, ILProxy il, ref bool successful)
@@ -426,45 +425,83 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableDeclaration statement, ILProxy il, ref bool successful)
     {
-        if (LocalBuilders.ContainsKey(statement)) return;
-        if (!ToType(statement.Type, out Type? type, out PossibleDiagnostic? typeError))
+        if (statement.IsGlobal)
         {
-            Diagnostics.Add(typeError.ToError(statement));
+            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
             successful = false;
-            return;
-        }
 
-        LocalBuilder local = LocalBuilders[statement] = il.DeclareLocal(type);
-        if (statement.InitialValue is not null)
-        {
-            switch (statement.InitialValue)
+            if (!EmittedGlobalVariables.TryGetValue(statement, out FieldInfo? field))
             {
-                case CompiledConstructorCall constructorCall:
-                    EmitStatement(constructorCall, il, ref successful, local);
-                    break;
-                case CompiledStackAllocation compiledStackAllocation:
-                    EmitStatement(compiledStackAllocation, il, ref successful, local);
-                    break;
-                default:
-                    EmitStatement(statement.InitialValue, il, ref successful);
-                    StoreLocal(il, local.LocalIndex);
-                    break;
+                if (successful)
+                { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Identifier}\" wasn't emitted for some reason", statement)); }
+                else
+                { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Identifier}\" wasn't emitted for some reason", statement)); }
+                successful = false;
+                return;
+            }
+
+            if (statement.InitialValue is not null)
+            {
+                EmitStatement(statement.InitialValue, il, ref successful);
+                il.Emit(OpCodes.Stsfld, field);
+            }
+        }
+        else
+        {
+            if (LocalBuilders.ContainsKey(statement)) return;
+            if (!ToType(statement.Type, out Type? type, out PossibleDiagnostic? typeError))
+            {
+                Diagnostics.Add(typeError.ToError(statement));
+                successful = false;
+                return;
+            }
+
+            LocalBuilder local = LocalBuilders[statement] = il.DeclareLocal(type);
+            if (statement.InitialValue is not null)
+            {
+                switch (statement.InitialValue)
+                {
+                    case CompiledConstructorCall constructorCall:
+                        EmitStatement(constructorCall, il, ref successful, local);
+                        break;
+                    case CompiledStackAllocation compiledStackAllocation:
+                        EmitStatement(compiledStackAllocation, il, ref successful, local);
+                        break;
+                    default:
+                        EmitStatement(statement.InitialValue, il, ref successful);
+                        StoreLocal(il, local.LocalIndex);
+                        break;
+                }
             }
         }
     }
     void EmitStatement(CompiledVariableGetter statement, ILProxy il, ref bool successful)
     {
-        if (!LocalBuilders.TryGetValue(statement.Variable, out LocalBuilder? local))
+        if (statement.Variable.IsGlobal)
         {
-            if (statement.Variable.IsGlobal)
-            { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement)); }
-            else
+            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+            successful = false;
+
+            if (!EmittedGlobalVariables.TryGetValue(statement.Variable, out FieldInfo? field))
             {
                 if (successful)
-                { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Variable.Identifier}\" not compiled", statement)); }
+                { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
                 else
-                { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Variable.Identifier}\" not compiled", statement)); }
+                { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
+                successful = false;
+                return;
             }
+
+            il.Emit(OpCodes.Ldsfld, field);
+            return;
+        }
+
+        if (!LocalBuilders.TryGetValue(statement.Variable, out LocalBuilder? local))
+        {
+            if (successful)
+            { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
+            else
+            { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
             successful = false;
             return;
         }
@@ -567,6 +604,30 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     return;
                 }
 
+                // FIXME test 70 & 71
+                if (false && f.UnmarshaledCallback.Target is not null)
+                {
+                    int i = DelegateTargets.IndexOf(f.UnmarshaledCallback.Target);
+                    if (i == -1)
+                    {
+                        i = DelegateTargets.Count;
+                        DelegateTargets.Add(f.UnmarshaledCallback.Target);
+                        GlobalContextType_Targets.SetValue(DelegateTargets.ToArray(), null);
+                    }
+
+                    il.Emit(OpCodes.Ldsflda, GlobalContextType_Targets);
+                    EmitValue(i, il);
+                    il.Emit(OpCodes.Ldelem_Ref);
+
+                    foreach (CompiledPassedArgument item in statement.Arguments)
+                    {
+                        EmitStatement(item.Value, il, ref successful);
+                    }
+                    il.Emit(OpCodes.Call, f.UnmarshaledCallback.GetMethodInfo());
+
+                    return;
+                }
+
                 Diagnostics.Add(Diagnostic.CriticalNoBreak($"Non-static external functions not supported", statement));
                 successful = false;
                 return;
@@ -583,17 +644,32 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableSetter statement, ILProxy il, ref bool successful)
     {
-        if (!LocalBuilders.TryGetValue(statement.Variable, out LocalBuilder? local))
+        if (statement.Variable.IsGlobal)
         {
-            if (statement.Variable.IsGlobal)
-            { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement)); }
-            else
+            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+            successful = false;
+
+            if (!EmittedGlobalVariables.TryGetValue(statement.Variable, out FieldInfo? field))
             {
                 if (successful)
-                { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Variable.Identifier}\" not compiled", statement)); }
+                { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
                 else
-                { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Variable.Identifier}\" not compiled", statement)); }
+                { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
+                successful = false;
+                return;
             }
+
+            EmitStatement(statement.Value, il, ref successful);
+            il.Emit(OpCodes.Stsfld, field);
+            return;
+        }
+
+        if (!LocalBuilders.TryGetValue(statement.Variable, out LocalBuilder? local))
+        {
+            if (successful)
+            { Diagnostics.Add(Diagnostic.Critical($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
+            else
+            { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{statement.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
             successful = false;
             return;
         }
@@ -854,18 +930,31 @@ public partial class CodeGeneratorForIL : CodeGenerator
         switch (statement.Of)
         {
             case CompiledVariableGetter v:
-                if (!LocalBuilders.TryGetValue(v.Variable, out LocalBuilder? local))
+                if (v.Variable.IsGlobal)
                 {
-                    if (v.Variable.IsGlobal)
-                    { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement)); }
-                    else
+                    Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+                    successful = false;
+
+                    if (!EmittedGlobalVariables.TryGetValue(v.Variable, out FieldInfo? field))
                     {
                         if (successful)
-                        { Diagnostics.Add(Diagnostic.Critical($"Variable \"{v.Variable.Identifier}\" not compiled", statement)); }
+                        { Diagnostics.Add(Diagnostic.Critical($"Variable \"{v.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
                         else
-                        { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{v.Variable.Identifier}\" not compiled", statement)); }
+                        { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{v.Variable.Identifier}\" wasn't emitted for some reason", statement)); }
+                        successful = false;
+                        return;
                     }
 
+                    il.Emit(OpCodes.Ldsflda, field);
+                    return;
+                }
+
+                if (!LocalBuilders.TryGetValue(v.Variable, out LocalBuilder? local))
+                {
+                    if (successful)
+                    { Diagnostics.Add(Diagnostic.Critical($"Variable \"{v.Variable.Identifier}\" not compiled", statement)); }
+                    else
+                    { Diagnostics.Add(Diagnostic.CriticalNoBreak($"Variable \"{v.Variable.Identifier}\" not compiled", statement)); }
                     successful = false;
                     return;
                 }
@@ -1443,9 +1532,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             EmitValue(statement.Value.Length, il);
             EmitValue(0, il);
             il.Emit(OpCodes.Stelem_I1);
-
-            //Diagnostics.Add(Diagnostic.Internal($"ASCII strings not supported", statement));
-            //successful = false;
         }
         else
         {
@@ -1462,8 +1548,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             EmitValue(statement.Value.Length, il);
             EmitValue(0, il);
             il.Emit(OpCodes.Stelem_I2);
-
-            //il.Emit(OpCodes.Ldstr, statement.Value + "\0");
         }
     }
     void EmitStatement(CompiledIndexGetter statement, ILProxy il, ref bool successful)
@@ -1471,16 +1555,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
         if (statement.Base.Type.Is(out PointerType? basePointerType) &&
             basePointerType.To.Is(out ArrayType? baseArrayType))
         {
-            //if (baseArrayType.Of.SameAs(BuiltinType.Char))
-            //{
-            //    EmitStatement(statement.Base, il, ref successful);
-            //    EmitStatement(statement.Index, il, ref successful);
-            //    il.Emit(OpCodes.Callvirt, typeof(string).GetMethod("get_Chars", new Type[] { typeof(int) })!);
-            //
-            //    //Diagnostics.Add(Diagnostic.Internal($"I will have to revisit this ...", statement));
-            //    return;
-            //}
-
             if (!ToType(baseArrayType.Of, out _, out PossibleDiagnostic? typeError))
             {
                 Diagnostics.Add(typeError.ToError(statement.Base));
@@ -1519,7 +1593,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
             }
 
-            // Diagnostics.Add(Diagnostic.Internal($"I will have to revisit this ...", statement));
             return;
         }
 
@@ -1617,8 +1690,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        // var function = GetOrEmitFunctionSignature(statement.Function);
-        // il.Emit(OpCodes.Ldftn, function);
+        //var function = GetOrEmitFunctionSignature(statement.Function);
+        //il.Emit(OpCodes.Ldftn, function);
 
         Diagnostics.Add(Diagnostic.CriticalNoBreak($"Function address getters not supported", statement));
         successful = false;
@@ -1780,14 +1853,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     static bool ToType(PointerType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
-
-        //if (type.To.Is(out ArrayType? arrayType) &&
-        //    arrayType.Of.SameAs(BuiltinType.Char))
-        //{
-        //    result = typeof(string);
-        //    return true;
-        //}
-
         result = typeof(nint);
         return true;
     }
@@ -1869,24 +1934,21 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
-    string MakeUnique(string id)
+    static string MakeUnique(string id, Func<string, bool> uniqueChecker)
     {
-        if (Module.GetType(id) is not null)
-        {
-            for (int i = 0; i < 64; i++)
-            {
-                string idCandidate = $"{id}_{i}";
-                if (Module.GetType(idCandidate) is not null) continue;
-                id = idCandidate;
-                goto good;
-            }
+        if (uniqueChecker.Invoke(id)) return id;
 
-            throw new InternalExceptionWithoutContext($"Failed to generate unique id for {id}");
-        good:;
+        for (int i = 0; i < 64; i++)
+        {
+            string idCandidate = $"{id}_{i}";
+            if (uniqueChecker.Invoke(idCandidate)) return idCandidate;
+            continue;
         }
 
-        return id;
+        throw new InternalExceptionWithoutContext($"Failed to generate unique id for {id}");
     }
+
+    string MakeUnique(string id) => MakeUnique(id, v => Module.GetType(v) is null);
 
     bool ToType(StructType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
@@ -1905,7 +1967,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType));
 
-        StringBuilder? stringBuilder = GenerateText ? new() : null;
+        StringBuilder? stringBuilder = Builders is null ? null : new();
 
         if (stringBuilder is not null)
         {
@@ -1931,7 +1993,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Array.Empty<Type>());
         ConstructorInfo conObj = typeof(object).GetConstructor(Array.Empty<Type>())!;
 
-        ILProxy il = new(constructor.GetILGenerator(), GenerateText);
+        ILProxy il = new(constructor.GetILGenerator(), Builders is not null);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, conObj);
         il.Emit(OpCodes.Ret);
@@ -1981,7 +2043,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), elementSize * (int)_length.Value);
 
-        StringBuilder? stringBuilder = GenerateText ? new() : null;
+        StringBuilder? stringBuilder = Builders is null ? null : new();
 
         if (stringBuilder is not null)
         {
@@ -1997,7 +2059,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Array.Empty<Type>());
         ConstructorInfo conObj = typeof(object).GetConstructor(Array.Empty<Type>())!;
 
-        ILProxy il = new(constructor.GetILGenerator(), GenerateText);
+        ILProxy il = new(constructor.GetILGenerator(), Builders is not null);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, conObj);
         il.Emit(OpCodes.Ret);
@@ -2025,7 +2087,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             typeof(int),
             Array.Empty<Type>(),
             Module);
-        ILProxy il = new(method.GetILGenerator(), GenerateText);
+        ILProxy il = new(method.GetILGenerator(), Builders is not null);
 
         EmitFunctionBody(statements, BuiltinType.I32, il, ref successful);
 
@@ -2096,7 +2158,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (EmittedFunctions.Contains(function)) return true;
 
-        ILProxy il = new(dynamicMethod.GetILGenerator(), GenerateText);
+        ILProxy il = new(dynamicMethod.GetILGenerator(), Builders is not null);
 
         bool successful = true;
         EmitFunctionBody(body.Statements, function is CompiledConstructorDefinition ? BuiltinType.Void : function.Type, il, ref successful);
@@ -2370,7 +2432,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             .ToArray();
         int parametersSize = parameters.Aggregate(0, (a, b) => a + b.Size);
 
-        ILProxy il = new(marshaled.GetILGenerator(), GenerateText);
+        ILProxy il = new(marshaled.GetILGenerator(), Builders is not null);
         if (method.ReturnType != typeof(void)) il.Emit(OpCodes.Ldarg_2);
 
         for (int i = 0; i < parameters.Length; i++)
@@ -2438,21 +2500,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to generate valid MSIL"));
         }
 
-        // StringBuilder builder = new();
-        // 
-        // Module.CreateGlobalFunctions();
-        // 
-        // foreach ((_, Type type) in GeneratedTypes)
-        // {
-        //     Stringify(builder, 0, type);
-        // }
-        // 
-        // foreach (DynamicMethod method in FunctionBuilders.Values.Append(result))
-        // {
-        //     Stringify(builder, 0, method);
-        // }
-        // 
-        // Console.WriteLine(builder);
+        //StringBuilder builder = new();
+        //foreach (Type type in Module.GetTypes()) Stringify(builder, 0, type);
+        //foreach (DynamicMethod method in FunctionBuilders.Values.Append(result)) Stringify(builder, 0, method);
+        //Console.WriteLine(builder);
 
         return (Func<int>)result.CreateDelegate(typeof(Func<int>));
     }

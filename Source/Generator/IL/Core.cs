@@ -29,7 +29,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
 
     readonly ILGeneratorSettings Settings;
-    // readonly Type GlobalScopeType;
+    readonly Type GlobalContextType;
+    readonly FieldInfo GlobalContextType_Targets;
+    readonly List<object> DelegateTargets = new();
+    readonly Dictionary<CompiledVariableDeclaration, FieldInfo> EmittedGlobalVariables = new();
 
     public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics, ILGeneratorSettings settings, ModuleBuilder? module) : base(compilerResult, diagnostics)
     {
@@ -47,21 +50,52 @@ public partial class CodeGeneratorForIL : CodeGenerator
             //     DebuggableAttribute.DebuggingModes.Default });
             // assemBuilder.SetCustomAttribute(daBuilder);
 
-            module = assemBuilder.DefineDynamicModule("BBLangGeneratedModule");
+            Module = assemBuilder.DefineDynamicModule("BBLangGeneratedModule");
+        }
+        else
+        {
+            Module = module;
         }
 
-        // TypeBuilder globalScopeTypeBuilder = module.DefineType(MakeUnique("global"));
-        // globalScopeTypeBuilder.DefineField("__memory", typeof(byte), FieldAttributes.Assembly);
-        // foreach (CompiledVariableDeclaration globalVariable in CompiledGlobalVariables)
-        // {
-        //     if (!ToType(globalVariable.Type, out Type? type, out PossibleDiagnostic? typeError))
-        //     {
-        //         Diagnostics.Add(typeError.ToError(globalVariable));
-        //         continue;
-        //     }
-        //     globalScopeTypeBuilder.DefineField(globalVariable.Identifier, type, FieldAttributes.Assembly);
-        // }
-        // GlobalScopeType = globalScopeTypeBuilder.CreateType();
+        TypeBuilder globalContextType = Module.DefineType("__GlobalContext", TypeAttributes.AutoClass | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(object));
+
+        HashSet<string> definedFields = new();
+
+        string targetsFieldName = MakeUnique("targets", v => !definedFields.Contains(v));
+        string memoryFieldName = MakeUnique("memory", v => !definedFields.Contains(v));
+
+        globalContextType.DefineField(targetsFieldName, typeof(object[]), FieldAttributes.Assembly | FieldAttributes.Static);
+        definedFields.Add(targetsFieldName);
+
+        //globalContextType.DefineField(memoryFieldName, typeof(byte), FieldAttributes.Assembly);
+        //definedFields.Add(memoryFieldName);
+
+        Dictionary<CompiledVariableDeclaration, string> variableFieldMap = new();
+
+        foreach (CompiledVariableDeclaration globalVariable in compilerResult.Statements.OfType<CompiledVariableDeclaration>())
+        {
+            if (!globalVariable.IsGlobal) continue;
+
+            if (!ToType(globalVariable.Type, out Type? type, out PossibleDiagnostic? typeError))
+            {
+                Diagnostics.Add(typeError.ToError(globalVariable));
+                continue;
+            }
+            string fieldName = MakeUnique(globalVariable.Identifier, v => !definedFields.Contains(v));
+            variableFieldMap[globalVariable] = fieldName;
+            globalContextType.DefineField(fieldName, type, FieldAttributes.Assembly | FieldAttributes.Static);
+            definedFields.Add(fieldName);
+        }
+
+        GlobalContextType = globalContextType.CreateType();
+
+        GlobalContextType_Targets = GlobalContextType.GetField(targetsFieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static) ?? throw new NullReferenceException();
+        GlobalContextType_Targets.SetValue(Array.Empty<object>(), null);
+
+        foreach (KeyValuePair<CompiledVariableDeclaration, string> item in variableFieldMap)
+        {
+            EmittedGlobalVariables.Add(item.Key, GlobalContextType.GetField(item.Value) ?? throw new NullReferenceException());
+        }
 
         Settings = settings;
         Module = module;

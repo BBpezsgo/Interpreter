@@ -94,11 +94,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         foreach (KeyValuePair<CompiledVariableDeclaration, string> item in variableFieldMap)
         {
-            EmittedGlobalVariables.Add(item.Key, GlobalContextType.GetField(item.Value) ?? throw new NullReferenceException());
+            EmittedGlobalVariables.Add(item.Key, GlobalContextType.GetField(item.Value, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static) ?? throw new NullReferenceException());
         }
 
         Settings = settings;
-        Module = module;
         Builders = new();
     }
 }

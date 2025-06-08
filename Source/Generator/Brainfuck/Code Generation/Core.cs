@@ -275,7 +275,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     static readonly BuiltinType ExitCodeType = BuiltinType.U8;
 
-    ImmutableDictionary<ICompiledFunctionDefinition, CompiledStatement> FunctionBodies;
+    readonly ImmutableDictionary<ICompiledFunctionDefinition, CompiledStatement> FunctionBodies;
 
     #endregion
 
@@ -553,10 +553,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     #endregion
 
-    bool GetVariable(string name, Uri file, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(CompiledVariables, name, file, out variable, out notFoundError);
-    bool GetVariable(CompiledStatementWithValue name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(CompiledVariables, name, out variable, out notFoundError);
-
-    static bool GetVariable(Stack<BrainfuckVariable> variables, string variableName, Uri relevantFile, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetVariable(string name, Uri file, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         BrainfuckVariable? result_ = default;
         PossibleDiagnostic? error_ = null;
@@ -567,8 +564,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         bool HandleIdentifier(BrainfuckVariable variable)
         {
-            if (variableName is not null &&
-                variable.Identifier != variableName)
+            if (name is not null &&
+                variable.Identifier != name)
             { return false; }
 
             perfectus = Max(perfectus, StatementCompiler.GlobalVariablePerfectus.Identifier);
@@ -577,8 +574,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         bool HandleFile(BrainfuckVariable variable)
         {
-            if (relevantFile is null ||
-                variable.File != relevantFile)
+            if (file is null ||
+                variable.File != file)
             {
                 // Not in the same file
                 return false;
@@ -586,7 +583,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
             if (perfectus >= StatementCompiler.GlobalVariablePerfectus.File)
             {
-                error_ = new PossibleDiagnostic($"Global variable \"{variableName}\" not found: multiple variables matched in the same file");
+                error_ = new PossibleDiagnostic($"Global variable \"{name}\" not found: multiple variables matched in the same file");
                 // Debugger.Break();
             }
 
@@ -595,7 +592,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             return true;
         }
 
-        foreach (BrainfuckVariable variable in variables)
+        foreach (BrainfuckVariable variable in CompiledVariables)
         {
             if (!HandleIdentifier(variable))
             { continue; }
@@ -619,80 +616,69 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             return true;
         }
 
-        error = error_ ?? new PossibleDiagnostic($"Global variable \"{variableName}\" not found");
+        error = error_ ?? new PossibleDiagnostic($"Global variable \"{name}\" not found");
         result = null;
         return false;
     }
-
-    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledStatementWithValue name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
+    bool GetVariable(CompiledStatementWithValue name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        variable = null;
-        notFoundError = null;
+        result = null;
+        error = null;
         return name switch
         {
-            CompiledVariableGetter identifier => GetVariable(variables, identifier, out variable, out notFoundError),
-            CompiledParameterGetter identifier => GetVariable(variables, identifier, out variable, out notFoundError),
-            CompiledPointer pointer => GetVariable(variables, pointer, out variable, out notFoundError),
+            CompiledVariableGetter identifier => GetVariable(identifier, out result, out error),
+            CompiledParameterGetter identifier => GetVariable(identifier, out result, out error),
+            CompiledPointer pointer => GetVariable(pointer, out result, out error),
             _ => false
         };
     }
-    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledVariableGetter name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Variable.Identifier, name.Variable.Location.File, out variable, out notFoundError);
-    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledParameterGetter name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError) => GetVariable(variables, name.Variable.Identifier.Content, name.Variable.File, out variable, out notFoundError);
-    static bool GetVariable(Stack<BrainfuckVariable> variables, CompiledPointer name, [NotNullWhen(true)] out BrainfuckVariable? variable, [NotNullWhen(false)] out PossibleDiagnostic? notFoundError)
+    bool GetVariable(CompiledVariableGetter name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        string _identifier;
-
-        if (name.To is CompiledVariableGetter variableGetter) _identifier = variableGetter.Variable.Identifier;
-        else if (name.To is CompiledParameterGetter parameterGetter) _identifier = parameterGetter.Variable.Identifier.Content;
-        else
+        foreach (BrainfuckVariable v in CompiledVariables)
         {
-            variable = null;
-            notFoundError = new PossibleDiagnostic($"Only variables supported :(");
+            if (v.Declaration == name.Variable)
+            {
+                result = v;
+                error = null;
+                return true;
+            }
+        }
+
+        return GetVariable(name.Variable.Identifier, name.Variable.Location.File, out result, out error);
+    }
+    bool GetVariable(CompiledParameterGetter name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetVariable(name.Variable.Identifier.Content, name.Variable.File, out result, out error);
+    bool GetVariable(CompiledPointer name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        switch (name.To)
+        {
+            case CompiledVariableGetter v:
+                if (!GetVariable(v, out result, out error))
+                {
+                    result = null;
+                    return false;
+                }
+                break;
+            case CompiledParameterGetter v:
+                if (!GetVariable(v, out result, out error))
+                {
+                    result = null;
+                    return false;
+                }
+                break;
+            default:
+                result = null;
+                error = new PossibleDiagnostic($"Only variables supported :(");
+                return false;
+        }
+
+        if (!result.IsReference)
+        {
+            error = new PossibleDiagnostic($"Variable \"{result.Identifier}\" isn't a reference");
             return false;
         }
 
-        for (int i = variables.Count - 1; i >= 0; i--)
-        {
-            if (variables[i].Identifier != _identifier) continue;
-
-            variable = variables[i];
-
-            if (!variables[i].IsReference)
-            {
-                notFoundError = new PossibleDiagnostic($"Variable \"{_identifier}\" isn't a reference");
-                return false;
-            }
-
-            notFoundError = null;
-            return true;
-        }
-
-        variable = null;
-        notFoundError = new PossibleDiagnostic($"Variable \"{_identifier}\" not found");
-        return false;
-    }
-
-    static void DiscardVariable(Stack<BrainfuckVariable> variables, string name)
-    {
-        for (int i = 0; i < variables.Count; i++)
-        {
-            if (variables[i].Identifier != name) continue;
-            BrainfuckVariable v = variables[i];
-            v.IsDiscarded = true;
-            variables[i] = v;
-            return;
-        }
-    }
-    static void UndiscardVariable(Stack<BrainfuckVariable> variables, string name)
-    {
-        for (int i = 0; i < variables.Count; i++)
-        {
-            if (variables[i].Identifier != name) continue;
-            BrainfuckVariable v = variables[i];
-            v.IsDiscarded = false;
-            variables[i] = v;
-            return;
-        }
+        error = null;
+        return true;
     }
 
     void CleanupVariables(int n)

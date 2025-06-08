@@ -21,6 +21,9 @@ public class Stack<T> : List<T>
         }
     }
 
+    public new ref T this[int index] => ref CollectionsMarshal.AsSpan(this)[index];
+    public ref T this[Index index] => ref CollectionsMarshal.AsSpan(this)[index];
+
     public Stack() { }
     public Stack(int capacity) : base(capacity) { }
     public Stack(IEnumerable<T> items) : base(items) { }

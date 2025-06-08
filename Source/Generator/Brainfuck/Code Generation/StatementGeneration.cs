@@ -85,13 +85,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         => PrecompileVariable(CompiledVariables, variableDeclaration, ignoreRedefinition);
     int PrecompileVariable(Stack<BrainfuckVariable> variables, CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition, GeneralType? type = null)
     {
-        if (variables.Any(other =>
-                other.Identifier == variableDeclaration.Identifier &&
-                other.File == variableDeclaration.Location.File))
-        {
-            if (ignoreRedefinition) return 0;
-            Diagnostics.Add(Diagnostic.Critical($"Variable \"{variableDeclaration.Identifier}\" already defined", variableDeclaration));
-        }
+        //if (variables.Any(other =>
+        //        other.Identifier == variableDeclaration.Identifier &&
+        //        other.File == variableDeclaration.Location.File))
+        //{
+        //    if (ignoreRedefinition) return 0;
+        //    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variableDeclaration.Identifier}\" already defined", variableDeclaration));
+        //}
 
         if (type is not null)
         {
@@ -487,7 +487,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            UndiscardVariable(CompiledVariables, variable.Identifier);
+            variable.IsDiscarded = false;
 
             using StackAddress tempAddress = Stack.GetTemporaryAddress(1, value);
 
@@ -621,7 +621,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             }
                         }
 
-                        UndiscardVariable(CompiledVariables, variable.Identifier);
+                        variable.IsDiscarded = false;
 
                         VariableCanBeDiscarded = null;
 
@@ -650,7 +650,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                             }
                         }
 
-                        UndiscardVariable(CompiledVariables, variable.Identifier);
+                        variable.IsDiscarded = false;
 
                         VariableCanBeDiscarded = null;
 
@@ -685,7 +685,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         }
                     }
 
-                    UndiscardVariable(CompiledVariables, variable.Identifier);
+                    variable.IsDiscarded = false;
 
                     VariableCanBeDiscarded = null;
 
@@ -705,7 +705,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             using (Code.Block(this, $"Store computed value (from {Stack.LastAddress}) to {variable.Address}"))
             { Stack.PopAndStore(variable.Address); }
 
-            UndiscardVariable(CompiledVariables, variable.Identifier);
+            variable.IsDiscarded = false;
 
             VariableCanBeDiscarded = null;
             variable.IsInitialized = true;
@@ -1661,7 +1661,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     VariableCanBeDiscarded == variable.Identifier)
                 {
                     Code.MoveValue(offsettedSource, offsettedTarget);
-                    DiscardVariable(CompiledVariables, variable.Identifier);
+                    variable.IsDiscarded = true;
                     _statistics.Optimizations++;
                 }
                 else

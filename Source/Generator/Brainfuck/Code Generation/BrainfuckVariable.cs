@@ -1,5 +1,4 @@
 ﻿using LanguageCore.Compiler;
-using LanguageCore.Parser;
 
 namespace LanguageCore.Brainfuck.Generator;
 

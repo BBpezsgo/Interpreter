@@ -392,7 +392,7 @@ public static class Entry
                 diagnostics.Print();
                 diagnostics.Throw();
 
-                Console.WriteLine(res.Invoke());
+                res.Invoke();
                 return 0;
             }
             case "brainfuck":

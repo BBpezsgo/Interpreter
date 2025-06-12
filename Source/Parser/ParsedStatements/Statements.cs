@@ -37,16 +37,16 @@ public static class StatementExtensions
 {
     public static Statement? GetStatementAt(this ParserResult parserResult, SinglePosition position)
         => parserResult.GetStatementsRecursively()
-        .FirstOrDefault(statement => statement.Position.Range.Contains(position));
+        .LastOrDefault(statement => statement.Position.Range.Contains(position));
 
     public static Statement? GetStatement(this ParserResult parserResult, Func<Statement, bool> condition)
         => parserResult.GetStatementsRecursively()
-        .FirstOrDefault(condition);
+        .LastOrDefault(condition);
 
     public static T? GetStatement<T>(this Statement statement, Func<T, bool> condition)
         => statement.GetStatementsRecursively(true)
         .OfType<T>()
-        .FirstOrDefault(condition);
+        .LastOrDefault(condition);
 
     public static bool GetStatementAt(this ParserResult parserResult, SinglePosition position, [NotNullWhen(true)] out Statement? statement)
         => (statement = GetStatement(parserResult, statement => statement.Position.Range.Contains(position))) is not null;
@@ -1785,12 +1785,12 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<Compile
     }
 }
 
-public class Field : StatementWithValue, IReferenceableTo<CompiledField>
+public class Field : StatementWithValue, IReferenceableTo
 {
     /// <summary>
     /// Set by the compiler
     /// </summary>
-    public CompiledField? Reference { get; set; }
+    public object? Reference { get; set; }
 
     public Identifier Identifier { get; }
     public StatementWithValue PrevStatement { get; }

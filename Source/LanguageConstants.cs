@@ -126,7 +126,9 @@ public static class LanguageConstants
         ProtectionKeywords.Private,
         ProtectionKeywords.Export,
 
-        StatementKeywords.As
+        StatementKeywords.As,
+        StatementKeywords.New,
+        StatementKeywords.Delete
     );
 }
 

@@ -10,16 +10,12 @@ public enum Signal : byte
     PointerOutOfRange,
 }
 
-#if UNITY_BURST
-[Unity.Burst.BurstCompile]
-#endif
 public ref partial struct ProcessorState
 {
     public const int StackDirection = -1;
 
     readonly Instruction CurrentInstruction => Code[Registers.CodePointer];
     public readonly bool IsDone => Registers.CodePointer == Code.Length;
-    public readonly int StackStart => StackDirection > 0 ? Settings.HeapSize : Settings.HeapSize + Settings.StackSize - 1;
 
     readonly BytecodeInterpreterSettings Settings;
 
@@ -82,14 +78,14 @@ public ref partial struct ProcessorState
 
     public void Setup()
     {
-        Registers.StackPointer = StackStart - StackDirection;
+        Registers.StackPointer = Settings.StackStart - StackDirection;
     }
 
     public readonly RuntimeContext GetContext() => new(
         Registers,
         ImmutableArray.Create(Memory),
         ImmutableArray.Create(Code),
-        StackStart
+        Settings.StackStart
     );
 
     void Step() => Registers.CodePointer++;

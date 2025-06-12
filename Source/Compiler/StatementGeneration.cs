@@ -982,9 +982,14 @@ public partial class StatementCompiler
 
             if (anyCall.PrevStatement is Identifier _identifier2)
             { _identifier2.AnalyzedType = TokenAnalyzedType.FunctionName; }
+
+            if (anyCall.PrevStatement is Field _field)
+            { _field.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
+
             anyCall.Reference = compiledFunction;
-            if (anyCall.PrevStatement is IReferenceableTo<CompiledFunctionDefinition> _ref1)
+            if (anyCall.PrevStatement is IReferenceableTo _ref1)
             { _ref1.Reference = compiledFunction; }
+
             compiledFunction.References.Add(new(anyCall, anyCall.File));
 
             if (functionCall.CompiledType is not null)
@@ -2744,9 +2749,11 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (GetConstant(statementToSet.Content, statementToSet.File, out _, out _))
+        if (GetConstant(statementToSet.Content, statementToSet.File, out CompiledVariableConstant? constant, out _))
         {
             statementToSet.AnalyzedType = TokenAnalyzedType.ConstantName;
+            statementToSet.Reference = constant;
+
             Diagnostics.Add(Diagnostic.Critical($"Can not set constant value: it is readonly", statementToSet));
             return false;
         }

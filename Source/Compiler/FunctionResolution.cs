@@ -582,7 +582,7 @@ public partial class StatementCompiler
                     if (!GeneralType.TryGetTypeParameters(defined, passed, _typeArguments))
                     {
                         result.Errors.Add(new PossibleDiagnostic($"Could not resolve the template types",
-                            new PossibleDiagnostic($"Invalid type passed: expected something like {defined} but passed {passed}")));
+                            new PossibleDiagnostic($"Invalid type passed: expected {GeneralType.InsertTypeParameters(defined, _typeArguments) ?? defined} but passed {passed}")));
                         return result;
                     }
                 }

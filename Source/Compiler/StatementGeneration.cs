@@ -2942,25 +2942,7 @@ public partial class StatementCompiler
         if (!CompileStatement(statementToSet.PrevStatement, out CompiledStatementWithValue? _base)) return false;
         if (!CompileStatement(statementToSet.Index, out CompiledStatementWithValue? _index)) return false;
 
-        GeneralType itemType;
-
-        // TODO: (index.PrevStatement as IInFile)?.OriginalFile can be null
-        if (GetIndexGetter(_base.Type, _index.Type, statementToSet.File, out FunctionQueryResult<CompiledFunctionDefinition>? indexer2, out PossibleDiagnostic? notFoundError))
-        { itemType = OnGotStatementType(statementToSet, indexer2.Function.Type); goto OK; }
-
-        if (_base.Type.Is(out ArrayType? arrayType))
-        { itemType = OnGotStatementType(statementToSet, arrayType.Of); goto OK; }
-
-        if (_base.Type.Is(out PointerType? pointerType) &&
-            pointerType.To.Is(out arrayType))
-        { itemType = arrayType.Of; goto OK; }
-
-        Diagnostics.Add(notFoundError.ToError(statementToSet));
-        return false;
-
-    OK:
-
-        if (!CompileStatement(value, out CompiledStatementWithValue? _value, itemType)) return false;
+        if (!CompileStatement(value, out CompiledStatementWithValue? _value)) return false;
 
         if (GetIndexSetter(_base.Type, _value.Type, _index.Type, statementToSet.File, out FunctionQueryResult<CompiledFunctionDefinition>? indexer, out PossibleDiagnostic? indexerNotFoundError, AddCompilable))
         {
@@ -2974,6 +2956,23 @@ public partial class StatementCompiler
             {
                 return false;
             }
+        }
+
+        GeneralType? itemType = null;
+
+        if (_base.Type.Is(out ArrayType? arrayType))
+        {
+            itemType = OnGotStatementType(statementToSet, arrayType.Of);
+        }
+        else if (_base.Type.Is(out PointerType? pointerType) &&
+            pointerType.To.Is(out arrayType))
+        {
+            itemType = arrayType.Of;
+        }
+        else
+        {
+            Diagnostics.Add(indexerNotFoundError.ToError(statementToSet));
+            return false;
         }
 
         if (!CanCastImplicitly(_value.Type, itemType, value, out PossibleDiagnostic? castError))
@@ -3255,7 +3254,7 @@ public partial class StatementCompiler
         {
             if (function.IsTemplate) continue;
             if (function.InstructionOffset >= 0) continue;
-            if (Settings.CompileEverything || !function.References.Any())
+            if (!Settings.CompileEverything && !function.References.Any())
             {
                 if (function is IExposeable exposeable &&
                     exposeable.ExposedFunctionName is not null)

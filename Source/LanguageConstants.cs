@@ -210,6 +210,7 @@ public static class AttributeConstants
     public const string ExternalIdentifier = "External";
     public const string ExposeIdentifier = "Expose";
     public const string BuiltinIdentifier = "Builtin";
+    public const string MSILIncompatibleIdentifier = "MSILIncompatible";
 }
 
 public static class BuiltinFunctions

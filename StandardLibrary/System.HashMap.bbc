@@ -19,7 +19,7 @@ int GetHash(string v)
     while (c)
     {
         hash = ((hash << 5) + hash) + c;
-        v += sizeof(char);
+        v = ((v as int) + sizeof(char)) as string;
         c = v[0];
     }
 
@@ -45,6 +45,7 @@ u8 Equals(string a, string b)
     {
         if (a[i] != b[i]) return (u8)0;
         if (a[i] == (char)0) break;
+        i++;
     }
     return (u8)1;
 }
@@ -68,6 +69,18 @@ struct HashMap
     private int _capacity;
     private int _length;
     private Pair<TKey, TValue>*[]* _ptr;
+
+    export inline void indexer_set(TKey key, TValue value)
+    {
+        this.Add(key, value);
+    }
+
+    export TValue indexer_get(temp TKey key)
+    {
+        TValue result;
+        if (!this.Get(temp key, &result)) crash "Key isn't present in the hashmap";
+        return result;
+    }
 
     void EnsureCapacity(int capacity)
     {

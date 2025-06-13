@@ -1325,7 +1325,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         EmitStatement(statement.Value, il, ref successful);
-        Diagnostics.Add(Diagnostic.Internal($"Fake type casts are unsafe (tried to cast {statement.Value.Type} to {statement.Type})", statement));
+        Diagnostics.Add(Diagnostic.InternalNoBreak($"Fake type casts are unsafe (tried to cast {statement.Value.Type} to {statement.Type})", statement));
         successful = false;
     }
     void EmitStatement(CompiledTypeCast statement, ILProxy il, ref bool successful)
@@ -1405,7 +1405,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         if (!EmitFunction(statement.Function, out DynamicMethod? function))
         {
-            Diagnostics.Add(Diagnostic.Internal($"Failed to emit function \"{statement.Function}\"", statement));
+            Diagnostics.Add(Diagnostic.Internal($"Failed to emit function {statement.Function}", statement));
             successful = false;
             return;
         }
@@ -2292,8 +2292,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
         marshaled = null;
 
         if (function.Function is IHaveAttributes attributes &&
-            attributes.Attributes.Any(v => v.Identifier.Content == "MSILIncompatible"))
+            attributes.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
         {
+            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Function {function} marked as MSIL incompatible", attributes.Attributes.First(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier)));
             return false;
         }
 

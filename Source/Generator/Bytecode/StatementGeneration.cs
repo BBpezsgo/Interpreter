@@ -2482,12 +2482,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         while (UndefinedFunctionOffsets.Count > 0)
         {
-            foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in compilerResult.Functions)
+            foreach (UndefinedOffset undefinedOffset in UndefinedFunctionOffsets.ToArray())
             {
-                if (UndefinedFunctionOffsets.Any(v => v.Called == function))
-                { GenerateCodeForFunction(function, body); }
+                foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in compilerResult.Functions)
+                {
+                    if (undefinedOffset.Called != function) continue;
+                    GenerateCodeForFunction(function, body);
+                    goto ok;
+                }
+                Diagnostics.Add(Diagnostic.Critical($"Function {undefinedOffset.Called} wasn't compiled for some reason", undefinedOffset.CallerLocation));
+                goto failed;
+            ok:;
             }
         }
+    failed:
 
         SetUndefinedFunctionOffsets(UndefinedInstructionLabels, true);
 

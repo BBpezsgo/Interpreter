@@ -77,16 +77,7 @@
 				"cwd": "${workspaceFolder:Core}",
 				"stopAtEntry": false,
 				"console": "internalConsole",
-			},
-			{
-				"name": "Debug core dump",
-				"type": "cppdbg",
-				"request": "launch",
-				"program": "${workspaceFolder}/TestFiles/02.bbc_executable",
-				"coreDumpPath": "${workspaceFolder}/TestFiles/core",
-				"cwd": "${workspaceFolder}",
-				"MIMode": "gdb",
-				"miDebuggerPath": "/usr/bin/gdb"
+				"justMyCode": false,
 			}
 		]
 	},

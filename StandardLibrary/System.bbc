@@ -1,6 +1,7 @@
 using Primitives;
 using System.Arrays;
 using System.Console;
+using System.HashMap;
 using System.Lists;
 using System.Math;
 using System.Memory;

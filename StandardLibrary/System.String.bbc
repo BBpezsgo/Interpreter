@@ -76,7 +76,7 @@ export string +(temp string a, temp string b)
 
     int lengthSum = al + bl;
 
-    string result = Alloc((lengthSum + 1) * sizeof(char)) as string;
+    string result = new char[lengthSum + 1]* as string;
   
     for (int i = 0; i < al; i++)
     {

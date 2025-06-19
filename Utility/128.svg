@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   id="svg1"
+   width="128"
+   height="128"
+   viewBox="0 0 128 128"
+   sodipodi:docname="1.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   inkscape:dataloss="true"
+   inkscape:export-filename="../../Core/Utility/icon.svg"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     showgrid="false"
+     inkscape:zoom="6.1041338"
+     inkscape:cx="52.669225"
+     inkscape:cy="60.696572"
+     inkscape:window-width="1920"
+     inkscape:window-height="1056"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="128"
+       height="128"
+       id="page2"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <path
+     id="path7"
+     style="display:inline;mix-blend-mode:normal;fill:#9a0d91;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:5.66929;stroke-dasharray:none;stroke-opacity:1"
+     d="m 6.5354598,27.308919 v 13.410282 7.550378 4.265877 l 3.6645712,2.183992 15.70773,9.359969 -15.70773,9.365641 -3.6645712,2.17832 v 4.265877 20.455795 C 10.229293,98.025466 13.944017,95.740876 17.670988,93.475396 28.851903,86.678934 40.152037,80.076503 51.400914,73.394004 l 3.670243,-2.17832 V 66.944134 61.29979 57.101984 L 51.491678,54.906647 17.965968,34.326061 Z M 121.46454,27.81379 C 106.5903,36.877141 91.573742,45.704485 76.599085,54.60032 l -3.675915,2.17832 v 4.27155 5.644347 4.197803 l 3.579481,2.201012 33.525709,20.580584 11.43618,7.017144 V 87.275122 79.724748 75.458871 l -3.66457,-2.183992 -15.7134,-9.359972 15.7134,-9.359969 3.66457,-2.183992 v -4.265877 z"
+     inkscape:label="1" />
+</svg>

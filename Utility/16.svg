@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   version="1.1"
+   id="svg1"
+   width="15.134647"
+   height="10.995746"
+   viewBox="0 0 15.134647 10.995746"
+   sodipodi:docname="icon.svg"
+   inkscape:version="1.4 (e7c3feb100, 2024-10-09)"
+   inkscape:dataloss="true"
+   inkscape:export-filename="1.svg"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     showgrid="false"
+     inkscape:zoom="6.1041338"
+     inkscape:cx="52.669225"
+     inkscape:cy="60.696572"
+     inkscape:window-width="1920"
+     inkscape:window-height="1056"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1">
+    <inkscape:page
+       x="0"
+       y="0"
+       width="15.134647"
+       height="10.995746"
+       id="page1"
+       margin="0"
+       bleed="0" />
+  </sodipodi:namedview>
+  <path
+     id="path7"
+     style="display:inline;mix-blend-mode:normal;fill:#9a0d91;fill-opacity:1;fill-rule:nonzero;stroke:#ffffff;stroke-width:1.15995;stroke-dasharray:none;stroke-opacity:1"
+     d="M 0.57997499,1.0365873 V 2.6671982 3.58528 4.1039848 L 1.0255652,4.3695462 2.9355323,5.5076626 1.0255652,6.6464694 0.57997499,6.9113403 V 7.4300452 9.9173491 C 1.0291232,9.6353021 1.4808117,9.3575091 1.9339894,9.0820401 3.2935226,8.2556301 4.667552,7.4528142 6.035349,6.6402614 L 6.4816288,6.3753905 V 5.8559952 5.1696764 4.6592483 L 6.0463853,4.3923077 1.9698572,1.8898305 Z M 14.554673,1.0979813 C 12.746052,2.2000306 10.920128,3.2733837 9.0992975,4.3550643 L 8.6523279,4.6199351 v 0.5193954 0.6863188 0.5104281 l 0.435244,0.2676301 4.0765281,2.5024776 1.390573,0.853243 V 8.3281271 7.4100466 6.8913409 L 14.109082,6.6257804 12.198425,5.4876631 14.109082,4.3495458 14.554673,4.0839854 V 3.5652805 Z"
+     inkscape:label="1" />
+</svg>

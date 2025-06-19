@@ -85,6 +85,18 @@ struct List
         return removed;
     }
 
+    export void SwapBack(int index)
+    {
+        if (!this._ptr)
+        { crash "List not initialized"; }
+
+        if (index < 0 || index >= this._length)
+        { crash "Index out of range exception"; }
+
+        this._length--;
+        this._ptr[index] = this._ptr[this._length];
+    }
+
     void EnsureCapacity(int capacity)
     {
         if (this._capacity < capacity)

@@ -257,7 +257,7 @@ public static class Utils
 
     public static CompilerSettings BytecodeCompilerSettings => new(CodeGeneratorForMain.DefaultCompilerSettings)
     {
-
+        CompileEverything = true,
     };
 
     public static CompilerSettings BrainfuckCompilerSettings => new(LanguageCore.Brainfuck.Generator.CodeGeneratorForBrainfuck.DefaultCompilerSettings)

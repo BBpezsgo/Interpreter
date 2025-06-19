@@ -7,20 +7,6 @@ namespace LanguageCore.IL.Generator;
 
 public partial class CodeGeneratorForIL : CodeGenerator
 {
-    protected override unsafe bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = sizeof(nint);
-        error = null;
-        return true;
-    }
-
-    protected override unsafe bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = sizeof(nint);
-        error = null;
-        return true;
-    }
-
     bool LoadIndirect(GeneralType type, ILProxy il, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
@@ -108,6 +94,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         else if (type == typeof(short)) { il.Emit(OpCodes.Ldind_I2); return true; }
         else if (type == typeof(sbyte)) { il.Emit(OpCodes.Ldind_I1); return true; }
         else if (type == typeof(uint)) { il.Emit(OpCodes.Ldind_U4); return true; }
+        else if (type == typeof(char)) { il.Emit(OpCodes.Ldind_U2); return true; }
         else if (type == typeof(ushort)) { il.Emit(OpCodes.Ldind_U2); return true; }
         else if (type == typeof(byte)) { il.Emit(OpCodes.Ldind_U1); return true; }
         else if (type == typeof(float)) { il.Emit(OpCodes.Ldind_R4); return true; }
@@ -133,6 +120,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         else if (type == typeof(sbyte)) { il.Emit(OpCodes.Stind_I1); return true; }
         else if (type == typeof(ulong)) { il.Emit(OpCodes.Stind_I8); return true; }
         else if (type == typeof(uint)) { il.Emit(OpCodes.Stind_I4); return true; }
+        else if (type == typeof(char)) { il.Emit(OpCodes.Stind_I2); return true; }
         else if (type == typeof(ushort)) { il.Emit(OpCodes.Stind_I2); return true; }
         else if (type == typeof(byte)) { il.Emit(OpCodes.Stind_I1); return true; }
         else if (type == typeof(float)) { il.Emit(OpCodes.Stind_R4); return true; }
@@ -378,4 +366,101 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
         return true;
     }
+
+    readonly Dictionary<Type, int> _sizeOfCache = new();
+    int SizeOf(Type type)
+    {
+        if (_sizeOfCache.TryGetValue(type, out int result)) return result;
+        DynamicMethod dm = new("func", typeof(int),
+            Type.EmptyTypes, typeof(Utils)
+        );
+        ILGenerator il = dm.GetILGenerator();
+        il.Emit(OpCodes.Sizeof, type);
+        il.Emit(OpCodes.Ret);
+        result = _sizeOfCache[type] = ((Func<int>)dm.CreateDelegate(typeof(Func<int>)))();
+        return result;
+    }
+
+    #region Find Size
+
+    protected override unsafe bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        size = sizeof(nint);
+        error = null;
+        return true;
+    }
+
+    protected override unsafe bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        size = sizeof(nint);
+        error = null;
+        return true;
+    }
+
+    protected override bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        if (!ToType(type, out Type? _type, out error))
+        {
+            size = default;
+            return false;
+        }
+
+        size = SizeOf(_type);
+
+        if (base.FindSize(type, out int expectedSize, out _))
+        {
+            if (size != expectedSize)
+            {
+                Debugger.Break();
+                throw null;
+            }
+        }
+
+        return true;
+    }
+
+    protected override bool FindSize(StructType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        if (!ToType(type, out Type? _type, out error))
+        {
+            size = default;
+            return false;
+        }
+
+        size = SizeOf(_type);
+
+        if (base.FindSize(type, out int expectedSize, out _))
+        {
+            if (size != expectedSize)
+            {
+                Debugger.Break();
+                throw null;
+            }
+        }
+
+        return true;
+    }
+
+    protected override bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        size = default;
+        error = default;
+        switch (type.Type)
+        {
+            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
+            case BasicType.U8: size = sizeof(byte); return true;
+            case BasicType.I8: size = sizeof(sbyte); return true;
+            case BasicType.U16: size = sizeof(ushort); return true;
+            case BasicType.I16: size = sizeof(short); return true;
+            case BasicType.U32: size = sizeof(uint); return true;
+            case BasicType.I32: size = sizeof(int); return true;
+            case BasicType.U64: size = sizeof(ulong); return true;
+            case BasicType.I64: size = sizeof(long); return true;
+            case BasicType.F32: size = sizeof(float); return true;
+            default: throw new UnreachableException();
+        }
+    }
+
+    #endregion
 }

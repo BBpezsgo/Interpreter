@@ -1029,7 +1029,15 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
                     EmitStatement(v.Base, il, ref successful);
                     EmitStatement(v.Index, il, ref successful);
-                    il.Emit(OpCodes.Ldelema, elementType);
+                    EmitValue(SizeOf(elementType), il);
+                    il.Emit(OpCodes.Mul);
+                    il.Emit(OpCodes.Add);
+
+                    if (!LoadIndirect(elementType, il, out PossibleDiagnostic? loadIndirectError))
+                    {
+                        Diagnostics.Add(loadIndirectError.ToError(statement));
+                        successful = false;
+                    }
 
                     break;
                 }
@@ -1093,6 +1101,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
                 EmitStatement(arrayType.Length, il, ref successful);
                 il.Emit(OpCodes.Newarr, type);
+                EmitValue(0, il);
+                il.Emit(OpCodes.Ldelema, type);
                 return;
             }
 
@@ -1271,7 +1281,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 IsUnmanaged(toTypePT))
             {
                 EmitStatement(statement.Value, il, ref successful);
-                Diagnostics.Add(Diagnostic.Warning($"Be careful! (casting {statement.Value.Type} to {statement.Type})", statement));
+                if (!fromTypePT.Equals(toTypeP))
+                {
+                    Diagnostics.Add(Diagnostic.Warning($"Be careful! (casting {statement.Value.Type.FinalValue} to {statement.Type.FinalValue})", statement));
+                }
                 return;
             }
         }
@@ -1517,37 +1530,29 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        if (statement.IsASCII)
+        Type elementType = statement.IsASCII ? typeof(byte) : typeof(char);
+        int elementSize = statement.IsASCII ? sizeof(byte) : sizeof(char);
+
+        EmitValue(statement.Value.Length + 1, il);
+        il.Emit(OpCodes.Newarr, elementType);
+        EmitValue(0, il);
+        il.Emit(OpCodes.Ldelema, elementType);
+
+        for (int i = 0; i < statement.Value.Length; i++)
         {
-            EmitValue(statement.Value.Length + 1, il);
-            il.Emit(OpCodes.Newarr, typeof(byte));
-            for (int i = 0; i < statement.Value.Length; i++)
-            {
-                il.Emit(OpCodes.Dup);
-                EmitValue(i, il);
-                EmitValue((byte)statement.Value[i], il);
-                il.Emit(OpCodes.Stelem_I1);
-            }
             il.Emit(OpCodes.Dup);
-            EmitValue(statement.Value.Length, il);
-            EmitValue(0, il);
-            il.Emit(OpCodes.Stelem_I1);
-        }
-        else
-        {
-            EmitValue(statement.Value.Length + 1, il);
-            il.Emit(OpCodes.Newarr, typeof(char));
-            for (int i = 0; i < statement.Value.Length; i++)
+            if (i != 0)
             {
-                il.Emit(OpCodes.Dup);
-                EmitValue(i, il);
-                EmitValue(statement.Value[i], il);
-                il.Emit(OpCodes.Stelem_I2);
+                EmitValue(i * elementSize, il);
+                il.Emit(OpCodes.Add);
             }
-            il.Emit(OpCodes.Dup);
-            EmitValue(statement.Value.Length, il);
-            EmitValue(0, il);
-            il.Emit(OpCodes.Stelem_I2);
+            EmitValue(statement.Value[i], il);
+            if (!StoreIndirect(elementType, il, out PossibleDiagnostic? storeIndirectError))
+            {
+                Diagnostics.Add(storeIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
         }
     }
     void EmitStatement(CompiledIndexGetter statement, ILProxy il, ref bool successful)
@@ -1563,27 +1568,33 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
 
             EmitStatement(statement.Base, il, ref successful);
-            il.Emit(OpCodes.Conv_U);
 
-            EmitStatement(statement.Index, il, ref successful);
-            il.Emit(OpCodes.Conv_I);
-
-            if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
+            if (statement.Index is CompiledEvaluatedValue evaluatedIndex && evaluatedIndex.Value == 0)
             {
-                Diagnostics.Add(typeError.ToError(statement.Base));
-                successful = false;
-                return;
-            }
-            if (elementSize != 1)
-            {
-                EmitValue(elementSize, il);
-
-                il.Emit(OpCodes.Mul);
-                il.Emit(OpCodes.Add);
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Index 0", statement.Base));
             }
             else
             {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+                EmitStatement(statement.Index, il, ref successful);
+
+                if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
+                {
+                    Diagnostics.Add(typeError.ToError(statement.Base));
+                    successful = false;
+                    return;
+                }
+
+                if (elementSize != 1)
+                {
+                    EmitValue(elementSize, il);
+
+                    il.Emit(OpCodes.Mul);
+                    il.Emit(OpCodes.Add);
+                }
+                else
+                {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+                }
             }
 
             if (!LoadIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
@@ -1626,10 +1637,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
 
             EmitStatement(statement.Base, il, ref successful);
-            il.Emit(OpCodes.Conv_U);
 
             EmitStatement(statement.Index, il, ref successful);
-            il.Emit(OpCodes.Conv_I);
 
             if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
             {
@@ -1850,11 +1859,19 @@ public partial class CodeGeneratorForIL : CodeGenerator
         _ => throw new UnreachableException(),
     };
 
-    static bool ToType(PointerType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool ToType(PointerType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
-        result = typeof(nint);
-        return true;
+        if (false && type.To.Is(out ArrayType? arrayType) && ToType(arrayType.Of, out Type? arrayOf, out _))
+        {
+            result = arrayOf.MakeArrayType();
+            return true;
+        }
+        else
+        {
+            result = typeof(nint);
+            return true;
+        }
     }
     static bool ToType(BuiltinType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
@@ -1965,7 +1982,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         string id = GenerateTypeId(type);
 
-        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType));
+        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1);
 
         StringBuilder? stringBuilder = Builders is null ? null : new();
 
@@ -2041,7 +2058,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
-        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), elementSize * (int)_length.Value);
+        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1, elementSize * (int)_length.Value);
 
         StringBuilder? stringBuilder = Builders is null ? null : new();
 

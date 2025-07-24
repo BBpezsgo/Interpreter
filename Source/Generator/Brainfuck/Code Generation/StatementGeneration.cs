@@ -1340,10 +1340,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using (Code.Block(this, $"For"))
         {
-            VariableCleanupStack.Push(PrecompileVariable(@for.VariableDeclaration, false));
+            VariableCleanupStack.Push(@for.VariableDeclaration is null ? 0 : PrecompileVariables(@for.VariableDeclaration, false));
 
-            using (Code.Block(this, "Variable Declaration"))
-            { GenerateCodeForStatement(@for.VariableDeclaration); }
+            if (@for.VariableDeclaration is not null)
+            {
+                using (Code.Block(this, "Variable Declaration"))
+                { GenerateCodeForStatement(@for.VariableDeclaration); }
+            }
 
             int conditionAddress = Stack.NextAddress;
             using (Code.Block(this, "Compute condition"))

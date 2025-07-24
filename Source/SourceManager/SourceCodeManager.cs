@@ -5,21 +5,41 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
+public class ImportIndex
+{
+    public readonly List<ImportIndex> Children = new();
+
+    public void ToList(List<ImportIndex> list)
+    {
+        list.Add(this);
+        foreach (ImportIndex child in Children) child.ToList(list);
+    }
+
+    public ImportIndex Next()
+    {
+        ImportIndex importIndex = new();
+        Children.Add(importIndex);
+        return importIndex;
+    }
+}
+
 public readonly record struct ParsedFile(
     Uri File,
     UsingDefinition? Using,
     TokenizerResult Tokens,
-    ParserResult AST
+    ParserResult AST,
+    ImportIndex Index
 );
 
 record PendingFile(
     Uri Uri,
     UsingDefinition? Initiator,
 #if UNITY
-    UnityEngine.Awaitable<Stream> Task
+    UnityEngine.Awaitable<Stream> Task,
 #else
-    Task<Stream> Task
+    Task<Stream> Task,
 #endif
+    ImportIndex Index
 );
 
 public class SourceCodeManager
@@ -99,16 +119,16 @@ public class SourceCodeManager
             if (ast.Usings.Any())
             { Output.LogDebug("Loading files ..."); }
 
-            ParsedFiles.Add(new ParsedFile(finishedFile.Uri, finishedFile.Initiator, tokens, ast));
+            ParsedFiles.Add(new ParsedFile(finishedFile.Uri, finishedFile.Initiator, tokens, ast, finishedFile.Index));
 
             foreach (UsingDefinition @using in ast.Usings)
             {
-                LoadSource(@using, @using.PathString, finishedFile.Uri, out _);
+                LoadSource(@using, finishedFile.Index, @using.PathString, finishedFile.Uri, out _);
             }
         }
     }
 
-    bool LoadSource(UsingDefinition? initiator, string requestedFile, Uri? currentFile, [NotNullWhen(true)] out Uri? resolvedUri)
+    bool LoadSource(UsingDefinition? initiator, ImportIndex initiatorIndex, string requestedFile, Uri? currentFile, [NotNullWhen(true)] out Uri? resolvedUri)
     {
         resolvedUri = null;
         bool wasHandlerFound = false;
@@ -151,9 +171,9 @@ public class SourceCodeManager
 #if UNITY
                         UnityEngine.AwaitableCompletionSource<Stream> task = new();
                         task.SetResult(res.Stream);
-                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, task.Awaitable));
+                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, task.Awaitable, initiatorIndex.Next()));
 #else
-                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, Task.FromResult(res.Stream)));
+                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, Task.FromResult(res.Stream), initiatorIndex.Next()));
 #endif
                         return true;
                     case SourceProviderResultType.NotFound:
@@ -190,7 +210,7 @@ public class SourceCodeManager
                             Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position, initiator?.File));
                             return false;
                         }
-                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, res.Stream));
+                        PendingFiles.Add(new PendingFile(resolvedUri, initiator, res.Stream, initiatorIndex.Next()));
                         return true;
                     case SourceProviderResultType.NotFound:
                         resolvedUri = res.ResolvedUri!;
@@ -325,9 +345,11 @@ public class SourceCodeManager
     {
         Uri? resolvedEntry = null;
 
+        ImportIndex rootIndex = new();
+
         if (file is not null)
         {
-            if (!LoadSource(null, file, null, out resolvedEntry))
+            if (!LoadSource(null, rootIndex, file, null, out resolvedEntry))
             {
                 if (resolvedEntry is null)
                 { Uri.TryCreate(file, UriKind.RelativeOrAbsolute, out resolvedEntry); }
@@ -344,7 +366,7 @@ public class SourceCodeManager
         {
             foreach (string additionalImport in additionalImports)
             {
-                LoadSource(null, additionalImport, null, out _);
+                LoadSource(null, rootIndex, additionalImport, null, out _);
             }
         }
 
@@ -357,9 +379,27 @@ public class SourceCodeManager
             ProcessPendingFiles();
         }
 
+        List<ImportIndex> importIndices = new(ParsedFiles.Count + 1);
+        rootIndex.ToList(importIndices);
+
+        List<ParsedFile> sortedParsedFiles = new(ParsedFiles.Count);
+
+        foreach (ImportIndex importIndex in importIndices.Skip(1)) // Skip root
+        {
+            ParsedFile? found = default;
+            foreach (ParsedFile parsedFile in ParsedFiles)
+            {
+                if (parsedFile.Index != importIndex) continue;
+                found = parsedFile;
+                break;
+            }
+            if (!found.HasValue) throw new UnreachableException();
+            sortedParsedFiles.Add(found.Value);
+        }
+
         return new()
         {
-            ParsedFiles = ParsedFiles.ToImmutableArray(),
+            ParsedFiles = sortedParsedFiles.ToImmutableArray(),
             ResolvedEntry = resolvedEntry,
         };
     }

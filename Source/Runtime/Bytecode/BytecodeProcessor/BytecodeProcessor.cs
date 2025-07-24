@@ -78,12 +78,35 @@ public class BytecodeProcessor
     public unsafe void RunUntilCompletion()
     {
         ProcessorState state = GetState();
-        while (Tick(ref state)) { }
+        RunUntilCompletion(ref state);
     }
 
     public unsafe void RunUntilCompletion(ref ProcessorState state)
     {
-        while (Tick(ref state)) { }
+        try
+        {
+        restart:
+            while (!state.IsDone)
+            {
+                if (IO.IsAwaitingInput) { System.Threading.Thread.Yield(); continue; }
+
+                state.Tick();
+                state.ThrowIfCrashed(DebugInformation);
+            }
+            HandleUserCalls(ref state);
+            if (!state.IsDone) goto restart;
+        }
+        catch (RuntimeException runtimeException)
+        {
+            runtimeException.DebugInformation = DebugInformation;
+            runtimeException.Context ??= GetContext();
+            throw;
+        }
+        finally
+        {
+            Registers = state.Registers;
+            HotFunctions = state.HotFunctions;
+        }
     }
 
     /// <returns>
@@ -107,6 +130,7 @@ public class BytecodeProcessor
         catch (RuntimeException runtimeException)
         {
             runtimeException.DebugInformation = DebugInformation;
+            runtimeException.Context ??= GetContext();
             throw;
         }
     }
@@ -125,7 +149,6 @@ public class BytecodeProcessor
         {
             CurrentUserCall = userCall;
             BeginUserCall(ref state, userCall);
-
         }
     }
 

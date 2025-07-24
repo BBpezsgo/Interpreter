@@ -1,6 +1,6 @@
 namespace LanguageCore.Compiler;
 
-class Scope
+public class Scope
 {
     public readonly Stack<CompiledVariableDeclaration> Variables;
     public readonly ImmutableArray<CompiledVariableConstant> Constants;

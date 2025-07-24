@@ -359,8 +359,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
             }
         }
-        catch
+        catch (Exception e)
         {
+#if UNITY
+            UnityEngine.Debug.LogException(e);
+#endif
             Debugger.Break();
             return false;
         }
@@ -411,8 +414,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             if (size != expectedSize)
             {
-                Debugger.Break();
-                throw null;
+                error = new PossibleDiagnostic($"Generated struct's ({type}) size ({size}) doesn't match with the expected size ({expectedSize}).");
+                return false;
             }
         }
 
@@ -433,8 +436,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             if (size != expectedSize)
             {
-                Debugger.Break();
-                throw null;
+                error = new PossibleDiagnostic($"Generated struct's ({type}) size ({size}) doesn't match with the expected size ({expectedSize}).");
+                return false;
             }
         }
 

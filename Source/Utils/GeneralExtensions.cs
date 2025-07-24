@@ -64,6 +64,12 @@ public static class GeneralExtensions
         { v.Add(pair.Key, pair.Value); }
     }
 
+    public static IEnumerable<T> Append<T>(this IEnumerable<T> v, IEnumerable<T> values)
+    {
+        foreach (T value in values) v = v.Append(value);
+        return v;
+    }
+
     public static void AddSorted<T>(this List<T> list, T value)
     {
         int x = list.BinarySearch(value);

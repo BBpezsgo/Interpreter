@@ -13,6 +13,7 @@ public enum ExternalFunctionScopedSyncFlags : byte
     None = 0,
     MSILPointerMarshal = 1 << 1,
     MSILSafe = 1 << 2,
+    MSILUnsafe = 1 << 3,
 }
 
 public unsafe struct ExternalFunctionScopedSync : IExternalFunction

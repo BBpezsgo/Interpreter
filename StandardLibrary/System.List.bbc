@@ -42,6 +42,20 @@ struct List
         this._ptr = new T[capacity]*;
     }
 
+    export List<T>()
+    {
+        this._capacity = 4;
+        this._length = 0;
+        this._ptr = new T[4]*;
+    }
+
+    export List<T>*()
+    {
+        this._capacity = 4;
+        this._length = 0;
+        this._ptr = new T[4]*;
+    }
+
     export destructor()
     {
         if (this._ptr)

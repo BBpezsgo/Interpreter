@@ -23,16 +23,17 @@ class DynamicScopeTokenResolver : ITokenResolver
 
     static DynamicScopeTokenResolver()
     {
-        BindingFlags s_bfInternal = BindingFlags.NonPublic | BindingFlags.Instance;
-        _indexer = Type.GetType("System.Reflection.Emit.DynamicScope").GetProperty("Item", s_bfInternal);
-        _scopeFi = Type.GetType("System.Reflection.Emit.DynamicILGenerator").GetField("m_scope", s_bfInternal);
+        const BindingFlags s_bfInternal = BindingFlags.NonPublic | BindingFlags.Instance;
+
+        _indexer = Type.GetType("System.Reflection.Emit.DynamicScope")?.GetProperty("Item", s_bfInternal);
+        _scopeFi = Type.GetType("System.Reflection.Emit.DynamicILGenerator")?.GetField("m_scope", s_bfInternal);
 
         _varArgMethodType = Type.GetType("System.Reflection.Emit.VarArgMethod");
-        _varargFi1 = _varArgMethodType.GetField("m_method", s_bfInternal);
+        _varargFi1 = _varArgMethodType?.GetField("m_method", s_bfInternal);
 
         _genMethodInfoType = Type.GetType("System.Reflection.Emit.GenericMethodInfo");
-        _genmethFi1 = _genMethodInfoType.GetField("m_methodHandle", s_bfInternal);
-        _genmethFi2 = _genMethodInfoType.GetField("m_context", s_bfInternal);
+        _genmethFi1 = _genMethodInfoType?.GetField("m_methodHandle", s_bfInternal);
+        _genmethFi2 = _genMethodInfoType?.GetField("m_context", s_bfInternal);
 
         _genFieldInfoType = Type.GetType("System.Reflection.Emit.GenericFieldInfo", false);
         if (_genFieldInfoType != null)

@@ -411,6 +411,15 @@ public abstract class GeneralType :
             case AliasType: // TODO
                 return null;
 
+            case FunctionType functionType:
+            {
+                GeneralType? returnType = InsertTypeParameters(functionType.ReturnType, typeArguments);
+                IEnumerable<GeneralType>? parameters = InsertTypeParameters(functionType.Parameters, typeArguments);
+                if (returnType is null) return null;
+                if (parameters is null) return null;
+                return new FunctionType(returnType, parameters);
+            }
+
             default:
                 throw new NotImplementedException();
         }

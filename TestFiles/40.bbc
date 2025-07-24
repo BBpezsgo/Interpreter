@@ -1,5 +1,4 @@
 using System;
-using System.Lists;
 
 List<int>* list = new List<int>*;
 list.Add(66);

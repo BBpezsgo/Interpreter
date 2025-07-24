@@ -61,8 +61,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         HashSet<string> definedFields = new();
 
-        string targetsFieldName = MakeUnique("targets", v => !definedFields.Contains(v));
-        string memoryFieldName = MakeUnique("memory", v => !definedFields.Contains(v));
+        string targetsFieldName = Utils.MakeUnique("targets", v => !definedFields.Contains(v));
+        string memoryFieldName = Utils.MakeUnique("memory", v => !definedFields.Contains(v));
 
         globalContextType.DefineField(targetsFieldName, typeof(object[]), FieldAttributes.Assembly | FieldAttributes.Static);
         definedFields.Add(targetsFieldName);
@@ -81,7 +81,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 Diagnostics.Add(typeError.ToError(globalVariable));
                 continue;
             }
-            string fieldName = MakeUnique(globalVariable.Identifier, v => !definedFields.Contains(v));
+            string fieldName = Utils.MakeUnique($"g_{globalVariable.Identifier}", v => !definedFields.Contains(v));
             variableFieldMap[globalVariable] = fieldName;
             globalContextType.DefineField(fieldName, type, FieldAttributes.Assembly | FieldAttributes.Static);
             definedFields.Add(fieldName);
@@ -90,7 +90,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         GlobalContextType = globalContextType.CreateType();
 
         GlobalContextType_Targets = GlobalContextType.GetField(targetsFieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static) ?? throw new NullReferenceException();
-        GlobalContextType_Targets.SetValue(Array.Empty<object>(), null);
+        GlobalContextType_Targets.SetValue(null, Array.Empty<object>());
 
         foreach (KeyValuePair<CompiledVariableDeclaration, string> item in variableFieldMap)
         {

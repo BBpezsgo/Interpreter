@@ -1,6 +1,6 @@
 using Primitives;
 using System.Memory;
-using System.Lists;
+using System.List;
 
 /*
  * Splits the string `string` based on the specified separator `separator` and adds

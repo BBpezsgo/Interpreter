@@ -560,7 +560,7 @@ public class CompiledWhileLoop : CompiledStatement
 
 public class CompiledForLoop : CompiledStatement
 {
-    public required CompiledVariableDeclaration VariableDeclaration { get; init; }
+    public required CompiledStatement? VariableDeclaration { get; init; }
     public required CompiledStatementWithValue Condition { get; init; }
     public required CompiledStatement Expression { get; init; }
     public required CompiledStatement Body { get; init; }
@@ -569,7 +569,7 @@ public class CompiledForLoop : CompiledStatement
     {
         StringBuilder res = new();
 
-        res.Append($"for ({VariableDeclaration.Stringify(depth + 1)}; {Condition.Stringify(depth + 1)}; {Expression.Stringify(depth + 1)})");
+        res.Append($"for ({VariableDeclaration?.Stringify(depth + 1)}; {Condition.Stringify(depth + 1)}; {Expression.Stringify(depth + 1)})");
         res.Append(' ');
         res.Append(Body.Stringify(depth));
 

@@ -145,7 +145,7 @@ public class Diagnostic :
 
     public Diagnostic Break()
     {
-#if DEBUG
+#if DEBUG && !UNITY
         if (!_isDebugged)
         { Debugger.Break(); }
         _isDebugged = true;

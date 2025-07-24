@@ -659,7 +659,7 @@ public ref partial struct ProcessorState
             }
             else
             {
-                if (HotFunctions.CurrentHotFunctionDepth++ == 0)
+                if (!scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILUnsafe) && HotFunctions.CurrentHotFunctionDepth++ == 0)
                 {
                     HotFunctions.HotFunctionStarted = HotFunctions.Cycle;
                     HotFunctions.CurrentHotFunction = CurrentInstruction.Operand1.Int;
@@ -701,7 +701,13 @@ public ref partial struct ProcessorState
                 }
                 else
                 {
-                    throw new Exception($"{elapsed}");
+                    for (int i = 0; i < ScopedExternalFunctions.Length; i++)
+                    {
+                        ref ExternalFunctionScopedSync scopedExternalFunction = ref MemoryMarshal.GetReference(ScopedExternalFunctions[i..]);
+                        if (scopedExternalFunction.Id != HotFunctions.CurrentHotFunction) continue;
+                        scopedExternalFunction.Flags |= ExternalFunctionScopedSyncFlags.MSILUnsafe;
+                        break;
+                    }
                 }
             }
 

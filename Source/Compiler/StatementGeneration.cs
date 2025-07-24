@@ -474,11 +474,11 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (keywordCall.Identifier.Content == "goto")
+        if (keywordCall.Identifier.Content == StatementKeywords.Goto)
         {
             if (keywordCall.Arguments.Length != 1)
             {
-                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to \"{"goto"}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
+                Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to \"{StatementKeywords.Goto}\": required {1} passed {keywordCall.Arguments.Length}", keywordCall));
                 return false;
             }
 
@@ -1074,7 +1074,6 @@ public partial class StatementCompiler
         {
             CompiledOperatorDefinition? operatorDefinition = result.Function;
 
-            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
@@ -1088,6 +1087,11 @@ public partial class StatementCompiler
                 compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
                 @operator.PredictedValue = evaluated;
+                operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File, true));
+            }
+            else
+            {
+                operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
             }
 
             return true;
@@ -1301,7 +1305,6 @@ public partial class StatementCompiler
         {
             CompiledOperatorDefinition? operatorDefinition = result.Function;
 
-            operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
@@ -1328,6 +1331,7 @@ public partial class StatementCompiler
                     return false;
                 }
 
+                operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
                 return CompileFunctionCall_External(compiledArguments, @operator.SaveValue, operatorDefinition, externalFunction, @operator.Location, out compiledStatement);
             }
 
@@ -1347,6 +1351,11 @@ public partial class StatementCompiler
                 compiledStatement = CompiledEvaluatedValue.Create(casted, compiledStatement);
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
                 @operator.PredictedValue = casted;
+                operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File, true));
+            }
+            else
+            {
+                operatorDefinition.References.Add(new Reference<StatementWithValue>(@operator, @operator.File));
             }
 
             return true;
@@ -2107,9 +2116,12 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        Scope scope = Scopes.Push(CompileScope(Enumerable.Repeat(forLoop.VariableDeclaration, 1)));
+        Scope scope = Scopes.Push(CompileScope(forLoop.VariableDeclaration is null ? Enumerable.Empty<Statement>() : Enumerable.Repeat(forLoop.VariableDeclaration, 1)));
 
-        if (!CompileStatement(forLoop.VariableDeclaration, out CompiledStatement? variableDeclaration)) return false;
+        CompiledStatement? variableDeclaration = null;
+        if (forLoop.VariableDeclaration is not null &&
+            !CompileStatement(forLoop.VariableDeclaration, out variableDeclaration))
+        { return false; }
 
         /*
         if (AllowEvaluating &&
@@ -2154,7 +2166,7 @@ public partial class StatementCompiler
 
         compiledStatement = new CompiledForLoop()
         {
-            VariableDeclaration = (CompiledVariableDeclaration)variableDeclaration,
+            VariableDeclaration = variableDeclaration,
             Condition = condition,
             Expression = expression,
             Body = body,

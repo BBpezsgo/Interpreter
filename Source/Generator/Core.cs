@@ -43,10 +43,12 @@ public static class ReferenceExtensions
 public readonly struct Reference
 {
     public Uri SourceFile { get; }
+    public bool IsImplicit { get; }
 
-    public Reference(Uri sourceFile)
+    public Reference(Uri sourceFile, bool isImplicit = false)
     {
         SourceFile = sourceFile;
+        IsImplicit = isImplicit;
     }
 }
 
@@ -54,14 +56,16 @@ public readonly struct Reference<TSource>
 {
     public TSource Source { get; }
     public Uri SourceFile { get; }
+    public bool IsImplicit { get; }
 
-    public Reference(TSource source, Uri sourceFile)
+    public Reference(TSource source, Uri sourceFile, bool isImplicit = false)
     {
         Source = source;
         SourceFile = sourceFile;
+        IsImplicit = isImplicit;
     }
 
-    public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile);
+    public static implicit operator Reference(Reference<TSource> v) => new(v.SourceFile, v.IsImplicit);
 }
 
 public interface IHaveInstructionOffset

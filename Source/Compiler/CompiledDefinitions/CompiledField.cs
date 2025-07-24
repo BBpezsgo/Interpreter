@@ -17,4 +17,6 @@ public class CompiledField : FieldDefinition,
         Type = type;
         Context = context;
     }
+
+    public override string ToString() => $"{Type} {Identifier}";
 }

@@ -9,6 +9,20 @@ public interface IDuplicatable<T> where T : notnull
 
 public static class Utils
 {
+    public static string MakeUnique(string value, Func<string, bool> uniqueChecker)
+    {
+        if (uniqueChecker.Invoke(value)) return value;
+
+        for (int i = 0; i < 64; i++)
+        {
+            string candidate = $"{value}_{i}";
+            if (uniqueChecker.Invoke(candidate)) return candidate;
+            continue;
+        }
+
+        throw new InternalExceptionWithoutContext($"Failed to generate unique id for {value}");
+    }
+
     /// <summary>
     /// Source: <see href="https://stackoverflow.com/questions/3855956/check-if-an-executable-exists-in-the-windows-path"/>
     /// </summary>

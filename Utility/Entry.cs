@@ -77,10 +77,16 @@ public static class Entry
                 BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
 
+                List<ExternalConstant> externalConstants = new()
+                {
+                    new ExternalConstant("heap_size", arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize )
+                };
+
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
                     DontOptimize = arguments.DontOptimize,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
+                    ExternalConstants = externalConstants.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
                     AdditionalImports = additionalImports,
                     SourceProviders = ImmutableArray.Create<ISourceProvider>(
@@ -98,6 +104,12 @@ public static class Entry
                     CheckNullPointers = !arguments.NoNullcheck,
                     DontOptimize = arguments.DontOptimize,
                     StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
+                    ILGeneratorSettings = new IL.Generator.ILGeneratorSettings()
+                    {
+                        AllowCrash = true,
+                        // AllowHeap = true,
+                        AllowPointers = true,
+                    },
                 };
                 BytecodeInterpreterSettings bytecodeInterpreterSettings = new(BytecodeInterpreterSettings.Default)
                 {
@@ -173,92 +185,95 @@ public static class Entry
                     }
                 }
 
-                static void PrintStuff(BytecodeProcessor interpreter)
+                void PrintStuff(BytecodeProcessor interpreter)
                 {
 #if DEBUG
-                    Console.WriteLine();
-                    Console.WriteLine($" ===== HEAP ===== ");
-                    Console.WriteLine();
-
-                    if (interpreter.Memory.AsSpan().Get<int>(0) != 0)
+                    if (arguments.PrintMemory)
                     {
-                        int endlessSafe = interpreter.Memory.Length;
-                        int i = 0;
-                        while (i + BytecodeHeapImplementation.HeaderSize < 127)
+                        Console.WriteLine();
+                        Console.WriteLine($" ===== HEAP ===== ");
+                        Console.WriteLine();
+
+                        if (interpreter.Memory.AsSpan().Get<int>(0) != 0)
                         {
-                            (int size, bool status) = BytecodeHeapImplementation.GetHeader(interpreter.Memory, i);
-
-                            Console.Write($"BLOCK {i}: ");
-
-                            Console.Write($"SIZE: {size} ");
-
-                            if (status)
+                            int endlessSafe = interpreter.Memory.Length;
+                            int i = 0;
+                            while (i + BytecodeHeapImplementation.HeaderSize < 127)
                             {
-                                Console.ForegroundColor = ConsoleColor.Yellow;
-                                Console.Write("USED");
-                                Console.ResetColor();
-                                Console.Write(" :");
-                                Console.WriteLine();
+                                (int size, bool status) = BytecodeHeapImplementation.GetHeader(interpreter.Memory, i);
 
-                                for (int j = 0; j < size; j++)
+                                Console.Write($"BLOCK {i}: ");
+
+                                Console.Write($"SIZE: {size} ");
+
+                                if (status)
                                 {
-                                    int address = i + BytecodeHeapImplementation.HeaderSize + j;
-                                    if (address >= interpreter.Memory.Length) break;
-                                    Console.ForegroundColor = ConsoleColor.Green;
-                                    Console.Write(interpreter.Memory.AsSpan().Get<byte>(address));
-                                    Console.Write(" ");
+                                    Console.ForegroundColor = ConsoleColor.Yellow;
+                                    Console.Write("USED");
+                                    Console.ResetColor();
+                                    Console.Write(" :");
+                                    Console.WriteLine();
+
+                                    for (int j = 0; j < size; j++)
+                                    {
+                                        int address = i + BytecodeHeapImplementation.HeaderSize + j;
+                                        if (address >= interpreter.Memory.Length) break;
+                                        Console.ForegroundColor = ConsoleColor.Green;
+                                        Console.Write(interpreter.Memory.AsSpan().Get<byte>(address));
+                                        Console.Write(" ");
+                                    }
+                                    Console.ResetColor();
+                                    Console.WriteLine();
+                                    Console.WriteLine();
                                 }
-                                Console.ResetColor();
-                                Console.WriteLine();
-                                Console.WriteLine();
-                            }
-                            else
-                            {
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.Write("FREE");
-                                Console.ResetColor();
-                                Console.WriteLine();
-                            }
+                                else
+                                {
+                                    Console.ForegroundColor = ConsoleColor.Green;
+                                    Console.Write("FREE");
+                                    Console.ResetColor();
+                                    Console.WriteLine();
+                                }
 
-                            i += size + BytecodeHeapImplementation.HeaderSize;
+                                i += size + BytecodeHeapImplementation.HeaderSize;
 
-                            if (endlessSafe-- < 0) throw new EndlessLoopException();
+                                if (endlessSafe-- < 0) throw new EndlessLoopException();
+                            }
                         }
-                    }
-                    else
-                    { Console.WriteLine("Empty"); }
+                        else
+                        { Console.WriteLine("Empty"); }
 
-                    Console.WriteLine();
-                    Console.WriteLine($" ===== STACK ===== ");
-                    Console.WriteLine();
+                        Console.WriteLine();
+                        Console.WriteLine($" ===== STACK ===== ");
+                        Console.WriteLine();
 
-                    IEnumerable<byte> stack;
+                        IEnumerable<byte> stack;
 #pragma warning disable CS0162 // Unreachable code detected
-                    if (ProcessorState.StackDirection > 0)
-                    {
-                        stack = new ArraySegment<byte>(interpreter.Memory)[interpreter.StackStart..interpreter.Registers.StackPointer];
-                    }
-                    else
-                    {
-                        stack = new ArraySegment<byte>(interpreter.Memory)[interpreter.Registers.StackPointer..(interpreter.StackStart + 1)].Reverse();
-                    }
+                        if (ProcessorState.StackDirection > 0)
+                        {
+                            stack = new ArraySegment<byte>(interpreter.Memory)[interpreter.StackStart..interpreter.Registers.StackPointer];
+                        }
+                        else
+                        {
+                            stack = new ArraySegment<byte>(interpreter.Memory)[interpreter.Registers.StackPointer..(interpreter.StackStart + 1)].Reverse();
+                        }
 #pragma warning restore CS0162 // Unreachable code detected
 
-                    int n = 0;
-                    foreach (byte item in stack)
-                    {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(item);
-                        Console.WriteLine();
-                        if (n++ > 200)
+                        int n = 0;
+                        foreach (byte item in stack)
                         {
-                            Console.ForegroundColor = ConsoleColor.Gray;
-                            Console.WriteLine("...");
-                            break;
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write(item);
+                            Console.WriteLine();
+                            if (n++ > 200)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Gray;
+                                Console.WriteLine("...");
+                                break;
+                            }
                         }
-                    }
 
-                    Console.ResetColor();
+                        Console.ResetColor();
+                    }
 #endif
                 }
 
@@ -314,8 +329,7 @@ public static class Entry
 
                     try
                     {
-                        while (!interpreter.IsDone)
-                        { interpreter.Tick(); }
+                        interpreter.RunUntilCompletion();
                     }
                     catch (UserException error)
                     {

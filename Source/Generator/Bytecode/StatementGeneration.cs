@@ -1134,10 +1134,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment("for (...) {");
 
-        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, Enumerable.Repeat(forLoop.VariableDeclaration, 1), false);
+        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, forLoop.VariableDeclaration is CompiledVariableDeclaration wah ? Enumerable.Repeat(wah, 1) : Enumerable.Empty<CompiledVariableDeclaration>(), false);
 
-        AddComment("For-loop variable");
-        GenerateCodeForStatement(forLoop.VariableDeclaration);
+        if (forLoop.VariableDeclaration is not null)
+        {
+            AddComment("For-loop variable");
+            GenerateCodeForStatement(forLoop.VariableDeclaration);
+        }
 
         AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;

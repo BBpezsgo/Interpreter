@@ -427,8 +427,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         if (statement.IsGlobal)
         {
-            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
-            successful = false;
+            //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+            //successful = false;
 
             if (!EmittedGlobalVariables.TryGetValue(statement, out FieldInfo? field))
             {
@@ -479,8 +479,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         if (statement.Variable.IsGlobal)
         {
-            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
-            successful = false;
+            //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+            //successful = false;
 
             if (!EmittedGlobalVariables.TryGetValue(statement.Variable, out FieldInfo? field))
             {
@@ -612,7 +612,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     {
                         i = DelegateTargets.Count;
                         DelegateTargets.Add(f.UnmarshaledCallback.Target);
-                        GlobalContextType_Targets.SetValue(DelegateTargets.ToArray(), null);
+                        GlobalContextType_Targets.SetValue(null, DelegateTargets.ToArray());
                     }
 
                     il.Emit(OpCodes.Ldsflda, GlobalContextType_Targets);
@@ -646,8 +646,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         if (statement.Variable.IsGlobal)
         {
-            Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
-            successful = false;
+            //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+            //successful = false;
 
             if (!EmittedGlobalVariables.TryGetValue(statement.Variable, out FieldInfo? field))
             {
@@ -841,7 +841,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledForLoop statement, ILProxy il, ref bool successful)
     {
-        EmitStatement(statement.VariableDeclaration, il, ref successful);
+        if (statement.VariableDeclaration is not null)
+        {
+            EmitStatement(statement.VariableDeclaration, il, ref successful);
+        }
 
         Label loopStart = il.DefineLabel();
         Label loopEnd = il.DefineLabel();
@@ -932,8 +935,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case CompiledVariableGetter v:
                 if (v.Variable.IsGlobal)
                 {
-                    Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
-                    successful = false;
+                    //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
+                    //successful = false;
 
                     if (!EmittedGlobalVariables.TryGetValue(v.Variable, out FieldInfo? field))
                     {
@@ -1745,6 +1748,26 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
         il.MarkLabel(label);
     }
+    void EmitStatement(RegisterGetter statement, ILProxy il, ref bool successful)
+    {
+        successful = false;
+        Diagnostics.Add(Diagnostic.CriticalNoBreak($"Direct register access isn't supported in MSIL", statement));
+    }
+    void EmitStatement(RegisterSetter statement, ILProxy il, ref bool successful)
+    {
+        successful = false;
+        Diagnostics.Add(Diagnostic.CriticalNoBreak($"Direct register access isn't supported in MSIL", statement));
+    }
+    void EmitStatement(InstructionLabelAddressGetter statement, ILProxy il, ref bool successful)
+    {
+        successful = false;
+        Diagnostics.Add(Diagnostic.CriticalNoBreak($"This isn't supported in MSIL", statement));
+    }
+    void EmitStatement(CompiledLiteralList statement, ILProxy il, ref bool successful)
+    {
+        successful = false;
+        Diagnostics.Add(Diagnostic.CriticalNoBreak($"no", statement));
+    }
     void EmitStatement(CompiledStatement statement, ILProxy il, ref bool successful)
     {
         switch (statement)
@@ -1786,6 +1809,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case CompiledRuntimeCall v: EmitStatement(v, il, ref successful); break;
             case CompiledGoto v: EmitStatement(v, il, ref successful); break;
             case CompiledInstructionLabelDeclaration v: EmitStatement(v, il, ref successful); break;
+            case RegisterGetter v: EmitStatement(v, il, ref successful); break;
+            case InstructionLabelAddressGetter v: EmitStatement(v, il, ref successful); break;
+            case RegisterSetter v: EmitStatement(v, il, ref successful); break;
+            case CompiledLiteralList v: EmitStatement(v, il, ref successful); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }
@@ -1913,59 +1940,25 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     string GenerateTypeId(GeneralType type)
     {
-        StringBuilder res = new();
-        GenerateTypeId(type, res);
-        return res.ToString();
+        return MakeUnique(GenerateTypeId_(type));
     }
-    void GenerateTypeId(GeneralType type, StringBuilder builder)
+
+    string GenerateTypeId_(GeneralType type) => type.FinalValue switch
     {
-        switch (type.FinalValue)
-        {
-            case BuiltinType v:
-                builder.Append(v.Type);
-                return;
-            case PointerType v:
-                builder.Append($"{v.To}*");
-                return;
-            case FunctionType v:
-                builder.Append($"{v.ReturnType}(");
-                for (int i = 0; i < v.Parameters.Length; i++)
-                {
-                    if (i > 0) builder.Append(',');
-                    GenerateTypeId(v.Parameters[i], builder);
-                }
-                builder.Append($")*");
-                return;
-            case ArrayType v:
-                builder.Append($"{v.Of}[{v.ComputedLength?.ToString() ?? ""}]");
-                return;
-            case StructType v:
-                string id = v.Struct.Identifier.Content;
-                foreach ((_, GeneralType item) in v.TypeArguments)
-                {
-                    id += "`" + item;
-                }
-                id = MakeUnique(id);
-                builder.Append(id);
-                return;
-        }
-    }
+        ArrayType v => $"{GenerateTypeId_(v.Of)}[{v.ComputedLength?.ToString() ?? ""}]",
+        BuiltinType v => v.Type.ToString(),
+        FunctionType => $"fnc",
+        PointerType => $"ptr",
+        StructType v => MakeUnique(v.Struct.Identifier.Content),
+        _ => throw new UnreachableException(),
+    };
 
-    static string MakeUnique(string id, Func<string, bool> uniqueChecker)
+    string GenerateTypeId(StructType type)
     {
-        if (uniqueChecker.Invoke(id)) return id;
-
-        for (int i = 0; i < 64; i++)
-        {
-            string idCandidate = $"{id}_{i}";
-            if (uniqueChecker.Invoke(idCandidate)) return idCandidate;
-            continue;
-        }
-
-        throw new InternalExceptionWithoutContext($"Failed to generate unique id for {id}");
+        return MakeUnique(type.Struct.Identifier.Content);
     }
 
-    string MakeUnique(string id) => MakeUnique(id, v => Module.GetType(v) is null);
+    string MakeUnique(string id) => Utils.MakeUnique(id, v => Module.GetType(v) is null);
 
     bool ToType(StructType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
@@ -2027,7 +2020,23 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         result = builder.CreateType();
+
         GeneratedStructTypes.Add((type, result));
+
+        int size = SizeOf(result);
+
+        if (!base.FindSize(type, out int expectedSize, out PossibleDiagnostic? findSizeError))
+        {
+            error = new PossibleDiagnostic($"Couldn't check the generated struct's size.", findSizeError);
+            return false;
+        }
+
+        if (size != expectedSize)
+        {
+            error = new PossibleDiagnostic($"Generated struct's ({result}) size ({size}) doesn't match with the expected size ({expectedSize}).");
+            return false;
+        }
+
         return true;
     }
     bool ToType(ArrayType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -2093,7 +2102,23 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         result = builder.CreateType();
+
         GeneratedInlineArrayTypes.Add((type, result));
+
+        int size = SizeOf(result);
+
+        if (!base.FindSize(type, out int expectedSize, out PossibleDiagnostic? findSizeError))
+        {
+            error = new PossibleDiagnostic($"Couldn't check the generated struct's size.", findSizeError);
+            return false;
+        }
+
+        if (size != expectedSize)
+        {
+            error = new PossibleDiagnostic($"Generated struct's ({result}) size ({size}) doesn't match with the expected size ({expectedSize}).");
+            return false;
+        }
+
         return true;
     }
 

@@ -2310,7 +2310,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = null;
 
-        if (!InlineMacro(statement.VariableDeclaration, parameters, out VariableDeclaration? variableDeclaration))
+        VariableDeclaration? variableDeclaration = null;
+        if (statement.VariableDeclaration is not null &&
+            !InlineMacro(statement.VariableDeclaration, parameters, out variableDeclaration))
         { return false; }
 
         StatementWithValue condition = InlineMacro(statement.Condition, parameters);
@@ -3080,14 +3082,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        if (!Inline(statement.VariableDeclaration, context, out CompiledStatement? inlinedVariableDeclaration)) return false;
+        CompiledStatement? inlinedVariableDeclaration = null;
+        if (statement.VariableDeclaration is not null && !Inline(statement.VariableDeclaration, context, out inlinedVariableDeclaration)) return false;
         if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
         if (!Inline(statement.Expression, context, out CompiledStatement? inlinedExpression)) return false;
         if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
 
         inlined = new CompiledForLoop()
         {
-            VariableDeclaration = (CompiledVariableDeclaration)inlinedVariableDeclaration,
+            VariableDeclaration = inlinedVariableDeclaration,
             Condition = inlinedCondition,
             Expression = inlinedExpression,
             Body = inlinedBody,
@@ -3856,6 +3859,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
+    bool TryCompute(FunctionAddressGetter functionAddressGetter, EvaluationContext context, out CompiledValue value)
+    {
+        if (functionAddressGetter.Function.InstructionOffset != InvalidFunctionAddress)
+        {
+            value = functionAddressGetter.Function.InstructionOffset;
+            return true;
+        }
+
+        value = CompiledValue.Null;
+        return false;
+    }
+
     bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, out CompiledValue value)
         => TryCompute(statement, EvaluationContext.Empty, out value);
     bool TryCompute(IEnumerable<CompiledStatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
@@ -3898,6 +3913,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledTypeCast v => TryCompute(v, context, out value),
             CompiledIndexGetter v => TryCompute(v, context, out value),
             CompiledPassedArgument v => TryCompute(v.Value, context, out value),
+            FunctionAddressGetter v => TryCompute(v, context, out value),
 
             CompiledStringInstance => false,
             CompiledStackStringInstance => false,
@@ -3909,6 +3925,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledAddressGetter => false,
             CompiledLiteralList => false,
             CompiledStatementWithValueThatActuallyDoesntHaveValue => false,
+            RegisterGetter => false,
             null => false,
 
             _ => throw new NotImplementedException(statement.GetType().ToString()),
@@ -4046,7 +4063,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         context.PushScope();
 
-        if (!TryEvaluate(forLoop.VariableDeclaration, context))
+        if (forLoop.VariableDeclaration is not null && !TryEvaluate(forLoop.VariableDeclaration, context))
         { return false; }
 
         while (true)
@@ -4349,9 +4366,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return res;
     }
 
+    StatementComplexity GetStatementComplexity(GeneralType statement) => statement.FinalValue switch
+    {
+        ArrayType v => (v.Length is null || v.ComputedLength.HasValue) ? StatementComplexity.None : GetStatementComplexity(v.Length),
+        BuiltinType v => StatementComplexity.None,
+        FunctionType v => StatementComplexity.None,
+        GenericType v => StatementComplexity.Bruh,
+        PointerType v => StatementComplexity.None,
+        StructType v => StatementComplexity.None,
+        _ => throw new NotImplementedException(statement.GetType().ToString()),
+    };
+
     StatementComplexity GetStatementComplexity(CompiledStatementWithValue statement) => statement switch
     {
-        CompiledSizeof => StatementComplexity.Bruh,
+        CompiledSizeof v => GetStatementComplexity(v.Of),
         CompiledPassedArgument v => GetStatementComplexity(v.Value) | ((v.Cleanup.Destructor is not null || v.Cleanup.Deallocator is not null) ? StatementComplexity.Complex | StatementComplexity.Volatile : StatementComplexity.None),
         CompiledBinaryOperatorCall v => GetStatementComplexity(v.Left) | GetStatementComplexity(v.Right) | StatementComplexity.Complex,
         CompiledUnaryOperatorCall v => GetStatementComplexity(v.Left) | StatementComplexity.Complex,

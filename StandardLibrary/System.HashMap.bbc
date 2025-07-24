@@ -13,6 +13,20 @@ inline int GetHash(float v)
 
 int GetHash(string v)
 {
+#if IL
+    int hash = 181;
+    int index = 0;
+    char c = v[index];
+
+    while (c)
+    {
+        hash = ((hash << 5) + hash) + c;
+        index++;
+        c = v[index];
+    }
+
+    return hash;
+#else
     int hash = 181;
     char c = v[0];
 
@@ -24,6 +38,7 @@ int GetHash(string v)
     }
 
     return hash;
+#endif
 }
 
 inline u8 Equals(int a, int b)

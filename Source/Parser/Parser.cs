@@ -1164,12 +1164,20 @@ public sealed class Parser
         if (!ExpectOperator("(", out Token? bracketStart))
         { throw new SyntaxException($"Expected \"(\" after \"{keyword}\" keyword", keyword.Position.After(), File); }
 
-        if (!ExpectVariableDeclaration(out VariableDeclaration? variableDeclaration))
-        { throw new SyntaxException("Expected variable declaration", bracketStart.Position.After(), File); }
+        VariableDeclaration? variableDeclaration;
+        if (ExpectOperator(";", out Token? semicolon1))
+        {
+            variableDeclaration = null;
+        }
+        else
+        {
+            if (!ExpectVariableDeclaration(out variableDeclaration))
+            { throw new SyntaxException("Expected variable declaration", bracketStart.Position.After(), File); }
 
-        if (!ExpectOperator(";", out Token? semicolon1))
-        { throw new SyntaxException($"Expected \";\" after for-loop variable declaration", variableDeclaration.Position.After(), File); }
-        variableDeclaration.Semicolon = semicolon1;
+            if (!ExpectOperator(";", out semicolon1))
+            { throw new SyntaxException($"Expected \";\" after for-loop variable declaration", variableDeclaration.Position.After(), File); }
+            variableDeclaration.Semicolon = semicolon1;
+        }
 
         if (!ExpectExpression(out StatementWithValue? condition))
         { throw new SyntaxException($"Expected condition after \"{keyword}\" variable declaration", semicolon1.Position.After(), File); }
@@ -1333,7 +1341,7 @@ public sealed class Parser
             return true;
         }
 
-        if (ExpectKeywordCall("goto", 1, out KeywordCall? keywordCallGoto))
+        if (ExpectKeywordCall(StatementKeywords.Goto, 1, out KeywordCall? keywordCallGoto))
         {
             statement = keywordCallGoto;
             return true;

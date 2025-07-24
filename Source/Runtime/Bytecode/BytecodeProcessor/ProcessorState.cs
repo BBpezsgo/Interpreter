@@ -115,8 +115,6 @@ public ref partial struct ProcessorState
         {
             case Opcode.NOP: break;
 
-            case Opcode.Exit: EXIT(); break;
-
             case Opcode.Push: PUSH_VALUE(); break;
             case Opcode.Pop8: POP_VALUE(BitWidth._8); break;
             case Opcode.Pop16: POP_VALUE(BitWidth._16); break;
@@ -127,8 +125,10 @@ public ref partial struct ProcessorState
             case Opcode.PopTo32: POP_TO_VALUE(BitWidth._32); break;
             case Opcode.PopTo64: POP_TO_VALUE(BitWidth._64); break;
 
-            case Opcode.Jump: JUMP_BY(); break;
-            case Opcode.Crash: CRASH(); break;
+            case Opcode.Exit: EXIT(); break;
+
+            case Opcode.Call: CALL(); break;
+            case Opcode.Return: RETURN(); break;
 
             case Opcode.JumpIfEqual: JumpIfEqual(); break;
             case Opcode.JumpIfNotEqual: JumpIfNotEqual(); break;
@@ -137,12 +137,27 @@ public ref partial struct ProcessorState
             case Opcode.JumpIfLess: JumpIfLess(); break;
             case Opcode.JumpIfLessOrEqual: JumpIfLessOrEqual(); break;
 
-            case Opcode.Call: CALL(); break;
-            case Opcode.Return: RETURN(); break;
+            case Opcode.Jump: JUMP_BY(); break;
 
             case Opcode.CallExternal: CALL_EXTERNAL(); break;
             case Opcode.CallMSIL: CALL_MSIL(); break;
             case Opcode.HotFuncEnd: HOT_FUNC_END(); break;
+
+            case Opcode.Crash: CRASH(); break;
+
+            case Opcode.Compare: Compare(); break;
+            case Opcode.CompareF: CompareF(); break;
+
+            case Opcode.LogicOR: LogicOR(); break;
+            case Opcode.LogicAND: LogicAND(); break;
+
+            case Opcode.BitsAND: BitsAND(); break;
+            case Opcode.BitsOR: BitsOR(); break;
+            case Opcode.BitsXOR: BitsXOR(); break;
+            case Opcode.BitsNOT: BitsNOT(); break;
+
+            case Opcode.BitsShiftLeft: BitsShiftLeft(); break;
+            case Opcode.BitsShiftRight: BitsShiftRight(); break;
 
             case Opcode.MathAdd: MathAdd(); break;
             case Opcode.MathSub: MathSub(); break;
@@ -155,20 +170,6 @@ public ref partial struct ProcessorState
             case Opcode.FMathMult: FMathMult(); break;
             case Opcode.FMathDiv: FMathDiv(); break;
             case Opcode.FMathMod: FMathMod(); break;
-
-            case Opcode.Compare: Compare(); break;
-            case Opcode.CompareF: CompareF(); break;
-
-            case Opcode.BitsShiftLeft: BitsShiftLeft(); break;
-            case Opcode.BitsShiftRight: BitsShiftRight(); break;
-
-            case Opcode.BitsAND: BitsAND(); break;
-            case Opcode.BitsOR: BitsOR(); break;
-            case Opcode.BitsXOR: BitsXOR(); break;
-            case Opcode.BitsNOT: BitsNOT(); break;
-
-            case Opcode.LogicOR: LogicOR(); break;
-            case Opcode.LogicAND: LogicAND(); break;
 
             case Opcode.Move: Move(); break;
 
@@ -303,16 +304,13 @@ public ref partial struct ProcessorState
                 throw new UnreachableException();
         }
     }
-    public readonly int GetData(int address, BitWidth size)
+    public readonly int GetData(int address, BitWidth size) => size switch
     {
-        return size switch
-        {
-            BitWidth._8 => Memory.Get<byte>(address).I32(),
-            BitWidth._16 => Memory.Get<ushort>(address).I32(),
-            BitWidth._32 => Memory.Get<int>(address).I32(),
-            _ => throw new UnreachableException(),
-        };
-    }
+        BitWidth._8 => Memory.Get<byte>(address).I32(),
+        BitWidth._16 => Memory.Get<ushort>(address).I32(),
+        BitWidth._32 => Memory.Get<int>(address).I32(),
+        _ => throw new UnreachableException(),
+    };
 
     public void SetData<T>(int ptr, T data) where T : unmanaged
     {
@@ -323,7 +321,7 @@ public ref partial struct ProcessorState
             return;
         }
 
-        Memory.Set<T>(ptr, data);
+        Memory.Set(ptr, data);
     }
 
     public T GetData<T>(int ptr) where T : unmanaged

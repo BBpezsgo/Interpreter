@@ -1445,7 +1445,7 @@ public class WhileLoop : StatementWithAnyBlock
 public class ForLoop : StatementWithBlock
 {
     public Token KeywordToken { get; }
-    public VariableDeclaration VariableDeclaration { get; }
+    public VariableDeclaration? VariableDeclaration { get; }
     public StatementWithValue Condition { get; }
     public AnyAssignment Expression { get; }
 
@@ -1454,7 +1454,7 @@ public class ForLoop : StatementWithBlock
 
     public ForLoop(
         Token keyword,
-        VariableDeclaration variableDeclaration,
+        VariableDeclaration? variableDeclaration,
         StatementWithValue condition,
         AnyAssignment expression,
         Block block,
@@ -1474,8 +1474,11 @@ public class ForLoop : StatementWithBlock
     {
         if (includeThis) yield return this;
 
-        foreach (Statement statement in VariableDeclaration.GetStatementsRecursively(true))
-        { yield return statement; }
+        if (VariableDeclaration is not null)
+        {
+            foreach (Statement statement in VariableDeclaration.GetStatementsRecursively(true))
+            { yield return statement; }
+        }
 
         foreach (Statement statement in Condition.GetStatementsRecursively(true))
         { yield return statement; }

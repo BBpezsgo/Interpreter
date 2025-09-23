@@ -104,7 +104,11 @@ public class StructType : GeneralType,
     }
 
     public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
-        => throw new InvalidOperationException();
+    {
+        bitWidth = default;
+        error = new PossibleDiagnostic($"Cannot get bit width of struct type \"{this}\"");
+        return false;
+    }
 
     public bool GetField(string name, IRuntimeInfoProvider runtime, [NotNullWhen(true)] out CompiledField? field, [NotNullWhen(true)] out int offset, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {

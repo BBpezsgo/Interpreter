@@ -363,6 +363,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
 #if UNITY
             UnityEngine.Debug.LogException(e);
+#else
+            Debug.WriteLine(e);
 #endif
             Debugger.Break();
             return false;

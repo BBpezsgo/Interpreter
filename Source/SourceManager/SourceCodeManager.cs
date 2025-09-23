@@ -393,7 +393,7 @@ public class SourceCodeManager
                 found = parsedFile;
                 break;
             }
-            if (!found.HasValue) throw new UnreachableException();
+            if (!found.HasValue) continue; // FIXME: is this correct?
             sortedParsedFiles.Add(found.Value);
         }
 

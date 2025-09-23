@@ -1,6 +1,4 @@
 using System;
-using System.Lists;
-using System.Math;
 
 template<T>
 struct Buffer

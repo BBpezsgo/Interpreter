@@ -24,7 +24,7 @@ public static class ExternalFunctions
         string scriptPath = GetScriptPath();
         string standardLibraryPath = GetStandardLibraryPath();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
 
         // "External functions" are called from the interpreter by its id and not its name, so you have to provide
         // the functions' ids too. You can generate a unique id with the `externalFunctions.GenerateId()` extension function.
@@ -74,11 +74,10 @@ public static class ExternalFunctions
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
-        interpreter.IO.RegisterStandardIO();
-
-        while (!interpreter.IsDone)
-        { interpreter.Tick(); }
+        interpreter.RunUntilCompletion();
     }
 }

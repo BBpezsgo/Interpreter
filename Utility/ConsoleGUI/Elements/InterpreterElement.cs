@@ -104,7 +104,7 @@ public sealed partial class InterpreterElement : WindowElement
 
     int _focusedElement;
 
-    public InterpreterElement(BytecodeProcessor interpreter)
+    public InterpreterElement(BytecodeProcessor interpreter, VirtualIO io)
     {
         Interpreter = interpreter;
 
@@ -210,10 +210,10 @@ public sealed partial class InterpreterElement : WindowElement
         InterpreterTimer.Elapsed += OnInterpreterTimer;
         InterpreterTimer.Enabled = true;
 
-        Interpreter.IO.OnStdOut += (data) => ConsolePanel.Write(char.ToString(data));
-        Interpreter.IO.OnNeedInput += () => ConsolePanel.BeginRead();
+        io.OnStdOut += (data) => ConsolePanel.Write(char.ToString(data));
+        io.OnNeedInput += () => ConsolePanel.BeginRead();
 
-        ConsolePanel.OnInput += Interpreter.IO.SendKey;
+        ConsolePanel.OnInput += io.SendKey;
     }
 
     void GetDataMovementIndicators(Instruction instruction, List<DataMovement> loadIndicators, List<DataMovement> storeIndicators)

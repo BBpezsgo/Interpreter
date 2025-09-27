@@ -53,12 +53,13 @@ public class HttpServer : IDisposable
         Listener.Close();
     }
 
-    void Dispose(bool _)
+    public void Dispose()
     {
-        if (IsDisposed) return;
-        IsDisposed = true;
-        Listener.Close();
+        if (!IsDisposed)
+        {
+            IsDisposed = true;
+            Listener.Close();
+        }
+        GC.SuppressFinalize(this);
     }
-
-    public void Dispose() { Dispose(true); GC.SuppressFinalize(this); }
 }

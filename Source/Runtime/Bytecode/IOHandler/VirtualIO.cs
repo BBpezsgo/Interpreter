@@ -2,9 +2,8 @@ namespace LanguageCore.Runtime;
 
 public delegate void KeyConsumer(char key);
 
-public class IOHandler
+public sealed class VirtualIO : IO
 {
-    public delegate void OnStdErrorEventHandler(char data);
     public delegate void OnStdOutEventHandler(char data);
     public delegate void OnInputEventHandler();
 
@@ -33,23 +32,15 @@ public class IOHandler
         _keyConsumer = null;
     }
 
-    public void RegisterStandardIO()
+    public override void Register(List<IExternalFunction> externalFunctions)
     {
-        OnStdOut += (data) => Console.Out.Write(char.ToString(data));
-        OnNeedInput += () => SendKey(Console.ReadKey(true).KeyChar);
-    }
-
-    public static IOHandler Create(List<IExternalFunction> externalFunctions)
-    {
-        IOHandler ioHandler = new();
-
         externalFunctions.AddExternalFunction(new ExternalFunctionAsync((ref ProcessorState processor, ReadOnlySpan<byte> parameters) =>
         {
-            if (ioHandler.OnNeedInput == null) throw new RuntimeException($"Event \"{ioHandler.OnNeedInput}\" does not have listeners");
+            if (OnNeedInput == null) throw new RuntimeException($"Event \"{OnNeedInput}\" does not have listeners");
             ProcessorState _processor = processor;
             char? consumedKey = null;
-            ioHandler._keyConsumer = (char key) => consumedKey = key;
-            ioHandler.OnNeedInput.Invoke();
+            _keyConsumer = key => consumedKey = key;
+            OnNeedInput.Invoke();
             return (ref ProcessorState processor, Span<byte> returnValue) =>
             {
                 if (consumedKey.HasValue)
@@ -63,9 +54,7 @@ public class IOHandler
 
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, (char @char) =>
         {
-            ioHandler.OnStdOut?.Invoke(@char);
+            OnStdOut?.Invoke(@char);
         }));
-
-        return ioHandler;
     }
 }

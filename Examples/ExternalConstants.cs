@@ -24,7 +24,7 @@ public static class ExternalConstants
         string scriptPath = GetScriptPath();
         string standardLibraryPath = GetStandardLibraryPath();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
 
         DiagnosticsCollection diagnostics = new();
         CompilerResult compiled = StatementCompiler.CompileFile(scriptPath, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
@@ -56,11 +56,10 @@ public static class ExternalConstants
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
-        interpreter.IO.RegisterStandardIO();
-
-        while (!interpreter.IsDone)
-        { interpreter.Tick(); }
+        interpreter.RunUntilCompletion();
     }
 }

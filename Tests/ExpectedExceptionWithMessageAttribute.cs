@@ -1,9 +1,9 @@
 ﻿namespace Tests;
 
-public class ExpectedExceptionWithMessageAttribute : ExpectedExceptionBaseAttribute
+public sealed class ExpectedExceptionWithMessageAttribute : ExpectedExceptionBaseAttribute
 {
-    public Type ExceptionType { get; set; }
-    public string ExpectedMessage { get; set; }
+    public Type ExceptionType { get; }
+    public string ExpectedMessage { get; }
 
     public ExpectedExceptionWithMessageAttribute(Type exceptionType, string expectedMessage)
     {

@@ -19,7 +19,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
     public bool ReturnSomething => true;
     public new GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }
-    public new CompiledStruct Context { get; }
+    public new CompiledStruct Context { get; set; }
     public List<Reference<ConstructorCall>> References { get; }
 
     IReadOnlyList<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters;

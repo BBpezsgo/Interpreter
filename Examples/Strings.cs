@@ -22,7 +22,7 @@ public static class Strings
 
         byte[] memory = new byte[BytecodeInterpreterSettings.Default.HeapSize + BytecodeInterpreterSettings.Default.StackSize];
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
 
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(), "str", (int stringPtr) =>
         {
@@ -53,18 +53,18 @@ public static class Strings
             generatedCode.Code,
             memory,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
-        interpreter.IO.RegisterStandardIO();
-
-        while (interpreter.Tick()) { }
+        interpreter.RunUntilCompletion();
 
         // Converting the string to bytes
         byte[] text = Encoding.Unicode.GetBytes("拜拜");
 
         // Allocating memory for the string and for the null character
         UserCall allocCall = interpreter.Call(generatedCode.ExposedFunctions["alloc"], text.Length + 2);
-        while (interpreter.Tick()) { }
+        interpreter.RunUntilCompletion();
 
         // Copying the text bytes into the memory
         text.CopyTo(interpreter.Memory.AsSpan()[allocCall.Result!.To<int>()..]);
@@ -73,6 +73,6 @@ public static class Strings
 
         // Calling the exposed function with the pointer to the string
         interpreter.Call(generatedCode.ExposedFunctions["str"], allocCall.Result!.To<int>());
-        while (interpreter.Tick()) { }
+        interpreter.RunUntilCompletion();
     }
 }

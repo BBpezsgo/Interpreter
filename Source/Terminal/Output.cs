@@ -55,9 +55,16 @@ public static class Output
     public static void LogDiagnostic(Diagnostic diagnostic, IEnumerable<ISourceProvider>? sourceProviders = null)
         => LogDiagnostic(diagnostic, 0, sourceProviders);
 
-    static void LogDiagnostic(Diagnostic diagnostic, int depth, IEnumerable<ISourceProvider>? sourceProviders = null)
+    static void LogDiagnostic(Diagnostic diagnostic, int depth, IEnumerable<ISourceProvider>? sourceProviders = null, Diagnostic? parent = null)
     {
-        if (!(diagnostic.Level switch
+        DiagnosticsLevel level = diagnostic.Level;
+
+        if (parent is not null && parent.Level > level)
+        {
+            level = parent.Level;
+        }
+
+        if (!(level switch
         {
             DiagnosticsLevel.Error => true,
             DiagnosticsLevel.Warning => LogWarnings,
@@ -68,7 +75,9 @@ public static class Output
         }))
         { return; }
 
-        Console.ForegroundColor = diagnostic.Level switch
+        Console.Write(new string(' ', depth * 2));
+        
+        Console.ForegroundColor = level switch
         {
             DiagnosticsLevel.Error => ErrorColor,
             DiagnosticsLevel.Warning => WarningColor,
@@ -78,7 +87,6 @@ public static class Output
             _ => DebugColor,
         };
 
-        Console.Write(new string(' ', depth * 2));
         Console.WriteLine(diagnostic.ToString());
         (string SourceCode, string Arrows)? arrows = diagnostic.GetArrows(sourceProviders);
         if (arrows.HasValue)
@@ -92,13 +100,13 @@ public static class Output
         if (diagnostic.SubErrors.Length > 0)
         {
             Console.Write(new string(' ', depth * 2));
-            Console.WriteLine("-->");
+            Console.WriteLine("Caused by:");
         }
 
         Console.ResetColor();
 
         foreach (Diagnostic subdiagnostic in diagnostic.SubErrors)
-        { LogDiagnostic(subdiagnostic, depth + 1, sourceProviders); }
+        { LogDiagnostic(subdiagnostic, depth + 1, sourceProviders, diagnostic); }
     }
 
     public static void LogError(Exception exception)

@@ -39,7 +39,7 @@ public static class Interactive
 
         try
         {
-            List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+            List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
 
             CompilerResult compiled = StatementCompiler.CompileFile(
                 "memory:///",
@@ -69,10 +69,14 @@ public static class Interactive
 
         if (diagnostics.HasErrors) return;
 
-        BytecodeProcessor interpreter = new(BytecodeInterpreterSettings.Default, generated.Code, null, generated.DebugInfo, null, generated.GeneratedUnmanagedFunctions);
-
-        interpreter.IO.OnStdOut += Console.Write;
-        interpreter.IO.OnNeedInput += () => interpreter.IO.SendKey(Console.ReadKey().KeyChar);
+        BytecodeProcessor interpreter = new(
+            BytecodeInterpreterSettings.Default,
+            generated.Code,
+            null,
+            generated.DebugInfo,
+            null,
+            generated.GeneratedUnmanagedFunctions
+        );
 
         int exitCodeAddress = interpreter.Registers.StackPointer + (sizeof(int) * ProcessorState.StackDirection);
 

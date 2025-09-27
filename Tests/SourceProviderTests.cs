@@ -44,7 +44,9 @@ public class SourceProviderTests
 
         DiagnosticsCollection diagnostics = new();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        StringBuilder output = new();
+
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(new FixedIO(string.Empty, output));
 
         CompilerResult compiled = StatementCompiler.CompileFile("http://localhost:6789/main.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -65,11 +67,8 @@ public class SourceProviderTests
             null,
             generatedCode.DebugInfo,
             externalFunctions,
-            generatedCode.GeneratedUnmanagedFunctions);
-
-        StringBuilder output = new();
-
-        interpreter.IO.OnStdOut += c => output.Append(c);
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
         while (interpreter.Tick()) ;
 
@@ -86,7 +85,9 @@ public class SourceProviderTests
     {
         DiagnosticsCollection diagnostics = new();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        StringBuilder output = new();
+
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(new FixedIO(string.Empty, output));
 
         CompilerResult compiled = StatementCompiler.CompileFile("https://raw.githubusercontent.com/BBpezsgo/Interpreter/refs/heads/master/Examples/hello_world.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -114,11 +115,8 @@ public class SourceProviderTests
             null,
             generatedCode.DebugInfo,
             externalFunctions,
-            generatedCode.GeneratedUnmanagedFunctions);
-
-        StringBuilder output = new();
-
-        interpreter.IO.OnStdOut += c => output.Append(c);
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
         while (interpreter.Tick()) ;
 
@@ -133,7 +131,9 @@ public class SourceProviderTests
     {
         DiagnosticsCollection diagnostics = new();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        StringBuilder output = new();
+
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(new FixedIO(string.Empty, output));
 
         CompilerResult compiled = StatementCompiler.CompileFile("/home/BB/Projects/BBLang/Core/Examples/hello_world.bbc", new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -159,11 +159,8 @@ public class SourceProviderTests
             null,
             generatedCode.DebugInfo,
             externalFunctions,
-            generatedCode.GeneratedUnmanagedFunctions);
-
-        StringBuilder output = new();
-
-        interpreter.IO.OnStdOut += c => output.Append(c);
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
         while (interpreter.Tick()) ;
 

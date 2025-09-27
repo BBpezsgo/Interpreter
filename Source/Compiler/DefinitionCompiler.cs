@@ -386,6 +386,272 @@ public partial class StatementCompiler
         return false;
     }
 
+    bool IsGeneratorStruct(CompiledStruct @struct)
+    {
+        if (!@struct.Attributes.TryGetAttribute(AttributeConstants.BuiltinIdentifier, out AttributeUsage? builtinAttribute)) return false;
+        if (!builtinAttribute.TryGetValue(out string? v)) return false;
+        if (v != "generator") return false;
+
+        return true;
+    }
+
+    bool CompileGeneratorStruct(CompiledStruct @struct)
+    {
+        if (!IsGeneratorStruct(@struct)) return false;
+
+        if (@struct.Template is null)
+        {
+            Diagnostics.Add(Diagnostic.Error($"Generator struct should be generic", @struct.Identifier.Position, @struct.File));
+            return true;
+        }
+
+        if (@struct.Template.Parameters.Length != 1)
+        {
+            Diagnostics.Add(Diagnostic.Error($"Generator struct should have one generic parameter", new Location(@struct.Template.Position, @struct.File)));
+            return true;
+        }
+
+        CompiledFunctionDefinition? nextFunction = null;
+
+        Token genericParameter = @struct.Template.Parameters[0];
+        GenericType generatorType = new(genericParameter, @struct.File);
+        genericParameter.AnalyzedType = TokenAnalyzedType.TypeParameter;
+
+        using StackAuto<ImmutableArray<Token>> _ = GenericParameters.PushAuto(@struct.Template!.Parameters);
+
+        foreach (FunctionDefinition method in @struct.Functions)
+        {
+            if (!method.Attributes.TryGetAttribute(AttributeConstants.BuiltinIdentifier, out AttributeUsage? builtinAttribute) || !builtinAttribute.TryGetValue(out string? v) || v != "next")
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Generator struct shouldn't have any methods other than one \"next\" method", method));
+                continue;
+            }
+
+            foreach (ParameterDefinition parameter in method.Parameters)
+            {
+                if (parameter.Modifiers.Contains(ModifierKeywords.This))
+                { Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, @struct.File)); }
+            }
+
+            List<ParameterDefinition> parameters = method.Parameters.ToList();
+            parameters.Insert(0,
+                new ParameterDefinition(
+                    ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
+                    TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(@struct.Identifier.Content, method.File, @struct.Template?.Parameters), method.File),
+                    Token.CreateAnonymous(StatementKeywords.This),
+                    null,
+                    method)
+                );
+
+            FunctionDefinition copy = new(
+                method.Attributes,
+                method.Modifiers,
+                method.Type,
+                method.Identifier,
+                new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                method.Template,
+                method.File)
+            {
+                Context = method.Context,
+                Block = method.Block,
+            };
+
+            CompiledFunctionDefinition compiledMethod = CompileFunctionDefinition(copy, @struct);
+
+            if (CompiledFunctions.Any(compiledMethod.IsSame))
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Function with name \"{compiledMethod.ToReadable()}\" already defined", method.Identifier, @struct.File));
+                continue;
+            }
+
+            if (nextFunction is not null)
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Generator struct should only have only one \"next\" function", method.Identifier, @struct.File));
+                continue;
+            }
+
+            nextFunction = compiledMethod;
+
+            CompiledFunctions.Add(compiledMethod);
+        }
+
+        if (@struct.GeneralFunctions.Length > 0)
+        {
+            Diagnostics.Add(Diagnostic.Error($"Generator struct shouldn't have any general functions", @struct.Identifier.Position, @struct.File));
+            return true;
+        }
+
+        if (@struct.Constructors.Length > 0)
+        {
+            Diagnostics.Add(Diagnostic.Error($"Generator struct shouldn't have any constructors", @struct.Identifier.Position, @struct.File));
+            return true;
+        }
+
+        if (@struct.Fields.Length > 0)
+        {
+            Diagnostics.Add(Diagnostic.Error($"Generator struct shouldn't have any fields", @struct.Identifier.Position, @struct.File));
+            return true;
+        }
+
+        if (nextFunction is null)
+        {
+            Diagnostics.Add(Diagnostic.Error($"Generator struct should only have a \"next\" function", @struct.Identifier.Position, @struct.File));
+            return true;
+        }
+
+        CompiledField stateField;
+        CompiledField functionField;
+
+        @struct.SetFields(new CompiledField[]
+        {
+            stateField = new(
+                new PointerType(BuiltinType.Any),
+                @struct,
+                new FieldDefinition(
+                    Token.CreateAnonymous("_state"),
+                    null,
+                    Enumerable.Empty<Token>(),
+                    Array.Empty<AttributeUsage>()
+                )
+            ),
+            functionField = new(
+                new FunctionType(
+                    BuiltinType.U8,
+                    new GeneralType[] {
+                        new PointerType(BuiltinType.Any),
+                        new PointerType(generatorType)
+                    }),
+                @struct,
+                new FieldDefinition(
+                    nextFunction.Identifier,
+                    null,
+                    Enumerable.Empty<Token>(),
+                    Array.Empty<AttributeUsage>()
+                )
+            ),
+        });
+
+        if (!nextFunction.Type.SameAs(BuiltinType.U8))
+        {
+            Diagnostics.Add(Diagnostic.Error($"The \"next\" function should return {BuiltinType.U8}", nextFunction.TypeToken));
+        }
+
+        if (nextFunction.ParameterCount != 2)
+        {
+            Diagnostics.Add(Diagnostic.Error($"The \"next\" function should have one parameter of type \"{new PointerType(generatorType)}\"", nextFunction, nextFunction.File));
+        }
+
+        if (!nextFunction.ParameterTypes[1].SameAs(new PointerType(generatorType)))
+        {
+            Diagnostics.Add(Diagnostic.Error($"The \"next\" function should have one parameter of type \"{new PointerType(generatorType)}\"", nextFunction.Parameters[1].Type, nextFunction.File));
+        }
+
+        if (nextFunction.Block is not null)
+        {
+            Diagnostics.Add(Diagnostic.Error($"The \"next\" function should not have a body", nextFunction.Block));
+        }
+
+        if (GeneratorStructDefinition is not null)
+        {
+            Diagnostics.Add(Diagnostic.Error($"A generator struct is already defined somewhere", @struct.Identifier.Position, @struct.File));
+        }
+
+        CompiledConstructorDefinition constructor = new(
+            new StructType(@struct, @struct.File),
+            new GeneralType[]
+            {
+                new PointerType(new StructType(@struct, @struct.File)),
+                new FunctionType(BuiltinType.U8, new GeneralType[]
+                {
+                    new PointerType(BuiltinType.Any),
+                    new PointerType(generatorType),
+                }),
+                new PointerType(BuiltinType.Any),
+            },
+            @struct,
+            new ConstructorDefinition(
+                new TypeInstanceSimple(@struct.Identifier, @struct.File, new TypeInstance[] { new TypeInstanceSimple(genericParameter, @struct.File) }),
+                Enumerable.Empty<Token>(),
+                new ParameterDefinitionCollection(
+                    new ParameterDefinition[]
+                    {
+                        new(
+                            new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                            new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(@struct.Identifier.Content), @struct.File), Token.CreateAnonymous("*"), @struct.File),
+                            Token.CreateAnonymous("this"),
+                            null
+                        ),
+                        new(
+                            Enumerable.Empty<Token>(),
+                            new TypeInstanceFunction(
+                                new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.U8, TokenType.Identifier), @struct.File),
+                                new TypeInstance[]
+                                {
+                                    new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File),
+                                    new TypeInstancePointer(new TypeInstanceSimple(genericParameter, @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File)
+                                },
+                                @struct.File),
+                            Token.CreateAnonymous("func"),
+                            null
+                        ),
+                        new(
+                            Enumerable.Empty<Token>(),
+                            new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*"), @struct.File),
+                            Token.CreateAnonymous("state"),
+                            null
+                        ),
+                    },
+                    TokenPair.CreateAnonymous("(", ")")
+                ),
+                @struct.File
+            )
+            {
+                Context = @struct,
+            })
+        {
+            Block = new Block(
+                new Statement[]
+                {
+                    new Assignment(
+                        Token.CreateAnonymous("="),
+                        new Field(
+                            new Identifier(Token.CreateAnonymous("this"), @struct.File),
+                            new Identifier(Token.CreateAnonymous("_state"), @struct.File),
+                            @struct.File
+                        ),
+                        new Identifier(Token.CreateAnonymous("state"), @struct.File),
+                        @struct.File
+                    ),
+                    new Assignment(
+                        Token.CreateAnonymous("="),
+                        new Field(
+                            new Identifier(Token.CreateAnonymous("this"), @struct.File),
+                            new Identifier(nextFunction.Identifier, @struct.File),
+                            @struct.File
+                        ),
+                        new Identifier(Token.CreateAnonymous("func"), @struct.File),
+                        @struct.File
+                    ),
+                },
+                TokenPair.CreateAnonymous("{", "}"),
+                @struct.File
+            ),
+            Context = @struct,
+        };
+
+        GeneratorStructDefinition = new CompiledGeneratorStructDefinition(
+            @struct,
+            nextFunction,
+            stateField,
+            functionField,
+            constructor
+        );
+
+        CompiledConstructors.Add(constructor);
+
+        return true;
+    }
+
     void CompileDefinitions(Uri file, ImmutableArray<ParsedFile> parsedFiles)
     {
         // First compile the structs without fields
@@ -441,6 +707,11 @@ public partial class StatementCompiler
             }
         }
 
+        foreach (CompiledStruct compiledStruct in CompiledStructs)
+        {
+            CompileGeneratorStruct(compiledStruct);
+        }
+
         foreach (FunctionDefinition @operator in OperatorDefinitions)
         {
             CompiledOperatorDefinition compiled = CompileOperatorDefinition(@operator, null);
@@ -469,6 +740,8 @@ public partial class StatementCompiler
 
         foreach (CompiledStruct compiledStruct in CompiledStructs)
         {
+            if (IsGeneratorStruct(compiledStruct)) continue;
+
             if (compiledStruct.Template is not null)
             {
                 GenericParameters.Push(compiledStruct.Template.Parameters);

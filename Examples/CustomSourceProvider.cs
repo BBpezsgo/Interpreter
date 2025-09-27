@@ -64,8 +64,10 @@ public static class CustomSourceProvider
         Dictionary<string, string> sources = new()
         {
             {
+                // Virtual filename
                 "/main",
 
+                // Content
                 """
                 using "./stdlib/stdout";
 
@@ -75,8 +77,10 @@ public static class CustomSourceProvider
             },
 
             {
+                // Virtual filename
                 "/stdlib/stdout",
 
+                // Content
                 """
                 [External("stdout")]
                 void Print(u16 c);
@@ -92,7 +96,7 @@ public static class CustomSourceProvider
             },
         };
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
 
         DiagnosticsCollection diagnostics = new();
 
@@ -119,10 +123,10 @@ public static class CustomSourceProvider
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
-        interpreter.IO.RegisterStandardIO();
-
-        while (interpreter.Tick()) ;
+        interpreter.RunUntilCompletion();
     }
 }

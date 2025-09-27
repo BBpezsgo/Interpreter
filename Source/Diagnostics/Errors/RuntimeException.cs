@@ -3,11 +3,10 @@
 namespace LanguageCore.Runtime;
 
 [ExcludeFromCodeCoverage]
-public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
+public class RuntimeException : LanguageExceptionWithoutContext
 {
     const int CallStackIndent = 1;
 
-    bool IsDisposed;
     public RuntimeContext? Context { get; set; }
     public CompiledDebugInformation DebugInformation { get; set; }
     public ReadOnlySpan<CallTraceItem> CallTrace =>
@@ -462,20 +461,4 @@ public class RuntimeException : LanguageExceptionWithoutContext, IDisposable
     }
 
     public override string ToString() => ToString(false);
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (IsDisposed) return;
-        if (disposing) { }
-        Context?.Dispose();
-        IsDisposed = true;
-    }
-
-    ~RuntimeException() { Dispose(disposing: false); }
-
-    void IDisposable.Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
 }

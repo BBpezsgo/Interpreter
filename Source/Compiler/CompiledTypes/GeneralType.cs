@@ -354,6 +354,7 @@ public abstract class GeneralType :
         }
     }
 
+    [return: NotNullIfNotNull(nameof(typeArguments))]
     public static GeneralType? InsertTypeParameters(GeneralType type, IReadOnlyDictionary<string, GeneralType>? typeArguments)
     {
         if (typeArguments is null) return null;
@@ -369,15 +370,13 @@ public abstract class GeneralType :
 
             case PointerType pointerType:
             {
-                GeneralType? pointerTo = InsertTypeParameters(pointerType.To, typeArguments);
-                if (pointerTo is null) return null;
+                GeneralType pointerTo = InsertTypeParameters(pointerType.To, typeArguments);
                 return new PointerType(pointerTo);
             }
 
             case ArrayType arrayType:
             {
-                GeneralType? stackArrayOf = InsertTypeParameters(arrayType.Of, typeArguments);
-                if (stackArrayOf is null) return null;
+                GeneralType stackArrayOf = InsertTypeParameters(arrayType.Of, typeArguments);
                 return new ArrayType(stackArrayOf, arrayType.Length);
             }
 
@@ -396,27 +395,25 @@ public abstract class GeneralType :
                     for (int i = 0; i < structTypeParameterValues.Length; i++)
                     {
                         if (structTypeParameterValues[i] is null or GenericType)
-                        { return null; }
+                        { return type; }
                     }
 
                     return new StructType(structType.Struct, structType.File, structTypeParameterValues);
                 }
 
-                return null;
+                return type;
             }
 
             case BuiltinType:
-                return null;
+                return type;
 
             case AliasType: // TODO
-                return null;
+                return type;
 
             case FunctionType functionType:
             {
-                GeneralType? returnType = InsertTypeParameters(functionType.ReturnType, typeArguments);
-                IEnumerable<GeneralType>? parameters = InsertTypeParameters(functionType.Parameters, typeArguments);
-                if (returnType is null) return null;
-                if (parameters is null) return null;
+                GeneralType returnType = InsertTypeParameters(functionType.ReturnType, typeArguments);
+                IEnumerable<GeneralType> parameters = InsertTypeParameters(functionType.Parameters, typeArguments);
                 return new FunctionType(returnType, parameters);
             }
 

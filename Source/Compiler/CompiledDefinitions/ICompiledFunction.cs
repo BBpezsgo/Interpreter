@@ -6,7 +6,8 @@ namespace LanguageCore.Compiler;
 public interface ICompiledFunctionDefinition :
     IHaveCompiledType,
     IInFile,
-    IHaveInstructionOffset
+    IHaveInstructionOffset,
+    ISimpleReadable
 {
     bool ReturnSomething { get; }
     Block? Block { get; }

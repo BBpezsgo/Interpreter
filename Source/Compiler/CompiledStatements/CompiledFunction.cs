@@ -1,6 +1,8 @@
+using LanguageCore.Parser.Statements;
+
 namespace LanguageCore.Compiler;
 
-public class CompiledFunction
+public class CompiledFunction : ISimpleReadable
 {
     public ICompiledFunctionDefinition Function;
     public CompiledBlock Body;
@@ -17,5 +19,7 @@ public class CompiledFunction
         body = Body;
     }
 
+    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch) => Function.ToReadable(typeSearch);
+    public string ToReadable() => Function.ToReadable();
     public override string? ToString() => Function.ToString() ?? base.ToString();
 }

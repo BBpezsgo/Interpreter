@@ -29,6 +29,19 @@ public partial struct CompiledValue :
         _ => throw new UnreachableException(),
     };
 
+    public string? ToStringValue() => Type switch
+    {
+        RuntimeType.Null => null,
+        RuntimeType.U8 => U8.ToString(),
+        RuntimeType.I8 => I8.ToString(),
+        RuntimeType.U16 => U16.ToString(),
+        RuntimeType.I16 => I16.ToString(),
+        RuntimeType.U32 => U32.ToString(),
+        RuntimeType.I32 => I32.ToString(),
+        RuntimeType.F32 => F32.ToString(),
+        _ => throw new UnreachableException(),
+    };
+
     public readonly bool TryCast(GeneralType type, out CompiledValue value)
     {
         value = default;

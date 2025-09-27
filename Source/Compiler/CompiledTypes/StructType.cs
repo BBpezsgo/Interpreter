@@ -39,13 +39,6 @@ public class StructType : GeneralType,
         set => throw new InvalidOperationException();
     }
 
-    StructType(CompiledStruct @struct, Uri file, IEnumerable<KeyValuePair<string, GeneralType>> typeArguments)
-    {
-        Struct = @struct;
-        File = file;
-        TypeArguments = typeArguments.ToImmutableDictionary();
-    }
-
     public StructType(StructType other)
     {
         Struct = other.Struct;

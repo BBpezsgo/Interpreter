@@ -316,8 +316,8 @@ public static class Utils
 
     public static MainResult RunMain(string file, string input, Action<List<IExternalFunction>>? externalFunctionAdder = null)
     {
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
-
+        FixedIO io = new(input);
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(io);
         externalFunctionAdder?.Invoke(externalFunctions);
 
         DiagnosticsCollection diagnostics = new();
@@ -418,30 +418,29 @@ public static class Utils
 
         GC.Collect();
 
-        (BytecodeProcessor, MainResult) Execute(BBLangGeneratorResult code, string input)
+        MainResult Execute(BBLangGeneratorResult code)
         {
-            List<IExternalFunction> _externalFunctions = new();
-            externalFunctionAdder?.Invoke(_externalFunctions);
+            io.Reset();
 
-            BytecodeProcessor interpreter = new(BytecodeInterpreterSettings, code.Code, null, code.DebugInfo, _externalFunctions, code.GeneratedUnmanagedFunctions);
-
-            InputBuffer inputBuffer = new(input);
-            StringBuilder stdOutput = new();
-            StringBuilder stdError = new();
-
-            interpreter.IO.OnStdOut += (data) => stdOutput.Append(data);
-            interpreter.IO.OnNeedInput += () => interpreter.IO.SendKey(inputBuffer.Read());
+            BytecodeProcessor interpreter = new(
+                BytecodeInterpreterSettings,
+                code.Code,
+                null,
+                code.DebugInfo,
+                externalFunctions,
+                code.GeneratedUnmanagedFunctions
+            );
 
             while (!interpreter.IsDone)
             { interpreter.Tick(); }
 
-            return (interpreter, new MainResult(stdOutput.ToString(), stdError.ToString(), interpreter));
+            return new MainResult(io.Output.ToString(), string.Empty, interpreter);
         }
 
-        (BytecodeProcessor interpreterUnoptimized, MainResult unoptimizedResult) = Execute(generatedCodeUnoptimized, input);
-        (BytecodeProcessor interpreter, MainResult result) = Execute(generatedCode, input);
-        (BytecodeProcessor interpreterUnoptimizedIL, MainResult unoptimizedResultIL) = Execute(generatedCodeILUnoptimized, input);
-        (BytecodeProcessor interpreterIL, MainResult resultIL) = Execute(generatedCodeIL, input);
+        MainResult unoptimizedResult = Execute(generatedCodeUnoptimized);
+        MainResult result = Execute(generatedCode);
+        MainResult unoptimizedResultIL = Execute(generatedCodeILUnoptimized);
+        MainResult resultIL = Execute(generatedCodeIL);
 
         if (result.StdOutput != unoptimizedResult.StdOutput)
         { throw new AssertFailedException($"StdOutput are different on optimized and unoptimized version (\"{result.StdOutput.Escape()}\" != \"{unoptimizedResult.StdOutput.Escape()}\")"); }
@@ -463,18 +462,11 @@ public static class Utils
 
         return result;
     }
-
     public static int RunIL(string file, string input)
     {
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(new FixedIO(input));
 
         DiagnosticsCollection diagnostics = new();
-
-        if (externalFunctions.TryGet("stdout", out IExternalFunction? stdoutFunction, out _))
-        {
-            static void callback(char c) => Console.Write(c);
-            externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdoutFunction.Id, "stdout", callback));
-        }
 
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(LanguageCore.IL.Generator.CodeGeneratorForIL.DefaultCompilerSettings)
         {

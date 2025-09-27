@@ -688,8 +688,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledParameterGetter => null,
         CompiledIndexGetter v => NeedDerefernce(v),
         CompiledFieldGetter v => NeedDerefernce(v),
+        CompiledFunctionCall v => NeedDerefernce(v),
         _ => throw new NotImplementedException()
     };
+    CompiledStatementWithValue? NeedDerefernce(CompiledFunctionCall functionCall)
+    {
+        if (functionCall.Type.Is<PointerType>())
+        { return functionCall; }
+
+        return null;
+    }
     CompiledStatementWithValue? NeedDerefernce(CompiledIndexGetter indexCall)
     {
         if (indexCall.Base.Type.Is<PointerType>())

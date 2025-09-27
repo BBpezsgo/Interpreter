@@ -81,6 +81,7 @@ public static class StatementKeywords
     public const string While = "while";
     public const string For = "for";
     public const string Return = "return";
+    public const string Yield = "yield";
     public const string Goto = "goto";
     public const string Crash = "crash";
     public const string Delete = "delete";

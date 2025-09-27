@@ -601,11 +601,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     ExternalFunctionScopedSync externFunc;
 #if UNITY_BURST
-                    UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code !!!");
+                    //UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code !!!");
                     IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
                     unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
 #else
-                    Debug.WriteLine($"Function {method.Method} compiled into machine code !!!");
+                    //Debug.WriteLine($"Function {method.Method} compiled into machine code !!!");
                     externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
 #endif
                     GeneratedUnmanagedFunctions.Add((externFunc, method));
@@ -621,7 +621,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         Type = caller.Type,
                     });
 
-                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Function \"{f.Function}\" compiled into MSIL", caller));
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Function {f.Function.ToReadable()} compiled into MSIL", caller));
 
                     Diagnostics.AddRange(ILGenerator.Diagnostics);
 
@@ -629,12 +629,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 anyway:;
                 }
+                //if (!ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
+                //{
+                //    ILGenerator.GenerateImplMarshaled(f, out _);
+                //}
                 Diagnostics.Add(Diagnostic.Warning($"Failed to generate MSIL for function {f.Function}", caller, ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error).ToArray()));
                 ILGenerator.Diagnostics.Clear();
             }
         }
 
-        AddComment($"Call \"{((ISimpleReadable)caller.Function).ToReadable()}\" {{");
+        AddComment($"Call {caller.Function.ToReadable()} {{");
 
         if (caller.Function.ReturnSomething)
         {
@@ -2493,7 +2497,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     GenerateCodeForFunction(function, body);
                     goto ok;
                 }
-                Diagnostics.Add(Diagnostic.Critical($"Function {undefinedOffset.Called} wasn't compiled for some reason", undefinedOffset.CallerLocation));
+                if (!Diagnostics.HasErrors) Diagnostics.Add(Diagnostic.Critical($"Function {undefinedOffset.Called} wasn't compiled for some reason", undefinedOffset.CallerLocation));
                 goto failed;
             ok:;
             }

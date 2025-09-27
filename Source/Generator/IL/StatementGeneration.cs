@@ -1373,6 +1373,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 il.Emit(OpCodes.Newobj, typeof(RuntimeException).GetConstructor(new Type[] { typeof(string) })!);
                 il.Emit(OpCodes.Throw);
                 break;
+            case CompiledEvaluatedValue compiledEvaluatedValue:
+                il.Emit(OpCodes.Ldstr, compiledEvaluatedValue.Value.ToStringValue() ?? string.Empty);
+                il.Emit(OpCodes.Newobj, typeof(RuntimeException).GetConstructor(new Type[] { typeof(string) })!);
+                il.Emit(OpCodes.Throw);
+                break;
             default:
                 Diagnostics.Add(Diagnostic.Internal($"Unimplemented value for crash reason", statement.Value));
                 successful = false;
@@ -2315,7 +2320,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         if (function.Function is IHaveAttributes attributes &&
             attributes.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function {function} marked as MSIL incompatible", attributes.Attributes.First(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier), false));
+            Diagnostics.Add(Diagnostic.Critical($"Function {function.ToReadable()} marked as MSIL incompatible", attributes.Attributes.First(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier), false));
             return false;
         }
 
@@ -2521,11 +2526,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to generate valid MSIL"));
         }
-
-        //StringBuilder builder = new();
-        //foreach (Type type in Module.GetTypes()) Stringify(builder, 0, type);
-        //foreach (DynamicMethod method in FunctionBuilders.Values.Append(result)) Stringify(builder, 0, method);
-        //Console.WriteLine(builder);
 
         return (Func<int>)result.CreateDelegate(typeof(Func<int>));
     }

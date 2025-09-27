@@ -1341,6 +1341,12 @@ public sealed class Parser
             return true;
         }
 
+        if (ExpectKeywordCall(StatementKeywords.Yield, 0, 1, out KeywordCall? keywordCallYield))
+        {
+            statement = keywordCallYield;
+            return true;
+        }
+
         if (ExpectKeywordCall(StatementKeywords.Goto, 1, out KeywordCall? keywordCallGoto))
         {
             statement = keywordCallGoto;

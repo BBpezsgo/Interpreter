@@ -28,7 +28,7 @@ public static class HelloWorld
 
         // This will generate some stub function informations, so it will not produce warnings.
         // This kinda a bad implementation, so I have to fix it sometime.
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
 
         // With this `DiagnosticsCollection` you can get all the diagnostics that the compiler and the generator produced.
         // This contains all the fatal errors too, if you use the generated output while there are errors, there will be some unexpected behavior.
@@ -69,12 +69,11 @@ public static class HelloWorld
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
-
-        // You can define your own IO handler, but this will use the standard IO (the `System.Console`).
-        interpreter.IO.RegisterStandardIO();
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
         // This will execute all the bytecodes until there are none left.
-        while (interpreter.Tick()) ;
+        interpreter.RunUntilCompletion();
     }
 }

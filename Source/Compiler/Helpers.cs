@@ -40,6 +40,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     public BuiltinType ExitCodeType => Settings.ExitCodeType;
 
     GeneralType? CurrentReturnType;
+    CompiledGeneratorContext? CompiledGeneratorContext;
 
     readonly CompilerSettings Settings;
     readonly List<CompiledFunction> GeneratedFunctions = new();
@@ -62,6 +63,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
     readonly IEnumerable<string> PreprocessorVariables;
     readonly ImmutableArray<CompiledStatement>.Builder CompiledTopLevelStatements = ImmutableArray.CreateBuilder<CompiledStatement>();
+
+    readonly List<(FunctionThingDefinition Function, CompiledGeneratorState State)> GeneratorStates = new();
+
+    CompiledGeneratorStructDefinition? GeneratorStructDefinition;
 
     #endregion
 
@@ -191,6 +196,21 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
 
+    CompiledGeneratorState GetGeneratorState(FunctionThingDefinition function)
+    {
+        foreach ((FunctionThingDefinition _function, CompiledGeneratorState state) in GeneratorStates)
+        {
+            if (_function.Identifier == function.Identifier &&
+                _function.Location == function.Location)
+            {
+                return state;
+            }
+        }
+        CompiledGeneratorState result = new();
+        GeneratorStates.Add((function, result));
+        return result;
+    }
+
     #region AddCompilable()
 
     void AddCompilable(CompliableTemplate<CompiledFunctionDefinition> compilable)
@@ -223,14 +243,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         CompilableGeneralFunctions.Add(compilable);
     }
 
-    void AddCompilable(CompliableTemplate<CompiledConstructorDefinition> compilable)
+    CompliableTemplate<CompiledConstructorDefinition> AddCompilable(CompliableTemplate<CompiledConstructorDefinition> compilable)
     {
         for (int i = 0; i < CompilableConstructors.Count; i++)
         {
             if (CompilableConstructors[i].Function.IsSame(compilable.Function))
-            { return; }
+            { return CompilableConstructors[i]; }
         }
         CompilableConstructors.Add(compilable);
+        return compilable;
     }
 
     #endregion
@@ -1490,6 +1511,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperatorDefinition>? _result, out _))
         {
+            if (_result.DidReplaceArguments) throw new UnreachableException();
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             return OnGotStatementType(@operator, _result.Function.Type);
         }
@@ -1613,6 +1635,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperatorDefinition>? result_, out _))
         {
+            if (result_.DidReplaceArguments) throw new UnreachableException();
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             return OnGotStatementType(@operator, result_.Function.Type);
         }
@@ -3926,6 +3949,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledLiteralList => false,
             CompiledStatementWithValueThatActuallyDoesntHaveValue => false,
             RegisterGetter => false,
+            InstructionLabelAddressGetter => false,
             null => false,
 
             _ => throw new NotImplementedException(statement.GetType().ToString()),

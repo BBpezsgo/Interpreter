@@ -22,7 +22,6 @@ public class BytecodeProcessor
     public readonly FrozenDictionary<int, IExternalFunction> ExternalFunctions;
     readonly ImmutableArray<ExternalFunctionScopedSync> ScopedExternalFunctions;
 
-    public readonly IOHandler IO;
     readonly Queue<UserCall> UserCalls = new();
     UserCall? CurrentUserCall = null;
     bool CurrentlySyncUserCalling = false;
@@ -38,17 +37,10 @@ public class BytecodeProcessor
         ImmutableArray<ExternalFunctionScopedSync> scopedExternalFunctions = default)
     {
         DebugInformation = debugInformation is null ? default : new CompiledDebugInformation(debugInformation);
-
-        List<IExternalFunction> _externalFunctions = GenerateExternalFunctions();
-        IO = IOHandler.Create(_externalFunctions);
-        foreach (IExternalFunction item in externalFunctions ?? Enumerable.Empty<IExternalFunction>())
-        {
-            if (_externalFunctions.Any(v => v.Id == item.Id)) continue;
-            _externalFunctions.Add(item);
-        }
+        externalFunctions ??= Enumerable.Empty<IExternalFunction>();
 
         Settings = settings;
-        ExternalFunctions = _externalFunctions.Select(v => new KeyValuePair<int, IExternalFunction>(v.Id, v)).ToFrozenDictionary();
+        ExternalFunctions = externalFunctions.Select(v => new KeyValuePair<int, IExternalFunction>(v.Id, v)).ToFrozenDictionary();
         Code = program;
         Memory = memory ?? new byte[settings.HeapSize + settings.StackSize];
         Registers.StackPointer = StackStart - ProcessorState.StackDirection;
@@ -88,8 +80,6 @@ public class BytecodeProcessor
         restart:
             while (!state.IsDone)
             {
-                if (IO.IsAwaitingInput) { System.Threading.Thread.Yield(); continue; }
-
                 state.Tick();
                 state.ThrowIfCrashed(DebugInformation);
             }
@@ -114,8 +104,6 @@ public class BytecodeProcessor
     /// </returns>
     public unsafe bool Tick(ref ProcessorState state)
     {
-        if (IO.IsAwaitingInput) return true;
-
         try
         {
             state.Tick();
@@ -221,26 +209,18 @@ public class BytecodeProcessor
         return externalFunctions;
     }
 
-    public static List<IExternalFunction> GetExternalFunctions()
+    public static List<IExternalFunction> GetExternalFunctions(IO? io)
     {
         List<IExternalFunction> externalFunctions = new();
 
-        AddRuntimeExternalFunctions(externalFunctions);
+        io?.Register(externalFunctions);
 
         AddStaticExternalFunctions(externalFunctions);
 
         return externalFunctions;
     }
 
-    static void AddRuntimeExternalFunctions(List<IExternalFunction> externalFunctions)
-    {
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, static () => '\0'));
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, static (char @char) => { }));
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("console-set"), "console-set", static (char @char, int x, int y) => { }));
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("console-clear"), "console-clear", static () => { }));
-    }
-
-    static void AddStaticExternalFunctions(List<IExternalFunction> externalFunctions)
+    public static void AddStaticExternalFunctions(List<IExternalFunction> externalFunctions)
     {
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("utc-time"), "utc-time", static () => (int)DateTime.UtcNow.TimeOfDay.TotalMilliseconds));
         externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId("local-time"), "local-time", static () => (int)DateTime.Now.TimeOfDay.TotalMilliseconds));

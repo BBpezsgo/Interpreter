@@ -26,7 +26,7 @@ public static class ExecutionManager
         string scriptPath = GetScriptPath();
         string standardLibraryPath = GetStandardLibraryPath();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
         DiagnosticsCollection diagnostics = new();
         CompilerResult compiled = StatementCompiler.CompileFile(scriptPath, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -53,8 +53,9 @@ public static class ExecutionManager
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
-        BytecodeProcessor.IO.RegisterStandardIO();
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
         InitFunction = generatedCode.ExposedFunctions["init"];
         TickFunction = generatedCode.ExposedFunctions["tick"];

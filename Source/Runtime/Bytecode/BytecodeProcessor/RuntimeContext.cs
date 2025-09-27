@@ -1,6 +1,6 @@
 ﻿namespace LanguageCore.Runtime;
 
-public readonly struct RuntimeContext : IDisposable
+public readonly struct RuntimeContext
 {
     public readonly Registers Registers;
     public readonly ImmutableArray<byte> Memory;
@@ -18,6 +18,4 @@ public readonly struct RuntimeContext : IDisposable
         Code = code;
         StackStart = stackStart;
     }
-
-    public void Dispose() { }
 }

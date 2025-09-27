@@ -24,7 +24,7 @@ public static class ExposedFunctions
         string scriptPath = GetScriptPath();
         string standardLibraryPath = GetStandardLibraryPath();
 
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(StandardIO.Instance);
         DiagnosticsCollection diagnostics = new();
         CompilerResult compiled = StatementCompiler.CompileFile(scriptPath, new CompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings)
         {
@@ -54,9 +54,9 @@ public static class ExposedFunctions
             generatedCode.Code,
             null,
             generatedCode.DebugInfo,
-            externalFunctions);
-
-        interpreter.IO.RegisterStandardIO();
+            externalFunctions,
+            generatedCode.GeneratedUnmanagedFunctions
+        );
 
         // These will not interpret the bytecodes, only queues the calls. They will be executed automatically
         // when the interpreter has no bytecodes to execute. (ie when the top-level statements or any previous calls are done)
@@ -68,7 +68,7 @@ public static class ExposedFunctions
         // The `Result` field of the promise will be set after the function is executed with the result of the call.
         // Until then, it will be `null`.
 
-        while (interpreter.Tick()) ;
+        interpreter.RunUntilCompletion();
 
         // There are no more bytecodes and no more calls to execute, so it will definietly have a `Result`.
         // You can convert the `byte[]` to other types with the `To<T>` extension function.

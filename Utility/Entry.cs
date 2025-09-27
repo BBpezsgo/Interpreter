@@ -72,7 +72,10 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = new();
+                IO io = arguments.Debug ? new VirtualIO() : StandardIO.Instance;
+                io.Register(externalFunctions);
+                BytecodeProcessor.AddStaticExternalFunctions(externalFunctions);
 
                 BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
@@ -117,20 +120,12 @@ public static class Entry
                     HeapSize = arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize,
                 };
 
-                if (arguments.ThrowErrors)
+                try
                 {
-                    CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
+                    CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
+                    //File.WriteAllText("/home/BB/Projects/BBLang/Core/out.bbc", compiled.Stringify());
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
-                    diagnostics.Throw();
-                }
-                else
-                {
-                    try
-                    {
-                        CompilerResult compiled = Compiler.StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                        diagnostics.Print();
                         if (diagnostics.HasErrors) return 1;
                     }
                     catch (LanguageException ex)
@@ -144,7 +139,6 @@ public static class Entry
                         diagnostics.Print();
                         Output.LogError(ex);
                         return 1;
-                    }
                 }
 
                 Output.LogDebug($"Optimized {generatedCode.Statistics.Optimizations} statements");
@@ -282,8 +276,9 @@ public static class Entry
                     generatedCode.Code,
                     null,
                     generatedCode.DebugInfo,
-                    null,
-                    generatedCode.GeneratedUnmanagedFunctions);
+                    externalFunctions,
+                    generatedCode.GeneratedUnmanagedFunctions
+                );
 
                 GC.Collect();
 
@@ -304,7 +299,7 @@ public static class Entry
 
                     ConsoleGUI.ConsoleGUI gui = new()
                     {
-                        FilledElement = new ConsoleGUI.InterpreterElement(interpreter)
+                        FilledElement = new ConsoleGUI.InterpreterElement(interpreter, (VirtualIO)io)
                     };
 
                     while (!gui.IsDisposed)
@@ -319,32 +314,24 @@ public static class Entry
                 }
                 else
                 {
-                    interpreter.IO.OnStdOut += (data) => Console.Out.Write(char.ToString(data));
-
-                    interpreter.IO.OnNeedInput += () =>
-                    {
-                        ConsoleKeyInfo input = Console.ReadKey(true);
-                        interpreter.IO.SendKey(input.KeyChar);
-                    };
-
                     try
                     {
                         interpreter.RunUntilCompletion();
                     }
                     catch (UserException error)
                     {
-                        Output.LogError($"User Exception: {error.ToString(true)}");
-                        if (arguments.ThrowErrors) throw;
+                        Output.LogError($"UserException: {error.ToString(true)}");
+                        throw;
                     }
                     catch (RuntimeException error)
                     {
-                        Output.LogError($"Runtime Exception: {error}");
-                        if (arguments.ThrowErrors) throw;
+                        Output.LogError($"RuntimeException: {error}");
+                        throw;
                     }
                     catch (Exception error)
                     {
-                        Output.LogError($"Internal Exception: {new RuntimeException(error.Message, error, interpreter.GetContext(), interpreter.DebugInformation)}");
-                        if (arguments.ThrowErrors) throw;
+                        Output.LogError($"{error.GetType().Name}: {new RuntimeException(error.Message, error, interpreter.GetContext(), interpreter.DebugInformation)}");
+                        throw;
                     }
                     finally
                     {
@@ -359,7 +346,7 @@ public static class Entry
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);
 
                 DiagnosticsCollection diagnostics = new();
 
@@ -404,7 +391,7 @@ public static class Entry
                     AllowPointers = true,
                 });
                 diagnostics.Print();
-                diagnostics.Throw();
+                if (diagnostics.HasErrors) return 1;
 
                 res.Invoke();
                 return 0;
@@ -441,29 +428,17 @@ public static class Entry
                 };
 
                 DiagnosticsCollection diagnostics = new();
-                if (arguments.ThrowErrors)
+                try
                 {
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                     generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
-                    diagnostics.Throw();
+                    if (diagnostics.HasErrors) return 1;
                     Output.LogDebug($"Optimized {generated.Statistics.Optimizations} statements");
                     Output.LogDebug($"Precomputed {generated.Statistics.Precomputations} statements");
                     Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
                 }
-                else
-                {
-                    try
-                    {
-                        CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
-                        generated = CodeGeneratorForBrainfuck.Generate(compiled, brainfuckGeneratorSettings, Output.Log, diagnostics);
-                        diagnostics.Print();
-                        diagnostics.Throw();
-                        Output.LogDebug($"Optimized {generated.Statistics.Optimizations} statements");
-                        Output.LogDebug($"Precomputed {generated.Statistics.Precomputations} statements");
-                        Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
-                    }
-                    catch (LanguageException exception)
+                catch (LanguageException exception)
                     {
                         diagnostics.Print();
                         Output.LogError(exception);
@@ -474,7 +449,6 @@ public static class Entry
                         diagnostics.Print();
                         Output.LogError(exception);
                         return 1;
-                    }
                 }
 
                 bool pauseBeforeRun = false;
@@ -716,21 +690,12 @@ public static class Entry
 
                 mainGeneratorSettings.PointerSize = (int)bits;
 
-                if (arguments.ThrowErrors)
+                try
                 {
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
-                    diagnostics.Throw();
-                }
-                else
-                {
-                    try
-                    {
-                        CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
-                        generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                        diagnostics.Print();
-                        diagnostics.Throw();
+                    if (diagnostics.HasErrors) return 1;
                     }
                     catch (LanguageException ex)
                     {
@@ -743,7 +708,6 @@ public static class Entry
                         diagnostics.Print();
                         Output.LogError(ex);
                         return 1;
-                    }
                 }
 
                 string asm = Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);

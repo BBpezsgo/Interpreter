@@ -10,6 +10,8 @@ public sealed class Parser
     readonly ImmutableArray<Token> OriginalTokens;
     readonly Uri File;
 
+    Location CurrentLocation => new(CurrentPosition, File);
+    Position CurrentPosition => CurrentToken?.Position ?? PreviousToken?.Position.After() ?? Position.UnknownPosition;
     Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
     Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Length) ? Tokens[CurrentTokenIndex - 1] : null;
 
@@ -252,22 +254,28 @@ public sealed class Parser
         }
     }
 
-    void ParseCodeBlock()
+    bool ParseCodeBlock()
     {
-        if (ExpectStructDefinition()) { }
-        else if (ExpectFunctionDefinition(out FunctionDefinition? functionDefinition))
+        OrderedDiagnosticCollection diagnostics = new();
+        if (ExpectStructDefinition(diagnostics)) { }
+        else if (ExpectFunctionDefinition(out FunctionDefinition? functionDefinition, diagnostics))
         { Functions.Add(functionDefinition); }
-        else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
+        else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition, diagnostics))
         { Operators.Add(operatorDefinition); }
-        else if (ExpectAliasDefinition(out AliasDefinition? aliasDefinition))
+        else if (ExpectAliasDefinition(out AliasDefinition? aliasDefinition, diagnostics))
         { AliasDefinitions.Add(aliasDefinition); }
         else if (ExpectStatement(out Statement? statement))
         { TopLevelStatements.Add(statement); }
         else
-        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File); }
+        {
+            Diagnostics.Add(Diagnostic.Error($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File, diagnostics.Compile().ToArray()));
+            return false;
+        }
+
+        return true;
     }
 
-    bool ExpectOperatorDefinition([NotNullWhen(true)] out FunctionDefinition? function)
+    bool ExpectOperatorDefinition([NotNullWhen(true)] out FunctionDefinition? function, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         function = null;
@@ -277,7 +285,11 @@ public sealed class Parser
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected type for operator definition", CurrentLocation, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         if (!ExpectOperator(OverloadableOperators, out Token? possibleName))
         {
@@ -289,13 +301,29 @@ public sealed class Parser
             }
             else
             {
-                CurrentTokenIndex = parseStart;
-                return false;
+                int callOperatorParseStart = CurrentTokenIndex;
+                if (ExpectOperator("(", out Token? opening) && ExpectOperator(")", out Token? closing) && CurrentToken?.Content == "(")
+                {
+                    possibleName = opening + closing;
+                }
+                else
+                {
+                    CurrentTokenIndex = callOperatorParseStart;
+
+                    diagnostic.Add(0, Diagnostic.Critical($"Expected an operator for operator definition", CurrentLocation, false));
+                    CurrentTokenIndex = parseStart;
+                    return false;
+                }
             }
         }
 
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters))
-        { CurrentTokenIndex = parseStart; return false; }
+        OrderedDiagnosticCollection parameterDiagnostics = new();
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected parameter list for operator", CurrentLocation, false), parameterDiagnostics);
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         possibleName.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -304,7 +332,11 @@ public sealed class Parser
         Block? block = null;
 
         if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", parameters.Brackets.End.Position.After(), File); }
+        {
+            diagnostic.Add(1, Diagnostic.Critical($"Expected \";\" or block", parameters.Brackets.End.Position.After(), File));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         function = new FunctionDefinition(
             attributes,
@@ -317,11 +349,10 @@ public sealed class Parser
         {
             Block = block
         };
-
         return true;
     }
 
-    bool ExpectAliasDefinition([NotNullWhen(true)] out AliasDefinition? aliasDefinition)
+    bool ExpectAliasDefinition([NotNullWhen(true)] out AliasDefinition? aliasDefinition, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         aliasDefinition = null;
@@ -332,20 +363,33 @@ public sealed class Parser
 
         if (!ExpectIdentifier(DeclarationKeywords.Alias, out Token? keyword))
         {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected keyword `{DeclarationKeywords.Alias}` for alias definition", CurrentLocation, false));
             CurrentTokenIndex = parseStart;
             return false;
         }
 
         if (!ExpectIdentifier(out Token? identifier))
-        { throw new SyntaxException($"Expected identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
+        {
+            diagnostic.Add(1, Diagnostic.Critical($"Expected identifier after keyword \"{keyword}\"", keyword.Position.After(), File));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         if (!ExpectType(AllowedType.Any | AllowedType.FunctionPointer | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
-        { throw new SyntaxException($"Expected type after alias identifier", identifier.Position.After(), File); }
+        {
+            diagnostic.Add(2, Diagnostic.Critical($"Expected type after alias identifier", identifier.Position.After(), File));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         CheckModifiers(modifiers, AliasModifiers);
 
         if (!ExpectOperator(";"))
-        { throw new SyntaxException($"Expected semicolon after alias definition", type.Position.After(), File); }
+        {
+            diagnostic.Add(3, Diagnostic.Critical($"Pls put a semicolon here", type.Position.After(), File));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         aliasDefinition = new AliasDefinition(
             attributes,
@@ -395,7 +439,7 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpectFunctionDefinition([NotNullWhen(true)] out FunctionDefinition? function)
+    bool ExpectFunctionDefinition([NotNullWhen(true)] out FunctionDefinition? function, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         function = null;
@@ -407,13 +451,26 @@ public sealed class Parser
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected type for function definition", CurrentLocation, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         if (!ExpectIdentifier(out Token? possibleNameT))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected identifier for function definition", CurrentLocation, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
-        if (!ExpecParameters(ParameterModifiers, true, out ParameterDefinitionCollection? parameters))
-        { CurrentTokenIndex = parseStart; return false; }
+        OrderedDiagnosticCollection parameterDiagnostics = new();
+        if (!ExpecParameters(ParameterModifiers, true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected parameter list for function definition", CurrentLocation, false), parameterDiagnostics);
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
@@ -422,7 +479,11 @@ public sealed class Parser
         Block? block = null;
 
         if (!ExpectOperator(";") && !ExpectBlock(out block))
-        { throw new SyntaxException($"Expected \";\" or block", parameters.Brackets.End.Position.After(), File); }
+        {
+            diagnostic.Add(1, Diagnostic.Critical($"Expected \";\" or block", parameters.Brackets.End.Position.After(), File));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         function = new FunctionDefinition(
             attributes,
@@ -435,11 +496,10 @@ public sealed class Parser
         {
             Block = block
         };
-
         return true;
     }
 
-    bool ExpectGeneralFunctionDefinition([NotNullWhen(true)] out GeneralFunctionDefinition? function)
+    bool ExpectGeneralFunctionDefinition([NotNullWhen(true)] out GeneralFunctionDefinition? function, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         function = null;
@@ -447,24 +507,41 @@ public sealed class Parser
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(out Token? possibleNameT))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected identifier for general function definition", CurrentLocation, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         if (possibleNameT.Content is
             not BuiltinFunctionIdentifiers.IndexerGet and
             not BuiltinFunctionIdentifiers.IndexerSet and
             not BuiltinFunctionIdentifiers.Destructor)
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Invalid identifier `{possibleNameT.Content}` for general function definition", possibleNameT, File, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters))
-        { CurrentTokenIndex = parseStart; return false; }
+        OrderedDiagnosticCollection parameterDiagnostics = new();
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        {
+            diagnostic.Add(1, Diagnostic.Critical($"Expected parameter list for general function definition", CurrentLocation), parameterDiagnostics);
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         possibleNameT.AnalyzedType = TokenAnalyzedType.FunctionName;
 
         CheckModifiers(modifiers, GeneralFunctionModifiers);
 
-        Block? block = null;
+        Block? block;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Diagnostics.Add(Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After() ?? Position.UnknownPosition, File)); }
+        {
+            diagnostic.Add(2, Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentPosition, File));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         function = new GeneralFunctionDefinition(
             possibleNameT,
@@ -474,11 +551,10 @@ public sealed class Parser
         {
             Block = block
         };
-
         return true;
     }
 
-    bool ExpectConstructorDefinition([NotNullWhen(true)] out ConstructorDefinition? function)
+    bool ExpectConstructorDefinition([NotNullWhen(true)] out ConstructorDefinition? function, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         function = null;
@@ -486,16 +562,29 @@ public sealed class Parser
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? type))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Error($"Expected a type for constructor definition", CurrentPosition, File, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out ParameterDefinitionCollection? parameters))
-        { CurrentTokenIndex = parseStart; return false; }
+        OrderedDiagnosticCollection parameterDiagnostics = new();
+        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        {
+            diagnostic.Add(0, Diagnostic.Error($"Expected a parameter list for constructor definition", CurrentPosition, File, false), parameterDiagnostics);
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         CheckModifiers(modifiers, ConstructorModifiers);
 
-        Block? block = null;
+        Block? block;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
-        { Diagnostics.Add(Diagnostic.Error($"Body is required for constructor definition", semicolon?.Position ?? CurrentToken?.Position ?? PreviousToken?.Position.After() ?? Position.UnknownPosition, File)); }
+        {
+            diagnostic.Add(0, Diagnostic.Error($"Body is required for constructor definition", semicolon?.Position ?? CurrentPosition, File, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         function = new ConstructorDefinition(
             type,
@@ -509,7 +598,7 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpectStructDefinition()
+    bool ExpectStructDefinition(OrderedDiagnosticCollection diagnostic)
     {
         int startTokenIndex = CurrentTokenIndex;
 
@@ -520,13 +609,25 @@ public sealed class Parser
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(DeclarationKeywords.Struct, out Token? keyword))
-        { CurrentTokenIndex = startTokenIndex; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected keyword `{DeclarationKeywords.Struct}` for struct definition", CurrentLocation, false));
+            CurrentTokenIndex = startTokenIndex;
+            return false;
+        }
 
         if (!ExpectIdentifier(out Token? possibleStructName))
-        { throw new SyntaxException($"Expected struct identifier after keyword \"{keyword}\"", keyword.Position.After(), File); }
+        {
+            diagnostic.Add(1, Diagnostic.Critical($"Expected struct identifier after keyword `{keyword}`", keyword.Position.After(), File));
+            CurrentTokenIndex = startTokenIndex;
+            return false;
+        }
 
         if (!ExpectOperator("{", out Token? bracketStart))
-        { throw new SyntaxException("Expected \"{\" after struct identifier", possibleStructName.Position.After(), File); }
+        {
+            diagnostic.Add(2, Diagnostic.Critical($"Expected `{{` after struct identifier `{keyword}`", possibleStructName.Position.After(), File));
+            CurrentTokenIndex = startTokenIndex;
+            return false;
+        }
 
         possibleStructName.AnalyzedType = TokenAnalyzedType.Struct;
         keyword.AnalyzedType = TokenAnalyzedType.Keyword;
@@ -541,31 +642,33 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator("}", out bracketEnd))
         {
-            if (ExpectField(out FieldDefinition? field))
+            OrderedDiagnosticCollection diagnostics = new();
+            if (ExpectField(out FieldDefinition? field, diagnostics))
             {
                 fields.Add(field);
                 if (ExpectOperator(";", out Token? semicolon))
                 { field.Semicolon = semicolon; }
             }
-            else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition))
+            else if (ExpectFunctionDefinition(out FunctionDefinition? methodDefinition, diagnostics))
             {
                 methods.Add(methodDefinition);
             }
-            else if (ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition? generalMethodDefinition))
+            else if (ExpectGeneralFunctionDefinition(out GeneralFunctionDefinition? generalMethodDefinition, diagnostics))
             {
                 generalMethods.Add(generalMethodDefinition);
             }
-            else if (ExpectConstructorDefinition(out ConstructorDefinition? constructorDefinition))
+            else if (ExpectConstructorDefinition(out ConstructorDefinition? constructorDefinition, diagnostics))
             {
                 constructors.Add(constructorDefinition);
             }
-            else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition))
+            else if (ExpectOperatorDefinition(out FunctionDefinition? operatorDefinition, diagnostics))
             {
                 operators.Add(operatorDefinition);
             }
             else
             {
-                throw new SyntaxException("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken!.Position.After(), File);
+                Diagnostics.Add(Diagnostic.Critical("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken!.Position.After(), File, diagnostics.Compile().ToArray()));
+                return false;
             }
 
             endlessSafe++;
@@ -598,13 +701,17 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpecParameters(ImmutableArray<string> allowedParameterModifiers, bool allowDefaultValues, [NotNullWhen(true)] out ParameterDefinitionCollection? parameterDefinitions)
+    bool ExpecParameters(ImmutableArray<string> allowedParameterModifiers, bool allowDefaultValues, [NotNullWhen(true)] out ParameterDefinitionCollection? parameterDefinitions, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         parameterDefinitions = null;
 
         if (!ExpectOperator("(", out Token? bracketStart))
-        { CurrentTokenIndex = parseStart; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Error("Expected a `(` for parameter list", CurrentLocation, false));
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
 
         List<ParameterDefinition> parameters = new();
 
@@ -617,10 +724,18 @@ public sealed class Parser
             CheckParameterModifiers(parameterModifiers, parameters.Count, allowedParameterModifiers);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
-            { throw new SyntaxException("Expected parameter type", PreviousToken!.Position.After(), File); }
+            {
+                diagnostic.Add(1, Diagnostic.Error("Expected parameter type", CurrentLocation));
+                CurrentTokenIndex = parseStart;
+                return false;
+            }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
-            { throw new SyntaxException("Expected a parameter name", parameterType.Position.After(), File); }
+            {
+                diagnostic.Add(1, Diagnostic.Error("Expected a parameter name", CurrentLocation));
+                CurrentTokenIndex = parseStart;
+                return false;
+            }
 
             parameterIdentifier.AnalyzedType = TokenAnalyzedType.VariableName;
 
@@ -628,13 +743,25 @@ public sealed class Parser
             if (ExpectOperator("=", out Token? assignmentOperator))
             {
                 if (!allowDefaultValues)
-                { throw new SyntaxException("Default parameter values are not valid in the current context", assignmentOperator, File); }
+                {
+                    diagnostic.Add(2, Diagnostic.Error("Default parameter values are not valid in the current context", assignmentOperator, File));
+                    CurrentTokenIndex = parseStart;
+                    return false;
+                }
                 if (!ExpectExpression(out defaultValue))
-                { throw new SyntaxException("Expected expression after \"=\" in parameter definition", assignmentOperator, File); }
+                {
+                    diagnostic.Add(2, Diagnostic.Error("Expected expression after \"=\" in parameter definition", assignmentOperator, File));
+                    CurrentTokenIndex = parseStart;
+                    return false;
+                }
                 expectOptionalParameters = true;
             }
             else if (expectOptionalParameters)
-            { throw new SyntaxException("Parameters without default value after a parameter that has one is not supported", parameterIdentifier.Position.After(), File); }
+            {
+                diagnostic.Add(2, Diagnostic.Error("Parameters without default value after a parameter that has one is not supported", parameterIdentifier.Position.After(), File));
+                CurrentTokenIndex = parseStart;
+                return false;
+            }
 
             ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier, defaultValue);
             parameters.Add(parameterDefinition);
@@ -643,7 +770,11 @@ public sealed class Parser
             { break; }
 
             if (!ExpectOperator(","))
-            { throw new SyntaxException("Expected \",\" or \")\"", PreviousToken!.Position.After(), File); }
+            {
+                diagnostic.Add(2, Diagnostic.Error("Expected \",\" or \")\"", PreviousToken!.Position.After(), File));
+                CurrentTokenIndex = parseStart;
+                return false;
+            }
             else
             { expectParameter = true; }
         }
@@ -1746,7 +1877,7 @@ public sealed class Parser
         return attributes.ToArray();
     }
 
-    bool ExpectField([NotNullWhen(true)] out FieldDefinition? field)
+    bool ExpectField([NotNullWhen(true)] out FieldDefinition? field, OrderedDiagnosticCollection diagnostic)
     {
         field = null;
 
@@ -1757,20 +1888,31 @@ public sealed class Parser
         Token[] modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType))
-        { CurrentTokenIndex = startTokenIndex; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected type for field definition", CurrentLocation, false));
+            CurrentTokenIndex = startTokenIndex;
+            return false;
+        }
 
         if (!ExpectIdentifier(out Token? possibleVariableName))
-        { CurrentTokenIndex = startTokenIndex; return false; }
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Expected identifier for field definition", CurrentLocation, false));
+            CurrentTokenIndex = startTokenIndex;
+            return false;
+        }
 
-        if (ExpectOperator("("))
-        { CurrentTokenIndex = startTokenIndex; return false; }
+        if (ExpectOperator("(", out Token? unexpectedThing))
+        {
+            diagnostic.Add(0, Diagnostic.Critical($"Unexpected `(` after field identifier", unexpectedThing, File, false));
+            CurrentTokenIndex = startTokenIndex;
+            return false;
+        }
 
         possibleVariableName.AnalyzedType = TokenAnalyzedType.None;
 
         CheckModifiers(modifiers, FieldModifiers);
 
         field = new(possibleVariableName, possibleType, modifiers, attributes);
-
         return true;
     }
 

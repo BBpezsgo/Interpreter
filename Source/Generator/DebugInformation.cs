@@ -264,10 +264,10 @@ public readonly struct CompiledDebugInformation
     public static ImmutableArray<ScopeInformation> GetScopes(ReadOnlySpan<ScopeInformation> scopeInformation, int codePointer)
     {
         List<ScopeInformation> result = new();
-        foreach (ScopeInformation scope in scopeInformation)
+        for (int i = 0; i < scopeInformation.Length; i++)
         {
-            if (!scope.Location.Contains(codePointer)) continue;
-            result.Add(scope);
+            if (!scopeInformation[i].Location.Contains(codePointer)) continue;
+            result.Add(scopeInformation[i]);
         }
         return result.ToImmutableArray();
     }

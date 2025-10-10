@@ -4,7 +4,7 @@ using LanguageCore.Tokenizing;
 
 namespace Tests;
 
-[TestClass, TestCategory("Tokenizer")]
+[TestClass, TestCategory("Internals")]
 public class TokenizerTests
 {
     static readonly TokenizerSettings Settings = new()
@@ -842,7 +842,7 @@ public class TokenizerTests
     }
 }
 
-[TestClass, TestCategory("Token Utils")]
+[TestClass, TestCategory("Internals")]
 public class TokenTests
 {
     [TestMethod]

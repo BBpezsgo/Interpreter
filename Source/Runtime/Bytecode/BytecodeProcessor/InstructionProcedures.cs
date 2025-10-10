@@ -599,10 +599,10 @@ public ref partial struct ProcessorState
             Span<byte> returnValue = Memory.Slice(Registers.StackPointer + scopedExternalFunction.ParametersSize, scopedExternalFunction.ReturnValueSize);
             nint scope = scopedExternalFunction.Scope;
 
-            if (scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILPointerMarshal))
+            if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILPointerMarshal) != default)
             {
                 // TODO: Unity burst compatibility
-                if (scope != 0) throw new RuntimeException($"Invalid MSIL marshal function (the scope must be null)");
+                if (scope != 0) throw new RuntimeException("Invalid MSIL marshal function (the scope must be null)");
                 scope = (nint)Unsafe.AsPointer(ref Memory[0]);
             }
 
@@ -636,16 +636,16 @@ public ref partial struct ProcessorState
             ref readonly ExternalFunctionScopedSync scopedExternalFunction = ref ScopedExternalFunctions[i];
             if (scopedExternalFunction.Id != functionId) continue;
 
-            if (scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILSafe))
+            if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILSafe) != default)
             {
                 Span<byte> parameters = Memory.Slice(Registers.StackPointer, scopedExternalFunction.ParametersSize);
                 Span<byte> returnValue = Memory.Slice(Registers.StackPointer + scopedExternalFunction.ParametersSize, scopedExternalFunction.ReturnValueSize);
                 nint scope = scopedExternalFunction.Scope;
 
-                if (scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILPointerMarshal))
+                if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILPointerMarshal) != default)
                 {
                     // TODO: Unity burst compatibility
-                    if (scope != 0) throw new RuntimeException($"Invalid MSIL marshal function (the scope must be null)");
+                    if (scope != 0) throw new RuntimeException("Invalid MSIL marshal function (the scope must be null)");
                     scope = (nint)Unsafe.AsPointer(ref Memory[0]);
                 }
 
@@ -659,7 +659,7 @@ public ref partial struct ProcessorState
             }
             else
             {
-                if (!scopedExternalFunction.Flags.HasFlag(ExternalFunctionScopedSyncFlags.MSILUnsafe) && HotFunctions.CurrentHotFunctionDepth++ == 0)
+                if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILUnsafe) == default && HotFunctions.CurrentHotFunctionDepth++ == 0)
                 {
                     HotFunctions.HotFunctionStarted = HotFunctions.Cycle;
                     HotFunctions.CurrentHotFunction = CurrentInstruction.Operand1.Int;

@@ -2,7 +2,7 @@
 
 namespace Tests;
 
-[TestClass, TestCategory("Code Position")]
+[TestClass, TestCategory("Internals")]
 public class PositionTests
 {
     [TestMethod]

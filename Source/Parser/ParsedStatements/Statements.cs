@@ -1911,3 +1911,36 @@ public class ModifiedStatement : StatementWithValue
         { yield return statement; }
     }
 }
+
+public class LambdaStatement : StatementWithValue
+{
+    public ParameterDefinitionCollection Parameters { get; }
+    public Token Arrow { get; }
+    public Statement Body { get; }
+
+    public override Position Position => new(
+        Parameters,
+        Arrow,
+        Body
+    );
+
+    public LambdaStatement(
+        ParameterDefinitionCollection parameters,
+        Token arrow,
+        Statement body,
+        Uri file) : base(file)
+    {
+        Parameters = parameters;
+        Arrow = arrow;
+        Body = body;
+    }
+
+    public override string ToString()
+        => $"{Parameters} {Arrow} {Body}";
+
+    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    {
+        if (includeThis) yield return this;
+        foreach (var v in Body.GetStatementsRecursively(true)) yield return v;
+    }
+}

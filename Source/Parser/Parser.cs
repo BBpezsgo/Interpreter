@@ -318,7 +318,7 @@ public sealed class Parser
         }
 
         OrderedDiagnosticCollection parameterDiagnostics = new();
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        if (!ExpectParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
         {
             diagnostic.Add(0, Diagnostic.Critical($"Expected parameter list for operator", CurrentLocation, false), parameterDiagnostics);
             CurrentTokenIndex = parseStart;
@@ -465,7 +465,7 @@ public sealed class Parser
         }
 
         OrderedDiagnosticCollection parameterDiagnostics = new();
-        if (!ExpecParameters(ParameterModifiers, true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        if (!ExpectParameters(ParameterModifiers, true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
         {
             diagnostic.Add(0, Diagnostic.Critical($"Expected parameter list for function definition", CurrentLocation, false), parameterDiagnostics);
             CurrentTokenIndex = parseStart;
@@ -524,7 +524,7 @@ public sealed class Parser
         }
 
         OrderedDiagnosticCollection parameterDiagnostics = new();
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        if (!ExpectParameters(ImmutableArray.Create(ModifierKeywords.Temp), false, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
         {
             diagnostic.Add(1, Diagnostic.Critical($"Expected parameter list for general function definition", CurrentLocation), parameterDiagnostics);
             CurrentTokenIndex = parseStart;
@@ -569,7 +569,7 @@ public sealed class Parser
         }
 
         OrderedDiagnosticCollection parameterDiagnostics = new();
-        if (!ExpecParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
+        if (!ExpectParameters(ImmutableArray.Create(ModifierKeywords.Temp), true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
         {
             diagnostic.Add(0, Diagnostic.Error($"Expected a parameter list for constructor definition", CurrentPosition, File, false), parameterDiagnostics);
             CurrentTokenIndex = parseStart;
@@ -701,7 +701,7 @@ public sealed class Parser
         return true;
     }
 
-    bool ExpecParameters(ImmutableArray<string> allowedParameterModifiers, bool allowDefaultValues, [NotNullWhen(true)] out ParameterDefinitionCollection? parameterDefinitions, OrderedDiagnosticCollection diagnostic)
+    bool ExpectParameters(ImmutableArray<string> allowedParameterModifiers, bool allowDefaultValues, [NotNullWhen(true)] out ParameterDefinitionCollection? parameterDefinitions, OrderedDiagnosticCollection diagnostic)
     {
         int parseStart = CurrentTokenIndex;
         parameterDefinitions = null;
@@ -786,6 +786,49 @@ public sealed class Parser
     #endregion
 
     #region Parse low level
+
+    bool ExpectLambda([NotNullWhen(true)] out LambdaStatement? lambdaStatement)
+    {
+        int parseStart = CurrentTokenIndex;
+        lambdaStatement = null;
+
+        OrderedDiagnosticCollection parametersDiagnostics = new();
+        if (!ExpectParameters(ParameterModifiers, false, out ParameterDefinitionCollection? parameters, parametersDiagnostics))
+        {
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
+
+        if (!ExpectOperator("=>", out Token? arrow))
+        {
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
+
+        Statement body;
+
+        if (ExpectBlock(out Block? block, false))
+        {
+            body = block;
+        }
+        else if (ExpectExpression(out StatementWithValue? expression))
+        {
+            body = expression;
+        }
+        else
+        {
+            CurrentTokenIndex = parseStart;
+            return false;
+        }
+
+        lambdaStatement = new LambdaStatement(
+            parameters,
+            arrow,
+            body,
+            File
+        );
+        return true;
+    }
 
     bool ExpectListValue([NotNullWhen(true)] out LiteralList? listValue)
     {
@@ -965,7 +1008,11 @@ public sealed class Parser
     {
         statementWithValue = null;
 
-        if (ExpectListValue(out LiteralList? listValue))
+        if (ExpectLambda(out LambdaStatement? lambdaStatement))
+        {
+            statementWithValue = lambdaStatement;
+        }
+        else if (ExpectListValue(out LiteralList? listValue))
         {
             statementWithValue = listValue;
         }
@@ -1200,7 +1247,7 @@ public sealed class Parser
         { statementWithReturnValue.SaveValue = false; }
     }
 
-    bool ExpectBlock([NotNullWhen(true)] out Block? block)
+    bool ExpectBlock([NotNullWhen(true)] out Block? block, bool consumeSemicolon = true)
     {
         if (!ExpectOperator("{", out Token? bracketStart))
         {
@@ -1231,7 +1278,7 @@ public sealed class Parser
 
         block = new Block(statements, new TokenPair(bracketStart, bracketEnd), File);
 
-        if (ExpectOperator(";", out Token? semicolon))
+        if (consumeSemicolon && ExpectOperator(";", out Token? semicolon))
         { block.Semicolon = semicolon; }
 
         return true;
@@ -2211,7 +2258,8 @@ public sealed class Parser
         Block or
         IfContainer or
         BaseBranch or
-        InstructionLabel
+        InstructionLabel or
+        LambdaStatement
     );
 
     #endregion

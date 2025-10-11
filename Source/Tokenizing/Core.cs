@@ -21,7 +21,8 @@ public partial class Tokenizer
     static readonly ImmutableArray<string> DoubleOperators = ImmutableArray.Create(
         "++", "--",
         "<<", ">>",
-        "&&", "||"
+        "&&", "||",
+        "=>"
     );
 
     static readonly ImmutableArray<char> SimpleOperators = ImmutableArray.Create(

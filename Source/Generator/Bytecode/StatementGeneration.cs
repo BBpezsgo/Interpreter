@@ -1028,6 +1028,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             else Push(new CompiledValue(stringInstance.Value[i]));
         }
     }
+    void GenerateCodeForStatement(CompiledLambda compiledLambda)
+    {
+        if (compiledLambda.InstructionOffset == InvalidFunctionAddress)
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(GeneratedCode.Count, true, compiledLambda, compiledLambda)); }
+
+        Push(compiledLambda.InstructionOffset);
+    }
     void GenerateCodeForStatement(RegisterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         AddInstruction(Opcode.Push, variable.Register);
@@ -1632,6 +1639,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledStatementWithValueThatActuallyDoesntHaveValue v: GenerateCodeForStatement(v.Statement); break;
             case CompiledStringInstance v: GenerateCodeForStatement(v); break;
             case CompiledStackStringInstance v: GenerateCodeForStatement(v); break;
+            case CompiledLambda v: GenerateCodeForStatement(v); break;
             case EmptyStatement: break;
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
@@ -2214,7 +2222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Address = GetReturnValueAddress(returnType.Type).Offset,
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
-                Size = returnType.Type.GetSize(this, Diagnostics, (FunctionThingDefinition)function),
+                Size = returnType.Type.GetSize(this, Diagnostics, (ILocated)function),
                 Identifier = "Return Value",
                 Type = returnType.Type,
             });
@@ -2284,13 +2292,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (body != null) AddComment("}");
 
-        DebugInfo?.FunctionInformation.Add(new FunctionInformation()
+        if (function is FunctionThingDefinition)
         {
-            IsValid = true,
-            Function = (FunctionThingDefinition)function,
-            TypeArguments = TypeArguments.ToImmutableDictionary(),
-            Instructions = (instructionStart, GeneratedCode.Count),
-        });
+            DebugInfo?.FunctionInformation.Add(new FunctionInformation()
+            {
+                IsValid = true,
+                Function = (FunctionThingDefinition)function,
+                TypeArguments = TypeArguments.ToImmutableDictionary(),
+                Instructions = (instructionStart, GeneratedCode.Count),
+            });
+        }
 
         SetUndefinedFunctionOffsets(UndefinedInstructionLabels, false);
 
@@ -2491,12 +2502,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             foreach (UndefinedOffset undefinedOffset in UndefinedFunctionOffsets.ToArray())
             {
+                if (undefinedOffset.Called is CompiledLambda compiledLambda)
+                {
+                    GenerateCodeForFunction(compiledLambda, compiledLambda.Block);
+                    goto ok;
+                }
+
                 foreach ((ICompiledFunctionDefinition function, CompiledBlock body) in compilerResult.Functions)
                 {
                     if (undefinedOffset.Called != function) continue;
                     GenerateCodeForFunction(function, body);
                     goto ok;
                 }
+
                 if (!Diagnostics.HasErrors) Diagnostics.Add(Diagnostic.Critical($"Function {undefinedOffset.Called} wasn't compiled for some reason", undefinedOffset.CallerLocation));
                 goto failed;
             ok:;

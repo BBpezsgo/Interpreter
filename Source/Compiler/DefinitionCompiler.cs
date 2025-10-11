@@ -923,6 +923,20 @@ public partial class StatementCompiler
                 CompiledConstructors.Add(compiledConstructor);
             }
 
+            // TODO: this
+            foreach (FunctionDefinition @operator in compiledStruct.Operators)
+            {
+                CompiledOperatorDefinition compiled = CompileOperatorDefinition(@operator, null);
+
+                if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
+                {
+                    Diagnostics.Add(Diagnostic.Critical($"Operator \"{compiled.ToReadable()}\" already defined", @operator.Identifier, @operator.File));
+                    continue;
+                }
+
+                CompiledOperators.Add(compiled);
+            }
+
             if (compiledStruct.Template is not null)
             { GenericParameters.Pop(); }
         }
@@ -967,12 +981,16 @@ public partial class StatementCompiler
 
     CompilerResult CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
     {
+        CompiledFrame dummyFrame = Frames.Push(CompiledFrame.Empty);
+
         CompileDefinitions(file, parsedFiles);
 
         GenerateCode(
             parsedFiles,
             file
         );
+
+        if (Frames.Pop() != dummyFrame) throw new InternalExceptionWithoutContext("Bruh");
 
         return new CompilerResult(
             parsedFiles,

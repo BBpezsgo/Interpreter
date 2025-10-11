@@ -4,9 +4,9 @@ public readonly struct CompliableTemplate<T> where T : ITemplateable<T>
 {
     public readonly T OriginalFunction;
     public readonly T Function;
-    public readonly Dictionary<string, GeneralType> TypeArguments;
+    public readonly ImmutableDictionary<string, GeneralType> TypeArguments;
 
-    public CompliableTemplate(T function, Dictionary<string, GeneralType> typeArguments)
+    public CompliableTemplate(T function, ImmutableDictionary<string, GeneralType> typeArguments)
     {
         OriginalFunction = function;
         TypeArguments = typeArguments;

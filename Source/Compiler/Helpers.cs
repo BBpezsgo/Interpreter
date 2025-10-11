@@ -17,14 +17,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     readonly List<CompiledGeneralFunctionDefinition> CompiledGeneralFunctions = new();
     readonly List<CompiledAlias> CompiledAliases = new();
 
-    readonly Stack<Scope> Scopes = new();
-    readonly Stack<CompiledParameter> CompiledParameters;
-
     readonly Stack<CompiledVariableConstant> CompiledGlobalConstants = new();
     readonly Stack<CompiledInstructionLabelDeclaration> CompiledGlobalInstructionLabels = new();
     readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables = new();
-
-    readonly Dictionary<string, GeneralType> TypeArguments;
 
     readonly DiagnosticsCollection Diagnostics;
 
@@ -38,9 +33,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     public int PointerSize => Settings.PointerSize;
     public BuiltinType SizeofStatementType => Settings.SizeofStatementType;
     public BuiltinType ExitCodeType => Settings.ExitCodeType;
-
-    GeneralType? CurrentReturnType;
-    CompiledGeneratorContext? CompiledGeneratorContext;
 
     readonly CompilerSettings Settings;
     readonly List<CompiledFunction> GeneratedFunctions = new();
@@ -66,6 +58,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     readonly List<(FunctionThingDefinition Function, CompiledGeneratorState State)> GeneratorStates = new();
 
+    readonly Stack<CompiledFrame> Frames;
+
     CompiledGeneratorStructDefinition? GeneratorStructDefinition;
 
     #endregion
@@ -83,7 +77,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         notFoundError = null;
         ConstantPerfectus perfectus = ConstantPerfectus.None;
 
-        foreach (Scope item in Scopes)
+        foreach (Scope item in Frames.Last.Scopes)
         {
             foreach (CompiledVariableConstant _constant in item.Constants)
             {
@@ -1005,7 +999,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (Scope scope in Scopes)
+        foreach (Scope scope in Frames.Last.Scopes)
         {
             foreach (CompiledVariableDeclaration compiledVariable_ in scope.Variables)
             {
@@ -1098,11 +1092,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (CompiledParameter compiledParameter_ in CompiledParameters)
+        foreach (CompiledParameter compiledParameter in Frames.Last.CompiledParameters)
         {
-            if (compiledParameter_.Identifier.Content == parameterName)
+            if (compiledParameter.Identifier.Content == parameterName)
             {
-                parameter = compiledParameter_;
+                parameter = compiledParameter;
                 error = null;
                 return true;
             }
@@ -1115,7 +1109,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetInstructionLabel(string identifier, [NotNullWhen(true)] out CompiledInstructionLabelDeclaration? instructionLabel, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (Scope scope in Scopes)
+        foreach (Scope scope in Frames.Last.Scopes)
         {
             foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in scope.InstructionLabels)
             {
@@ -1290,7 +1284,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
+        if (Frames.Last.TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
         {
             result = typeArgument;
             return true;

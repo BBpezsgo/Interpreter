@@ -33,13 +33,11 @@ public partial class StatementCompiler
 
     public StatementCompiler(CompilerSettings settings, DiagnosticsCollection diagnostics, PrintCallback? print)
     {
-        CompiledParameters = new();
+        Frames = new();
 
         CompilableFunctions = new();
         CompilableOperators = new();
         CompilableGeneralFunctions = new();
-
-        TypeArguments = new Dictionary<string, GeneralType>();
 
         Diagnostics = diagnostics;
         Settings = settings;

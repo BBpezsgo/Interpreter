@@ -10,7 +10,6 @@ public interface ICompiledFunctionDefinition :
     ISimpleReadable
 {
     bool ReturnSomething { get; }
-    Block? Block { get; }
     IReadOnlyList<ParameterDefinition> Parameters { get; }
     IReadOnlyList<GeneralType> ParameterTypes { get; }
 }

@@ -633,7 +633,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 //{
                 //    ILGenerator.GenerateImplMarshaled(f, out _);
                 //}
-                Diagnostics.Add(Diagnostic.Warning($"Failed to generate MSIL for function {f.Function}", caller, ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error).ToArray()));
+                Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to generate MSIL for function {f.Function}", caller, ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error).ToArray()));
                 ILGenerator.Diagnostics.Clear();
             }
         }

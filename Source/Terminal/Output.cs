@@ -71,6 +71,7 @@ public static class Output
             DiagnosticsLevel.Information => LogInfos,
             DiagnosticsLevel.Hint => LogInfos,
             DiagnosticsLevel.OptimizationNotice => false,
+            DiagnosticsLevel.FailedOptimization => false,
             _ => false,
         }))
         { return; }
@@ -84,6 +85,7 @@ public static class Output
             DiagnosticsLevel.Information => InfoColor,
             DiagnosticsLevel.Hint => InfoColor,
             DiagnosticsLevel.OptimizationNotice => DebugColor,
+            DiagnosticsLevel.FailedOptimization => WarningColor,
             _ => DebugColor,
         };
 

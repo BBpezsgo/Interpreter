@@ -125,6 +125,9 @@ public class Diagnostic :
     public static Diagnostic OptimizationNotice(string message, ILocated location, params Diagnostic?[] suberrors)
         => new(DiagnosticsLevel.OptimizationNotice, message, location.Location.Position, location.Location.File, false, suberrors);
 
+    public static Diagnostic FailedOptimization(string message, ILocated location, params Diagnostic?[] suberrors)
+        => new(DiagnosticsLevel.FailedOptimization, message, location.Location.Position, location.Location.File, false, suberrors);
+
     public Diagnostic Break()
     {
 #if DEBUG && !UNITY

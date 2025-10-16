@@ -8,6 +8,7 @@ public enum DiagnosticsLevel
     Information,
     Hint,
     OptimizationNotice,
+    FailedOptimization,
 }
 
 public interface IDiagnostic

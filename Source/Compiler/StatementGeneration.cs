@@ -1119,7 +1119,7 @@ public partial class StatementCompiler
                                 }
                             }
                             Debugger.Break();
-                            Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because the behavior might change", item));
+                            Diagnostics.Add(Diagnostic.FailedOptimization($"Can't inline \"{callee.ToReadable()}\" because the behavior might change", item));
                             goto bad;
                         ok:;
                         }
@@ -1133,7 +1133,7 @@ public partial class StatementCompiler
                         if (complexity.HasFlag(StatementComplexity.Bruh))
                         {
                             Debugger.Break();
-                            Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because of this argument", argument));
+                            Diagnostics.Add(Diagnostic.FailedOptimization($"Can't inline \"{callee.ToReadable()}\" because of this argument", argument));
                             goto bad;
                         }
 
@@ -1142,7 +1142,7 @@ public partial class StatementCompiler
                             if (inlineContext.InlinedArguments.Count(v => v == argument) > 1)
                             {
                                 //Debugger.Break();
-                                Diagnostics.Add(Diagnostic.Warning($"Can't inline \"{callee.ToReadable()}\" because this expression might be complex", argument));
+                                Diagnostics.Add(Diagnostic.FailedOptimization($"Can't inline \"{callee.ToReadable()}\" because this expression might be complex", argument));
                                 goto bad;
                             }
                         }
@@ -1192,7 +1192,7 @@ public partial class StatementCompiler
                             .Select((value, index) => (value.Identifier.Content, compiledArguments[index]))
                             .ToImmutableDictionary(v => v.Content, v => v.Item2),
                     }, out inlined1);
-                    Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{callee.ToReadable()}\"", caller));
+                    Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to inline \"{callee.ToReadable()}\"", caller));
                 }
             }
         }

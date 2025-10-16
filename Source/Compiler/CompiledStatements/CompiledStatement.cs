@@ -784,10 +784,18 @@ public class CompiledStackStringInstance : CompiledStatementWithValue
 
 public class FunctionAddressGetter : CompiledStatementWithValue
 {
-    public required CompiledFunctionDefinition Function { get; init; }
+    public required IHaveInstructionOffset Function { get; init; }
 
-    public override string Stringify(int depth = 0) => $"&{Function.Identifier}";
-    public override string ToString() => $"&{Function.Identifier}";
+    public override string Stringify(int depth = 0) => $"&{Function switch
+    {
+        CompiledFunctionDefinition v => v.Identifier,
+        _ => Function.ToString(),
+    }}";
+    public override string ToString() => $"&{Function switch
+    {
+        CompiledFunctionDefinition v => v.Identifier,
+        _ => Function.ToString(),
+    }}";
 }
 
 public class InstructionLabelAddressGetter : CompiledStatementWithValue

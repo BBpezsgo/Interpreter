@@ -1061,7 +1061,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        CompiledFunctionDefinition? compiledFunction = variable.Function;
+        IHaveInstructionOffset compiledFunction = variable.Function;
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(GeneratedCode.Count, true, variable, compiledFunction)); }
@@ -2209,7 +2209,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (body is null)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function \"{((FunctionThingDefinition)function).ToReadable()}\" does not have a body", (FunctionThingDefinition)function));
+            Diagnostics.Add(Diagnostic.Critical($"Function \"{function.ToReadable()}\" does not have a body", (ILocated)function));
             return;
         }
 
@@ -2292,12 +2292,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (body != null) AddComment("}");
 
-        if (function is FunctionThingDefinition)
+        if (function is FunctionThingDefinition functionDefinition)
         {
             DebugInfo?.FunctionInformation.Add(new FunctionInformation()
             {
                 IsValid = true,
-                Function = (FunctionThingDefinition)function,
+                Function = functionDefinition,
                 TypeArguments = TypeArguments.ToImmutableDictionary(),
                 Instructions = (instructionStart, GeneratedCode.Count),
             });

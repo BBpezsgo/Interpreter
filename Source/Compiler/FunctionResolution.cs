@@ -58,7 +58,7 @@ public partial class StatementCompiler
                 Identifier = identifier,
                 Arguments = arguments,
                 ArgumentCount = arguments.Length,
-                Converter = (FunctionQueryArgumentConverter<GeneralType>)FunctionArgumentConverter,
+                Converter = FunctionArgumentConverter,
                 RelevantFile = relevantFile,
                 ReturnType = returnType,
                 AddCompilable = addCompilable,

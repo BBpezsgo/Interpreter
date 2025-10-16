@@ -7,6 +7,7 @@ class CompiledFrame
     public required Stack<Scope> Scopes { get; init; }
     public required CompiledGeneratorContext? CompiledGeneratorContext { get; init; }
     public required GeneralType? CurrentReturnType { get; init; }
+    public bool IsMsilCompatible { get; set; } = true;
 
     public static CompiledFrame Empty => new()
     {

@@ -8,13 +8,14 @@ public class CompiledLambda : CompiledStatementWithValue,
     IHaveInstructionOffset
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
+    public bool IsMsilCompatible { get; set; } = true;
+
     public ImmutableArray<GeneralType> ParameterTypes { get; }
     public CompiledBlock Block { get; }
     public ParameterDefinitionCollection Parameters { get; }
     public Uri File { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
-
     IReadOnlyList<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters;
     IReadOnlyList<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
 

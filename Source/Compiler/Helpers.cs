@@ -2789,12 +2789,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     static bool Inline(CompiledConstructorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Object, context, out CompiledStatement? inlinedObject)) return false;
+        if (!Inline(statement.Object, context, out CompiledStatementWithValue? inlinedObject)) return false;
         if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
 
         inlined = new CompiledConstructorCall()
         {
-            Object = (CompiledStatementWithValue)inlinedObject,
+            Object = inlinedObject,
             Arguments = inlinedArguments,
             Function = statement.Function,
             Type = statement.Type,

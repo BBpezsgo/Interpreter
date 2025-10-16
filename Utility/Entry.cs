@@ -126,19 +126,19 @@ public static class Entry
                     //File.WriteAllText("/home/BB/Projects/BBLang/Core/out.bbc", compiled.Stringify());
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
-                        if (diagnostics.HasErrors) return 1;
-                    }
-                    catch (LanguageException ex)
-                    {
-                        diagnostics.Print();
-                        Output.LogError(ex);
-                        return 1;
-                    }
-                    catch (Exception ex)
-                    {
-                        diagnostics.Print();
-                        Output.LogError(ex);
-                        return 1;
+                    if (diagnostics.HasErrors) return 1;
+                }
+                catch (LanguageException ex)
+                {
+                    diagnostics.Print();
+                    Output.LogError(ex);
+                    return 1;
+                }
+                catch (Exception ex)
+                {
+                    diagnostics.Print();
+                    Output.LogError(ex);
+                    return 1;
                 }
 
                 Output.LogDebug($"Optimized {generatedCode.Statistics.Optimizations} statements");
@@ -340,7 +340,7 @@ public static class Entry
                     }
                 }
 
-                break;
+                return interpreter.Memory.AsSpan().Get<int>(interpreter.Registers.StackPointer);
             }
             case "il":
             {
@@ -439,16 +439,16 @@ public static class Entry
                     Output.LogDebug($"Evaluated {generated.Statistics.FunctionEvaluations} functions");
                 }
                 catch (LanguageException exception)
-                    {
-                        diagnostics.Print();
-                        Output.LogError(exception);
-                        return 1;
-                    }
-                    catch (Exception exception)
-                    {
-                        diagnostics.Print();
-                        Output.LogError(exception);
-                        return 1;
+                {
+                    diagnostics.Print();
+                    Output.LogError(exception);
+                    return 1;
+                }
+                catch (Exception exception)
+                {
+                    diagnostics.Print();
+                    Output.LogError(exception);
+                    return 1;
                 }
 
                 bool pauseBeforeRun = false;
@@ -696,18 +696,18 @@ public static class Entry
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
                     if (diagnostics.HasErrors) return 1;
-                    }
-                    catch (LanguageException ex)
-                    {
-                        diagnostics.Print();
-                        Output.LogError(ex);
-                        return 1;
-                    }
-                    catch (Exception ex)
-                    {
-                        diagnostics.Print();
-                        Output.LogError(ex);
-                        return 1;
+                }
+                catch (LanguageException ex)
+                {
+                    diagnostics.Print();
+                    Output.LogError(ex);
+                    return 1;
+                }
+                catch (Exception ex)
+                {
+                    diagnostics.Print();
+                    Output.LogError(ex);
+                    return 1;
                 }
 
                 string asm = Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);

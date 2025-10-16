@@ -123,6 +123,11 @@ public interface IHaveAttributes
     ImmutableArray<AttributeUsage> Attributes { get; }
 }
 
+public interface IMsilCompatible
+{
+    bool IsMsilCompatible { get; set; }
+}
+
 public interface IExternalFunctionDefinition
 {
     string? ExternalFunctionName { get; }

@@ -1160,7 +1160,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
                     EmitStatement(new CompiledHeapAllocation()
                     {
-                        Allocator = (CompiledFunctionDefinition)allocatorCaller.Function,
+                        Allocator = allocatorCallee,
                         Location = statement.Location,
                         SaveValue = statement.SaveValue,
                         Type = resultPointerType,
@@ -1177,7 +1177,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
                     EmitStatement(new CompiledHeapAllocation()
                     {
-                        Allocator = (CompiledFunctionDefinition)allocatorCaller.Function,
+                        Allocator = allocatorCallee,
                         Location = statement.Location,
                         SaveValue = statement.SaveValue,
                         Type = resultPointerType,
@@ -1210,7 +1210,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
                 EmitStatement(new CompiledHeapAllocation()
                 {
-                    Allocator = (CompiledFunctionDefinition)allocatorCaller.Function,
+                    Allocator = allocatorCallee,
                     Location = statement.Location,
                     SaveValue = statement.SaveValue,
                     Type = resultPointerType,
@@ -2321,6 +2321,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
             attributes.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
         {
             Diagnostics.Add(Diagnostic.Critical($"Function {function.ToReadable()} marked as MSIL incompatible", attributes.Attributes.First(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier), false));
+            return false;
+        }
+
+        if (!function.Function.IsMsilCompatible)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Function {function.ToReadable()} is not MSIL incompatible", (ILocated)function.Function, false));
             return false;
         }
 

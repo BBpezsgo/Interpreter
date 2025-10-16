@@ -59,7 +59,7 @@ public static class Interactive
         }
         catch (LanguageException ex)
         {
-            diagnostics.Add((Diagnostic)ex);
+            diagnostics.Add(ex.ToDiagnostic());
             return;
         }
         finally

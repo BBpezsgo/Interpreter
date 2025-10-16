@@ -281,6 +281,43 @@ public partial class StatementCompiler
             function
         );
 
+        /*
+        if (type.Is(out StructType? structType) &&
+            structType.Struct == GeneratorStructDefinition?.Struct)
+        {
+            List<GeneralType> _parameterTypes = new(parameterTypes.Length + 1)
+            {
+                new PointerType(new StructType(GetGeneratorState(function).Struct, function.File))
+            };
+            _parameterTypes.AddRange(parameterTypes);
+            parameterTypes = _parameterTypes.ToArray();
+
+            result = new(
+                type,
+                parameterTypes,
+                context,
+                new FunctionDefinition(
+                    result.Attributes,
+                    result.Modifiers,
+                    result.TypeToken,
+                    result.Identifier,
+                    new ParameterDefinitionCollection(
+                        Enumerable.Empty<ParameterDefinition>()
+                        .Append(new ParameterDefinition(
+                            new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                            new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(GetGeneratorState(function).Struct.Identifier.Content), function.File), Token.CreateAnonymous("*"), function.File),
+                            Token.CreateAnonymous("this"),
+                            null
+                        ))
+                        .Append(result.Parameters.Select(v => v))
+                        .ToArray(),
+                        result.Parameters.Brackets),
+                    result.Template,
+                    result.File)
+            );
+        }
+        */
+
         if (function.Template is not null)
         { GenericParameters.Pop(); }
 

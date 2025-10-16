@@ -442,7 +442,6 @@ public partial class StatementCompiler
 
         return true;
     }
-
     bool CompileStatement(InstructionLabel instructionLabel, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
@@ -456,7 +455,6 @@ public partial class StatementCompiler
         compiledStatement = compiledInstructionLabelDeclaration;
         return true;
     }
-
     bool CompileStatement(KeywordCall keywordCall, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
     {
         compiledStatement = null;
@@ -812,7 +810,6 @@ public partial class StatementCompiler
         compiledArguments = result.ToImmutable();
         return true;
     }
-
     bool CompileArguments(IReadOnlyList<StatementWithValue> arguments, FunctionType function, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> compiledArguments)
     {
         compiledArguments = ImmutableArray<CompiledPassedArgument>.Empty;
@@ -885,18 +882,20 @@ public partial class StatementCompiler
         };
         return true;
     }
-
     bool CompileFunctionCall<TFunction>(StatementWithValue caller, ImmutableArray<StatementWithValue> arguments, FunctionQueryResult<TFunction> _callee, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, IExportable, ISimpleReadable, ILocated, IExternalFunctionDefinition, IHaveInstructionOffset
     {
         (TFunction callee, ImmutableDictionary<string, GeneralType>? typeArguments) = _callee;
         _callee.ReplaceArgumentsIfNeeded(ref arguments);
 
+        if (_callee.Function.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
+        {
+            Frames.LastRef.IsMsilCompatible = false;
+        }
+
         if (callee.Type.Is(out StructType? returnStructType) &&
             returnStructType.Struct == GeneratorStructDefinition?.Struct)
         {
-            //Debugger.Break();
-
             if (!CompileAllocation(new AnyCall(
                 new Identifier(Token.CreateAnonymous("sizeof"), caller.File),
                 new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), new StructType(GetGeneratorState(callee).Struct, caller.File), caller.File) },
@@ -928,7 +927,7 @@ public partial class StatementCompiler
                     {
                         Value = new FunctionAddressGetter()
                         {
-                            Function = (CompiledFunctionDefinition)(object)callee,
+                            Function = callee,
                             Type = new FunctionType(callee),
                             Location = caller.Location,
                             SaveValue = true,
@@ -1044,6 +1043,7 @@ public partial class StatementCompiler
                 {
                     Field = GeneratorStructDefinition.FunctionField,
                     Object = compiledArguments[0].Value,
+                    // FIXME: dirty ahh
                     Type = GeneralType.InsertTypeParameters(GeneratorStructDefinition.FunctionField.Type, ((StructType)((PointerType)callee.ParameterTypes[0]).To).TypeArguments) ?? GeneratorStructDefinition.FunctionField.Type,
                     Location = caller.Location,
                     SaveValue = true,
@@ -1392,6 +1392,11 @@ public partial class StatementCompiler
 
             if (result.DidReplaceArguments) throw new UnreachableException();
 
+            if (operatorDefinition.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
+            {
+                Frames.LastRef.IsMsilCompatible = false;
+            }
+
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
@@ -1628,6 +1633,11 @@ public partial class StatementCompiler
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
             @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
+
+            if (operatorDefinition.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
+            {
+                Frames.LastRef.IsMsilCompatible = false;
+            }
 
             if (!operatorDefinition.CanUse(@operator.File))
             {
@@ -1892,6 +1902,11 @@ public partial class StatementCompiler
                 };
             }
 
+            if (!frame.IsMsilCompatible)
+            {
+                Frames.LastRef.IsMsilCompatible = false;
+            }
+
             compiledStatement = new CompiledLambda(
                 functionType.ReturnType,
                 functionType.Parameters,
@@ -1905,6 +1920,7 @@ public partial class StatementCompiler
                 SaveValue = lambdaStatement.SaveValue,
                 Type = expectedType,
             };
+
             return true;
         }
         finally
@@ -2357,6 +2373,11 @@ public partial class StatementCompiler
                 type = expectedType;
             }
 
+            if (constant.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
+            {
+                Frames.LastRef.IsMsilCompatible = false;
+            }
+
             compiledStatement = new CompiledEvaluatedValue()
             {
                 Value = value,
@@ -2458,6 +2479,11 @@ public partial class StatementCompiler
         if (GetFunction(variable.Content, expectedType, out FunctionQueryResult<CompiledFunctionDefinition>? result, out PossibleDiagnostic? functionNotFoundError))
         {
             CompiledFunctionDefinition? compiledFunction = result.Function;
+
+            if (result.Function.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
+            {
+                Frames.LastRef.IsMsilCompatible = false;
+            }
 
             compiledFunction.References.AddReference(variable, variable.File);
             variable.AnalyzedType = TokenAnalyzedType.FunctionName;
@@ -2776,6 +2802,11 @@ public partial class StatementCompiler
         {
             Diagnostics.Add(notFound.ToError(constructorCall.Type, constructorCall.File));
             return false;
+        }
+
+        if (result.Function.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
+        {
+            Frames.LastRef.IsMsilCompatible = false;
         }
 
         CompiledConstructorDefinition? compiledFunction = result.Function;
@@ -3684,7 +3715,8 @@ public partial class StatementCompiler
 
     HashSet<FunctionThingDefinition> _generatedFunctions = new();
 
-    bool CompileFunction(FunctionThingDefinition function, ImmutableDictionary<string, GeneralType>? typeArguments)
+    bool CompileFunction<TFunction>(TFunction function, ImmutableDictionary<string, GeneralType>? typeArguments)
+        where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition
     {
         if (!_generatedFunctions.Add(function)) return false;
 
@@ -3698,13 +3730,10 @@ public partial class StatementCompiler
         if (function.Identifier is not null)
         { function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
 
-        if (function is FunctionDefinition functionDefinition)
+        for (int i = 0; i < function.Attributes.Length; i++)
         {
-            for (int i = 0; i < functionDefinition.Attributes.Length; i++)
-            {
-                if (functionDefinition.Attributes[i].Identifier.Content == AttributeConstants.ExternalIdentifier)
-                { goto end; }
-            }
+            if (function.Attributes[i].Identifier.Content == AttributeConstants.ExternalIdentifier)
+            { goto end; }
         }
 
         if (function.Block is null)
@@ -3713,7 +3742,7 @@ public partial class StatementCompiler
             goto end;
         }
 
-        GeneralType returnType = function is IHaveCompiledType haveCompiledType ? haveCompiledType.Type : BuiltinType.Void;
+        GeneralType returnType = function.Type;
         ImmutableArray<CompiledParameter>.Builder compiledParameters = ImmutableArray.CreateBuilder<CompiledParameter>();
         CompiledGeneratorContext? compiledGeneratorContext = null;
 
@@ -3727,8 +3756,6 @@ public partial class StatementCompiler
             returnType.FinalValue.Is(out StructType? _v) &&
             _v.Struct == GeneratorStructDefinition.Struct)
         {
-            //Debugger.Break();
-
             GeneralType resultType = _v.TypeArguments.First().Value;
 
             CompiledGeneratorState generatorState = GetGeneratorState(function);
@@ -3817,21 +3844,11 @@ public partial class StatementCompiler
                 State = generatorState,
             };
         }
-        else if (function is ICompiledFunctionDefinition compiledFunctionDefinition)
-        {
-            for (; paramIndex < function.Parameters.Count; paramIndex++)
-            {
-                GeneralType parameterType = compiledFunctionDefinition.ParameterTypes[paramIndex];
-                compiledParameters.Add(new CompiledParameter(paramIndex, parameterType, function.Parameters[paramIndex]));
-            }
-        }
         else
         {
             for (; paramIndex < function.Parameters.Count; paramIndex++)
             {
-                GeneralType parameterType = CompileType(function.Parameters[paramIndex].Type);
-                function.Parameters[paramIndex].Type.SetAnalyzedType(parameterType);
-
+                GeneralType parameterType = function.ParameterTypes[paramIndex];
                 compiledParameters.Add(new CompiledParameter(paramIndex, parameterType, function.Parameters[paramIndex]));
             }
         }
@@ -3882,7 +3899,9 @@ public partial class StatementCompiler
 
             if (frame.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
 
-            GeneratedFunctions.Add(new((ICompiledFunctionDefinition)function, (CompiledBlock)_body));
+            function.IsMsilCompatible = function.IsMsilCompatible && frame.IsMsilCompatible;
+
+            GeneratedFunctions.Add(new(function, (CompiledBlock)_body));
 
             return true;
         }
@@ -3895,7 +3914,7 @@ public partial class StatementCompiler
         return false;
     }
     bool CompileFunctions<TFunction>(IEnumerable<TFunction> functions)
-        where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable
+        where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable, ICompiledFunctionDefinition
     {
         bool compiledAnything = false;
         foreach (TFunction function in functions)
@@ -3919,7 +3938,7 @@ public partial class StatementCompiler
         return compiledAnything;
     }
     bool CompileFunctionTemplates<T>(IReadOnlyList<CompliableTemplate<T>> functions)
-        where T : FunctionThingDefinition, ITemplateable<T>, IHaveInstructionOffset
+        where T : FunctionThingDefinition, ITemplateable<T>, IHaveInstructionOffset, ICompiledFunctionDefinition
     {
         bool compiledAnything = false;
         int i = 0;

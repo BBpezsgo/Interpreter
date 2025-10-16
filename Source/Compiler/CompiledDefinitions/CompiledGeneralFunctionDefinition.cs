@@ -13,6 +13,7 @@ public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
     ICompiledFunctionDefinition
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
+    public bool IsMsilCompatible { get; set; } = true;
 
     public GeneralType Type { get; }
     public ImmutableArray<GeneralType> ParameterTypes { get; }

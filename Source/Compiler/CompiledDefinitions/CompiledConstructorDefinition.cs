@@ -15,6 +15,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
     IExternalFunctionDefinition
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
+    public bool IsMsilCompatible { get; set; } = true;
 
     public bool ReturnSomething => true;
     public new GeneralType Type { get; }

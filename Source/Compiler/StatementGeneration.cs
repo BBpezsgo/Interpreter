@@ -1059,13 +1059,16 @@ public partial class StatementCompiler
 
         if (callee.ExternalFunctionName is not null)
         {
-            if (!ExternalFunctions.TryGet(callee.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+            if (ExternalFunctions.TryGet(callee.ExternalFunctionName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
+            {
+                return CompileFunctionCall_External(compiledArguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
+            }
+
+            if (callee.Block is null)
             {
                 Diagnostics.Add(exception.ToError(caller));
                 return false;
             }
-
-            return CompileFunctionCall_External(compiledArguments, caller.SaveValue, callee, externalFunction, caller.Location, out compiledStatement);
         }
 
         CompileFunction(callee, typeArguments);
@@ -3730,10 +3733,12 @@ public partial class StatementCompiler
         if (function.Identifier is not null)
         { function.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
 
-        for (int i = 0; i < function.Attributes.Length; i++)
+        if (function is IExternalFunctionDefinition externalFunctionDefinition &&
+            externalFunctionDefinition.ExternalFunctionName is not null &&
+            ExternalFunctions.Any(v => v.Name == externalFunctionDefinition.ExternalFunctionName))
         {
-            if (function.Attributes[i].Identifier.Content == AttributeConstants.ExternalIdentifier)
-            { goto end; }
+            // FIXME: hmmm
+            goto end;
         }
 
         if (function.Block is null)

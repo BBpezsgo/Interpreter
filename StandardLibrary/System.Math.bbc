@@ -42,6 +42,7 @@ export int Random(int state)
  *
  * Source: https://stackoverflow.com/a/67122267
  */
+[External("sin")]
 export float Sin(float x)
 {
     float value = x;
@@ -63,6 +64,7 @@ export float Sin(float x)
  * 
  * Source: https://stackoverflow.com/a/67122267
  */
+[External("cos")]
 export float Cos(float x)
 {
     float value = 1f;
@@ -306,6 +308,7 @@ export byte Log10(u8 v)
 /**
  * Source: https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Approximations_that_depend_on_the_floating_point_representation
  */
+[External("sqrt")]
 export float Sqrt(float z)
 {
     int _z = z as int;

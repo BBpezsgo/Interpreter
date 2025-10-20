@@ -21,7 +21,7 @@ public ref partial struct ProcessorState
 
     public readonly Span<byte> Memory;
     public readonly ReadOnlySpan<Instruction> Code;
-    public readonly ReadOnlySpan<ExternalFunctionScopedSync> ScopedExternalFunctions;
+    public readonly Span<ExternalFunctionScopedSync> ScopedExternalFunctions;
 
     public int Crash;
     public Signal Signal;
@@ -50,7 +50,7 @@ public ref partial struct ProcessorState
 #if !UNITY_BURST
         externalFunctions.Values.AsSpan(),
 #endif
-        ReadOnlySpan<ExternalFunctionScopedSync>.Empty
+        Span<ExternalFunctionScopedSync>.Empty
     );
 
     public ProcessorState(
@@ -61,7 +61,8 @@ public ref partial struct ProcessorState
 #if !UNITY_BURST
         ReadOnlySpan<IExternalFunction> externalFunctions,
 #endif
-        ReadOnlySpan<ExternalFunctionScopedSync> scopedExternalFunctions)
+        Span<ExternalFunctionScopedSync> scopedExternalFunctions
+)
     {
         Settings = settings;
         Registers = registers;
@@ -74,6 +75,7 @@ public ref partial struct ProcessorState
         ScopedExternalFunctions = scopedExternalFunctions;
         Crash = 0;
         Signal = Signal.None;
+        HotFunctions = default;
     }
 
     public void Setup()

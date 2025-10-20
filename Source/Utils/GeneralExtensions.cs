@@ -178,6 +178,10 @@ public static class GeneralExtensions
                 stringBuilder.Append(indent);
                 stringBuilder.Append(line);
             }
+            else if (i + 1 == lines.Length)
+            {
+                break;
+            }
             stringBuilder.AppendLine();
         }
     }

@@ -55,7 +55,7 @@ public class BytecodeProcessor
 #if !UNITY_BURST
         ExternalFunctions.Values.AsSpan(),
 #endif
-        ScopedExternalFunctions.AsSpan()
+        ScopedExternalFunctions.ToArray()
     )
     {
         HotFunctions = HotFunctions,

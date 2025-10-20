@@ -2347,6 +2347,18 @@ public partial class StatementCompiler
             return true;
         }
 
+        if (variable.Content.StartsWith('@'))
+        {
+            compiledStatement = new CompilerVariableGetter()
+            {
+                Identifier = variable.Content[1..],
+                Type = BooleanType,
+                Location = variable.Location,
+                SaveValue = variable.SaveValue,
+            };
+            return true;
+        }
+
         if (RegisterKeywords.TryGetValue(variable.Content, out (Register Register, BuiltinType Type) registerKeyword))
         {
             compiledStatement = new RegisterGetter()

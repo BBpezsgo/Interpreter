@@ -16,7 +16,7 @@ public abstract class ILInstruction
 
     public abstract override string ToString();
 
-    protected string ToString(string operand) => $"IL_{Offset:x4}: {OpCode.Name,-10} {operand}";
+    protected string ToString(string operand) => $"{OpCode.Name,-10} {operand}";
 }
 
 public class InlineNoneInstruction : ILInstruction
@@ -24,7 +24,7 @@ public class InlineNoneInstruction : ILInstruction
     public InlineNoneInstruction(int offset, OpCode opCode)
         : base(offset, opCode) { }
 
-    public override string ToString() => $"IL_{Offset:x4}: {OpCode.Name,-10}";
+    public override string ToString() => $"{OpCode.Name}";
 }
 
 public class InlineBrTargetInstruction : ILInstruction
@@ -54,9 +54,9 @@ public class InlineLabelInstruction : ILInstruction
     public override string ToString()
     {
 #if NETSTANDARD
-        return ToString(Label.ToString());
+        return ToString($"L_?");
 #else
-        return ToString(Label.Id.ToString());
+        return ToString($"L_{Label.Id}");
 #endif
     }
 }
@@ -181,7 +181,7 @@ public class InlineRInstruction : ILInstruction
         Double = value;
     }
 
-    public override string ToString() => ToString(Double.ToString());
+    public override string ToString() => ToString(Double.ToString() + "d");
 }
 
 public class ShortInlineRInstruction : ILInstruction
@@ -194,7 +194,7 @@ public class ShortInlineRInstruction : ILInstruction
         Single = value;
     }
 
-    public override string ToString() => ToString(Single.ToString());
+    public override string ToString() => ToString(Single.ToString() + "f");
 }
 
 public class InlineFieldInstruction : ILInstruction
@@ -223,11 +223,11 @@ public class InlineFieldInstruction : ILInstruction
         string field;
         try
         {
-            field = Field + "/" + Field.DeclaringType;
+            field = $"{Field.FieldType} {Field.DeclaringType}.{Field.Name}";
         }
         catch (Exception ex)
         {
-            field = "!" + ex.Message + "!";
+            field = $"!{ex.Message}!";
         }
         return ToString(field);
     }
@@ -259,11 +259,11 @@ public class InlineMethodInstruction : ILInstruction
         string method;
         try
         {
-            method = Method + "/" + Method.DeclaringType;
+            method = Method.DeclaringType is null ? Method.ToString()! : $"{Method}/{Method.DeclaringType}";
         }
         catch (Exception ex)
         {
-            method = "!" + ex.Message + "!";
+            method = $"!{ex.Message}!";
         }
         return ToString(method);
     }
@@ -366,11 +366,11 @@ public class InlineTokInstruction : ILInstruction
         string member;
         try
         {
-            member = Member + "/" + Member.DeclaringType;
+            member = $"{Member}/{Member.DeclaringType}";
         }
         catch (Exception ex)
         {
-            member = "!" + ex.Message + "!";
+            member = $"!{ex.Message}!";
         }
         return ToString(member);
     }

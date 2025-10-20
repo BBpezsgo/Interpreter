@@ -538,7 +538,7 @@ public sealed class Parser
         Block? block;
         if (ExpectOperator(";", out Token? semicolon) || !ExpectBlock(out block))
         {
-            diagnostic.Add(2, Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentPosition, File));
+            diagnostic.Add(2, Diagnostic.Error($"Body is required for general function definition", semicolon?.Position ?? CurrentPosition, File, false));
             CurrentTokenIndex = parseStart;
             return false;
         }
@@ -725,14 +725,14 @@ public sealed class Parser
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
             {
-                diagnostic.Add(1, Diagnostic.Error("Expected parameter type", CurrentLocation));
+                diagnostic.Add(1, Diagnostic.Error("Expected parameter type", CurrentLocation, false));
                 CurrentTokenIndex = parseStart;
                 return false;
             }
 
             if (!ExpectIdentifier(out Token? parameterIdentifier))
             {
-                diagnostic.Add(1, Diagnostic.Error("Expected a parameter name", CurrentLocation));
+                diagnostic.Add(1, Diagnostic.Error("Expected a parameter name", CurrentLocation, false));
                 CurrentTokenIndex = parseStart;
                 return false;
             }
@@ -744,13 +744,13 @@ public sealed class Parser
             {
                 if (!allowDefaultValues)
                 {
-                    diagnostic.Add(2, Diagnostic.Error("Default parameter values are not valid in the current context", assignmentOperator, File));
+                    diagnostic.Add(2, Diagnostic.Error("Default parameter values are not valid in the current context", assignmentOperator, File, false));
                     CurrentTokenIndex = parseStart;
                     return false;
                 }
                 if (!ExpectExpression(out defaultValue))
                 {
-                    diagnostic.Add(2, Diagnostic.Error("Expected expression after \"=\" in parameter definition", assignmentOperator, File));
+                    diagnostic.Add(2, Diagnostic.Error("Expected expression after \"=\" in parameter definition", assignmentOperator, File, false));
                     CurrentTokenIndex = parseStart;
                     return false;
                 }
@@ -771,7 +771,7 @@ public sealed class Parser
 
             if (!ExpectOperator(","))
             {
-                diagnostic.Add(2, Diagnostic.Error("Expected \",\" or \")\"", PreviousToken!.Position.After(), File));
+                diagnostic.Add(2, Diagnostic.Error("Expected \",\" or \")\"", PreviousToken!.Position.After(), File, false));
                 CurrentTokenIndex = parseStart;
                 return false;
             }

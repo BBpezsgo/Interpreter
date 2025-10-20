@@ -24,4 +24,5 @@ public struct BBLangGeneratorResult
     public FrozenDictionary<string, ExposedFunction> ExposedFunctions;
     public ImmutableArray<ExternalFunctionScopedSync> GeneratedUnmanagedFunctions;
     public ImmutableArray<ExternalFunctionScopedSyncCallback> GeneratedUnmanagedFunctionReferences;
+    public ImmutableArray<string> ILGeneratorBuilders;
 }

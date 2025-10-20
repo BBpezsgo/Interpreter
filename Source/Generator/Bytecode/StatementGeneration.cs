@@ -510,7 +510,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall_MSIL(CompiledExternalFunctionCall caller)
     {
-        AddComment($"Call \"{((ISimpleReadable)caller.Declaration).ToReadable()}\" {{");
+        AddComment($"Call \"{caller.Declaration.ToReadable()}\" {{");
 
         if (caller.Function.ReturnValueSize > 0 && caller.SaveValue)
         {
@@ -595,20 +595,29 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         goto anyway;
                     }
 
-                    int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
-                    int parametersSize = f.Function.ParameterTypes.Aggregate(0, (a, b) => a + b.GetSize(this));
-                    int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
-
+                    int existing = GeneratedUnmanagedFunctions.FindIndex(v => v.Reference == method);
                     ExternalFunctionScopedSync externFunc;
+
+                    if (existing == -1)
+                    {
+                        int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
+                        int parametersSize = f.Function.ParameterTypes.Aggregate(0, (a, b) => a + b.GetSize(this));
+                        int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
+
 #if UNITY_BURST
-                    //UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code !!!");
-                    IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
-                    unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
+                        IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
+                        unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
+                        UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code as {externFunc} !!!");
 #else
-                    //Debug.WriteLine($"Function {method.Method} compiled into machine code !!!");
-                    externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
+                        externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
+                        Debug.WriteLine($"Function {method.Method} compiled into machine code as {externFunc} !!!");
 #endif
-                    GeneratedUnmanagedFunctions.Add((externFunc, method));
+                        GeneratedUnmanagedFunctions.Add((externFunc, method));
+                    }
+                    else
+                    {
+                        externFunc = GeneratedUnmanagedFunctions[existing].Function;
+                    }
 
                     GenerateCodeForFunctionCall_MSIL(new()
                     {
@@ -1034,6 +1043,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(GeneratedCode.Count, true, compiledLambda, compiledLambda)); }
 
         Push(compiledLambda.InstructionOffset);
+    }
+    void GenerateCodeForStatement(CompilerVariableGetter compilerVariableGetter)
+    {
+        Push(false);
     }
     void GenerateCodeForStatement(RegisterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
@@ -1641,6 +1654,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledStackStringInstance v: GenerateCodeForStatement(v); break;
             case CompiledLambda v: GenerateCodeForStatement(v); break;
             case EmptyStatement: break;
+            case CompilerVariableGetter v: GenerateCodeForStatement(v); break;
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
@@ -2559,6 +2573,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             ExposedFunctions = exposedFunctions.ToFrozenDictionary(),
             GeneratedUnmanagedFunctions = GeneratedUnmanagedFunctions.Select(v => v.Function).ToImmutableArray(),
             GeneratedUnmanagedFunctionReferences = GeneratedUnmanagedFunctions.Select(v => v.Reference).ToImmutableArray(),
+            ILGeneratorBuilders = ILGenerator?.Builders?.ToImmutableArray() ?? ImmutableArray<string>.Empty,
         };
     }
 }

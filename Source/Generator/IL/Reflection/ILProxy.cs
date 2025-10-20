@@ -225,7 +225,7 @@ public class ILProxy
             foreach (LocalBuilder _local in _locals)
             {
                 result.Indent(1);
-                result.Append($"[{_local.LocalIndex}] {_local.LocalType};");
+                result.AppendLine($"[{_local.LocalIndex}] {_local.LocalType};");
             }
             result.AppendLine($")");
             result.AppendLine();
@@ -236,12 +236,10 @@ public class ILProxy
             foreach ((int offset, int id) in _labelOffsets ?? Enumerable.Empty<KeyValuePair<int, int>>())
             {
                 if (offset != instruction.Offset) continue;
-                result.Append($"L_{id}:");
-                result.AppendLine();
+                result.AppendLine($"L_{id}:");
             }
 
-            result.Append(instruction.ToString());
-            result.AppendLine();
+            result.AppendLine(instruction.ToString());
         }
 
         return result.ToString();

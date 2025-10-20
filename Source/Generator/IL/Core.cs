@@ -36,6 +36,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics, ILGeneratorSettings settings, ModuleBuilder? module) : base(compilerResult, diagnostics)
     {
+        Builders = new();
+
         if (module is null)
         {
             AssemblyBuilder assemBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName()
@@ -98,6 +100,5 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         Settings = settings;
-        Builders = new();
     }
 }

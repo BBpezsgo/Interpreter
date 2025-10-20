@@ -642,27 +642,41 @@ public ref partial struct ProcessorState
                 Span<byte> returnValue = Memory.Slice(Registers.StackPointer + scopedExternalFunction.ParametersSize, scopedExternalFunction.ReturnValueSize);
                 nint scope = scopedExternalFunction.Scope;
 
-                if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILPointerMarshal) != default)
+                if (true || (scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILPointerMarshal) != default)
                 {
                     // TODO: Unity burst compatibility
                     if (scope != 0) throw new RuntimeException("Invalid MSIL marshal function (the scope must be null)");
-                    scope = (nint)Unsafe.AsPointer(ref Memory[0]);
+                    scope = (nint)Unsafe.AsPointer(ref MemoryMarshal.GetReference(Memory));
                 }
 
                 fixed (byte* parametersPtr = parameters)
                 fixed (byte* returnValuePtr = returnValue)
                 {
+#if UNITY
+                    //UnityEngine.Debug.Log($"CALLING {scopedExternalFunction} ({Convert.ToString(scope, 16)}) !!!");
+#else
+                    //Debug.WriteLine($"CALLING {scopedExternalFunction} ({Convert.ToString(scope, 16)}) !!!");
+#endif
                     scopedExternalFunction.Callback(scope, (nint)parametersPtr, (nint)returnValuePtr);
+                }
+
+                if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILPointerMarshal) != default)
+                {
+                    if (scope != (nint)Unsafe.AsPointer(ref MemoryMarshal.GetReference(Memory)))
+                    {
+                        throw new UnreachableException();
+                    }
                 }
 
                 Push<byte>(1);
             }
             else
             {
-                if ((scopedExternalFunction.Flags & ExternalFunctionScopedSyncFlags.MSILUnsafe) == default && HotFunctions.CurrentHotFunctionDepth++ == 0)
+                HotFunctions.CurrentHotFunctionDepth++;
+                if (HotFunctions.CurrentHotFunctionDepth == 1 && HotFunctions.HotFunctionStarted == 0 && HotFunctions.CurrentHotFunction == 0)
                 {
                     HotFunctions.HotFunctionStarted = HotFunctions.Cycle;
-                    HotFunctions.CurrentHotFunction = CurrentInstruction.Operand1.Int;
+                    HotFunctions.CurrentHotFunction = functionId;
                 }
 
                 Push<byte>(0);
@@ -681,21 +695,23 @@ public ref partial struct ProcessorState
 
     void HOT_FUNC_END()
     {
-        if (--HotFunctions.CurrentHotFunctionDepth == 0)
+        int functionId = GetData(CurrentInstruction.Operand1.Int);
+
+        HotFunctions.CurrentHotFunctionDepth--;
+        if (HotFunctions.CurrentHotFunctionDepth == 0)
         {
             if (HotFunctions.HotFunctionStarted == default) throw new InternalExceptionWithoutContext($"Invalid program");
-            if (HotFunctions.CurrentHotFunction != CurrentInstruction.Operand1.Int) throw new InternalExceptionWithoutContext($"Invalid program");
+            if (HotFunctions.CurrentHotFunction != functionId) throw new InternalExceptionWithoutContext($"Invalid program");
 
             if (HotFunctions.Cycle > HotFunctions.HotFunctionStarted)
             {
                 ulong elapsed = HotFunctions.Cycle - HotFunctions.HotFunctionStarted;
-                if (elapsed < 1000)
+                if (elapsed < 50000)
                 {
                     for (int i = 0; i < ScopedExternalFunctions.Length; i++)
                     {
-                        ref ExternalFunctionScopedSync scopedExternalFunction = ref MemoryMarshal.GetReference(ScopedExternalFunctions[i..]);
-                        if (scopedExternalFunction.Id != HotFunctions.CurrentHotFunction) continue;
-                        scopedExternalFunction.Flags |= ExternalFunctionScopedSyncFlags.MSILSafe;
+                        if (ScopedExternalFunctions[i].Id != HotFunctions.CurrentHotFunction) continue;
+                        ScopedExternalFunctions[i].Flags |= ExternalFunctionScopedSyncFlags.MSILSafe;
                         break;
                     }
                 }
@@ -703,9 +719,8 @@ public ref partial struct ProcessorState
                 {
                     for (int i = 0; i < ScopedExternalFunctions.Length; i++)
                     {
-                        ref ExternalFunctionScopedSync scopedExternalFunction = ref MemoryMarshal.GetReference(ScopedExternalFunctions[i..]);
-                        if (scopedExternalFunction.Id != HotFunctions.CurrentHotFunction) continue;
-                        scopedExternalFunction.Flags |= ExternalFunctionScopedSyncFlags.MSILUnsafe;
+                        if (ScopedExternalFunctions[i].Id != HotFunctions.CurrentHotFunction) continue;
+                        ScopedExternalFunctions[i].Flags |= ExternalFunctionScopedSyncFlags.MSILUnsafe;
                         break;
                     }
                 }

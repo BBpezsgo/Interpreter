@@ -624,7 +624,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
             }
             case ExternalFunctionStub:
-                Diagnostics.Add(Diagnostic.Critical($"Can't call an external function stub", statement));
+                Diagnostics.Add(Diagnostic.Critical($"Can't call an external function stub", statement, false));
                 successful = false;
                 return;
             default:
@@ -1581,6 +1581,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 else
                 {
                     Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+                    il.Emit(OpCodes.Add);
                 }
             }
 
@@ -1643,6 +1644,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             else
             {
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+                il.Emit(OpCodes.Add);
             }
 
             EmitStatement(statement.Value, il, ref successful);
@@ -1752,6 +1754,17 @@ public partial class CodeGeneratorForIL : CodeGenerator
         successful = false;
         Diagnostics.Add(Diagnostic.Critical($"no", statement));
     }
+    void EmitStatement(CompilerVariableGetter statement, ILProxy il, ref bool successful)
+    {
+        if (statement.Identifier == "IL")
+        {
+            EmitValue(1, il);
+        }
+        else
+        {
+            EmitValue(0, il);
+        }
+    }
     void EmitStatement(CompiledStatement statement, ILProxy il, ref bool successful)
     {
         switch (statement)
@@ -1797,6 +1810,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case InstructionLabelAddressGetter v: EmitStatement(v, il, ref successful); break;
             case RegisterSetter v: EmitStatement(v, il, ref successful); break;
             case CompiledLiteralList v: EmitStatement(v, il, ref successful); break;
+            case CompilerVariableGetter v: EmitStatement(v, il, ref successful); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }
@@ -1844,6 +1858,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         else
         {
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", @base));
+            il.Emit(OpCodes.Add);
         }
     }
 
@@ -1959,24 +1974,26 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         string id = GenerateTypeId(type);
 
-        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1);
-
-        StringBuilder? stringBuilder = Builders is null ? null : new();
-
-        if (stringBuilder is not null)
+        if (!type.GetSize(this, out int size, out error))
         {
-            stringBuilder.AppendLine($"struct {id}");
-            stringBuilder.AppendLine($"{{");
+            return false;
         }
 
-        foreach (CompiledField field in type.Struct.Fields)
+        if (!type.GetFields(this, out ImmutableDictionary<CompiledField, int>? fields, out error))
+        {
+            return false;
+        }
+
+        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.ExplicitLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1, size);
+
+        foreach ((CompiledField field, int offset) in fields)
         {
             GeneralType fieldType = type.ReplaceType(field.Type, out error);
             if (error is not null) return false;
             if (!ToType(fieldType, out Type? fieldType1, out error)) return false;
 
-            builder.DefineField(field.Identifier.Content, fieldType1, FieldAttributes.Public);
-            stringBuilder?.AppendLine($"  public {fieldType1} {field.Identifier.Content};");
+            FieldBuilder fieldBuilder = builder.DefineField(field.Identifier.Content, fieldType1, FieldAttributes.Public);
+            fieldBuilder.SetOffset(offset);
         }
 
         ConstructorBuilder constructor = builder.DefineConstructor(
@@ -1992,22 +2009,21 @@ public partial class CodeGeneratorForIL : CodeGenerator
         il.Emit(OpCodes.Call, conObj);
         il.Emit(OpCodes.Ret);
 
-        if (stringBuilder is not null)
-        {
-            stringBuilder.AppendLine($"  public {id}()");
-            stringBuilder.AppendLine($"  {{");
-            stringBuilder.AppendIndented("    ", il.ToString());
-            stringBuilder.AppendLine($"  }}");
-            stringBuilder.AppendLine($"}}");
-
-            Builders?.Add(stringBuilder.ToString());
-        }
-
         result = builder.CreateType();
+
+        Builders?.Add(DebugTypeLayout(result, v =>
+        {
+            v.AppendLine();
+
+            v.AppendLine($"  public {id}()");
+            v.AppendLine($"  {{");
+            v.AppendIndented("    ", il.ToString());
+            v.AppendLine($"  }}");
+        }));
 
         GeneratedStructTypes.Add((type, result));
 
-        int size = SizeOf(result);
+        int managedSize = SizeOf(result);
 
         if (!base.FindSize(type, out int expectedSize, out PossibleDiagnostic? findSizeError))
         {
@@ -2015,9 +2031,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
-        if (size != expectedSize)
+        if (managedSize != expectedSize)
         {
-            error = new PossibleDiagnostic($"Generated struct's ({result}) size ({size}) doesn't match with the expected size ({expectedSize}).");
+            error = new PossibleDiagnostic($"Generated struct's ({result}) size ({managedSize}) doesn't match with the expected size ({expectedSize}).");
             return false;
         }
 
@@ -2053,14 +2069,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1, elementSize * (int)_length.Value);
 
-        StringBuilder? stringBuilder = Builders is null ? null : new();
-
-        if (stringBuilder is not null)
-        {
-            stringBuilder.AppendLine($"struct {id}");
-            stringBuilder.AppendLine($"{{");
-        }
-
         ConstructorBuilder constructor = builder.DefineConstructor(
             MethodAttributes.Public |
             MethodAttributes.SpecialName |
@@ -2074,18 +2082,16 @@ public partial class CodeGeneratorForIL : CodeGenerator
         il.Emit(OpCodes.Call, conObj);
         il.Emit(OpCodes.Ret);
 
-        if (stringBuilder is not null)
-        {
-            stringBuilder.AppendLine($"  public {id}()");
-            stringBuilder.AppendLine($"  {{");
-            stringBuilder.AppendIndented("    ", il.ToString());
-            stringBuilder.AppendLine($"  }}");
-            stringBuilder.AppendLine($"}}");
-
-            Builders?.Add(stringBuilder.ToString());
-        }
-
         result = builder.CreateType();
+
+        Builders?.Add(DebugTypeLayout(result, v =>
+        {
+            v.AppendLine();
+            v.AppendLine($"  public {id}()");
+            v.AppendLine($"  {{");
+            v.AppendIndented("    ", il.ToString());
+            v.AppendLine($"  }}");
+        }));
 
         GeneratedInlineArrayTypes.Add((type, result));
 
@@ -2159,6 +2165,20 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         dynamicMethod = null;
 
+        if (FunctionBuilders.TryGetValue(function, out dynamicMethod))
+        {
+            if (!EmittedFunctions.Contains(function))
+            {
+                throw new UnreachableException();
+            }
+            return true;
+        }
+
+        if (EmittedFunctions.Contains(function) && !FunctionBuilders.ContainsKey(function))
+        {
+            throw new UnreachableException();
+        }
+
         if (EmittingFunctionsStack.Any(v => v == function))
         {
             return false;
@@ -2182,12 +2202,22 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
+        FunctionBuilders.Add(function, dynamicMethod);
+
         if (EmittedFunctions.Contains(function)) return true;
 
         ILProxy il = new(dynamicMethod.GetILGenerator(), Builders is not null);
 
         bool successful = true;
         EmitFunctionBody(body.Statements, function is CompiledConstructorDefinition ? BuiltinType.Void : function.Type, il, ref successful);
+
+        successful = successful && CheckCode(dynamicMethod);
+
+        if (!successful)
+        {
+            FunctionBuilders.Remove(function);
+            return false;
+        }
 
         if (Builders is not null)
         {
@@ -2199,24 +2229,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Builders.Add(stringBuilder.ToString());
         }
 
-        if (!successful)
-        {
-            FunctionBuilders.Remove(function);
-            return false;
-        }
-
-        successful = successful && CheckCode(dynamicMethod);
         EmittedFunctions.Add(function);
         return true;
     }
 
     bool EmitFunctionSignature(ICompiledFunctionDefinition function, [NotNullWhen(true)] out DynamicMethod? dynamicMethod)
     {
-        if (FunctionBuilders.TryGetValue(function, out dynamicMethod))
-        {
-            return true;
-        }
-
         dynamicMethod = null;
         if (!ToType(function is CompiledConstructorDefinition ? BuiltinType.Void : function.Type, out Type? returnType, out PossibleDiagnostic? returnTypeError))
         {
@@ -2253,7 +2271,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 Module),
             _ => throw new UnreachableException(),
         };
-        FunctionBuilders.Add(function, dynamicMethod);
         return true;
     }
 
@@ -2316,6 +2333,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     public unsafe bool GenerateImplMarshaled(CompiledFunction function, [NotNullWhen(true)] out ExternalFunctionScopedSyncCallback? marshaled)
     {
         marshaled = null;
+        if (_marshalCache.TryGetValue(function, out marshaled)) return true;
 
         if (function.Function is IHaveAttributes attributes &&
             attributes.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
@@ -2348,6 +2366,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         marshaled = (ExternalFunctionScopedSyncCallback)marshaledBuilder.CreateDelegate(typeof(ExternalFunctionScopedSyncCallback));
+        _marshalCache.Add(function, marshaled);
 
         return true;
     }
@@ -2362,7 +2381,57 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return checked((int)func());
     }
 
-    readonly Dictionary<object, DynamicMethod> _marshalCache = new();
+    static string DebugTypeLayout(Type type, Action<StringBuilder>? additionalStuff = null)
+    {
+        object? value = Activator.CreateInstance(type);
+        StringBuilder result = new();
+        result.AppendLine($"{type} : {type.BaseType} {{");
+        if (type.StructLayoutAttribute is not null)
+        {
+            result.AppendLine($"  CharSet: {type.StructLayoutAttribute.CharSet}");
+            result.AppendLine($"  Pack: {type.StructLayoutAttribute.Pack}");
+            result.AppendLine($"  Size: {GetManagedSize(type)} (defined as {type.StructLayoutAttribute.Size})");
+            result.AppendLine($"  Layout: {type.StructLayoutAttribute.Value}");
+            result.AppendLine($"");
+        }
+        else
+        {
+            result.AppendLine($"  Size: {GetManagedSize(type)}");
+            result.AppendLine($"");
+        }
+        List<(FieldInfo, nint)> fieldAddresses = new();
+        nint smallestAddress = default;
+        foreach (FieldInfo field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+        {
+            DynamicMethod method = new("DebugTypeLayoutImpl", typeof(nint), new Type[] { typeof(object) }, false);
+            ILProxy gen = new(method.GetILGenerator(), false);
+            gen.Emit(OpCodes.Ldarg_0);
+            gen.Emit(OpCodes.Ldflda, field);
+            gen.Emit(OpCodes.Ret);
+            nint address = value is null ? default : ((Func<object, nint>)method.CreateDelegate(typeof(Func<object, nint>))).Invoke(value);
+            fieldAddresses.Add((field, address));
+            if (smallestAddress == default || smallestAddress > address)
+            {
+                smallestAddress = address;
+            }
+        }
+        fieldAddresses.Sort(static (a, b) => (int)(a.Item2 - b.Item2));
+        foreach ((FieldInfo field, nint address) in fieldAddresses)
+        {
+            result.Append("  ");
+            if (value is not null)
+            {
+                result.Append($"{address - smallestAddress,-3}");
+            }
+            result.Append($"{field.FieldType} {field.Name}");
+            result.AppendLine();
+        }
+        additionalStuff?.Invoke(result);
+        result.AppendLine($"}}");
+        return result.ToString();
+    }
+
+    readonly Dictionary<CompiledFunction, ExternalFunctionScopedSyncCallback> _marshalCache = new();
 
     static bool IsPointer(Type type) => type.IsPointer || type == typeof(nint) || type == typeof(nuint);
 
@@ -2450,8 +2519,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     bool WrapWithMarshaling(DynamicMethod method, [NotNullWhen(true)] out DynamicMethod? marshaled)
     {
-        if (_marshalCache.TryGetValue(method, out marshaled)) return true;
-
         marshaled = new(
             $"marshal___{method.Name}",
             typeof(void),
@@ -2463,7 +2530,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             .Select(v => (v.ParameterType, MarshalType(v.ParameterType, MarshalDirection.MsilToVm)))
             .Select(v => (v.ParameterType, GetManagedSize(v.Item2)))
             .ToArray();
-        int parametersSize = parameters.Aggregate(0, (a, b) => a + b.Size);
+        int parametersSize = parameters.Sum(v => v.Size);
 
         ILProxy il = new(marshaled.GetILGenerator(), Builders is not null);
         if (method.ReturnType != typeof(void)) il.Emit(OpCodes.Ldarg_2);
@@ -2518,7 +2585,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
-        _marshalCache.Add(method, marshaled);
         return true;
     }
 
@@ -2532,6 +2598,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to generate valid MSIL"));
         }
+
+        StringBuilder builder = new();
+        foreach (Type type in Module.GetTypes()) Stringify(builder, 0, type);
+        foreach (DynamicMethod method in FunctionBuilders.Values.Append(result)) Stringify(builder, 0, method);
 
         return (Func<int>)result.CreateDelegate(typeof(Func<int>));
     }

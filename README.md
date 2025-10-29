@@ -1,7 +1,7 @@
 # My Programming Language
 
-[![.Net 9.0](https://img.shields.io/badge/.NET-9.0-5C2D91)](#)
-[![C# 11](https://img.shields.io/badge/C%23-11-239120.svg)](#)
+[![.Net 9.0](https://img.shields.io/badge/.NET-9.0-5C2D91?style=flat-square)](#)
+[![C# 11](https://img.shields.io/badge/C%23-11-239120.svg?style=flat-square)](#)
 
 - [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 - [Language Server](https://github.com/BBpezsgo/BBCode-LanguageServer)

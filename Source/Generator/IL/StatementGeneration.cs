@@ -2247,30 +2247,30 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
-        dynamicMethod = function switch
+        string identifier = function switch
         {
-            CompiledFunctionDefinition v => new DynamicMethod(
-                v.Identifier.Content,
-                returnType,
-                parameterTypes,
-                Module),
-            CompiledOperatorDefinition v => new DynamicMethod(
-                $"op_{v.Identifier.Content}",
-                returnType,
-                parameterTypes,
-                Module),
-            CompiledConstructorDefinition v => new DynamicMethod(
-                $"ctor_{v.Identifier.Content}",
-                returnType,
-                parameterTypes,
-                Module),
-            CompiledGeneralFunctionDefinition v => new DynamicMethod(
-                $"genr_{v.Identifier.Content}",
-                returnType,
-                parameterTypes,
-                Module),
+            CompiledFunctionDefinition v => v.Identifier.Content,
+            CompiledOperatorDefinition v => $"op_{v.Identifier.Content switch
+            {
+                "+" => "add",
+                "-" => "sub",
+                "*" => "mul",
+                "/" => "div",
+                "%" => "mod",
+                _ => v.Identifier.Content,
+            }}",
+            CompiledConstructorDefinition v => $"ctor_{v.Identifier.Content}",
+            CompiledGeneralFunctionDefinition v => $"genr_{v.Identifier.Content}",
             _ => throw new UnreachableException(),
         };
+        identifier = Utils.MakeUnique(identifier, v => !FunctionBuilders.Any(w => w.Value.Name == v));
+
+        dynamicMethod = new DynamicMethod(
+            identifier,
+            returnType,
+            parameterTypes,
+            Module
+        );
         return true;
     }
 
@@ -2330,9 +2330,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return true;
     }
 
-    public unsafe bool GenerateImplMarshaled(CompiledFunction function, [NotNullWhen(true)] out ExternalFunctionScopedSyncCallback? marshaled)
+    public unsafe bool GenerateImplMarshaled(CompiledFunction function, [NotNullWhen(true)] out ExternalFunctionScopedSyncCallback? marshaled, out DynamicMethod? raw)
     {
         marshaled = null;
+        raw = null;
         if (_marshalCache.TryGetValue(function, out marshaled)) return true;
 
         if (function.Function is IHaveAttributes attributes &&
@@ -2366,6 +2367,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         marshaled = (ExternalFunctionScopedSyncCallback)marshaledBuilder.CreateDelegate(typeof(ExternalFunctionScopedSyncCallback));
+        raw = builder;
         _marshalCache.Add(function, marshaled);
 
         return true;

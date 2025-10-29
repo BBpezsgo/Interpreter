@@ -1,4 +1,5 @@
-﻿using LanguageCore.Compiler;
+﻿using System.Reflection.Emit;
+using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
@@ -587,7 +588,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (f is not null)
             {
                 ILGenerator.Diagnostics.Clear();
-                if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method))
+                if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method, out DynamicMethod? raw))
                 {
                     if (ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
                     {
@@ -607,10 +608,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if UNITY_BURST
                         IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
                         unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
-                        UnityEngine.Debug.LogWarning($"Function {method.Method} compiled into machine code as {externFunc} !!!");
+                        UnityEngine.Debug.LogWarning($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
 #else
                         externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
-                        Debug.WriteLine($"Function {method.Method} compiled into machine code as {externFunc} !!!");
+                        Debug.WriteLine($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
 #endif
                         GeneratedUnmanagedFunctions.Add((externFunc, method));
                     }

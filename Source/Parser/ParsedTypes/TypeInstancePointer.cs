@@ -33,7 +33,7 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
     }
 
     public override string ToString() => $"{To}{Operator}";
-    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
+    public override string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
 
     public static TypeInstancePointer CreateAnonymous(TypeInstance to, Uri file) => new(to, Token.CreateAnonymous("*", TokenType.Operator), file);
 }

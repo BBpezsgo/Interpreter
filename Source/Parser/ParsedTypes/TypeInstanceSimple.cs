@@ -81,10 +81,10 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
         if (TypeArguments is null) return Identifier.Content;
         return $"{Identifier.Content}<{string.Join<TypeInstance>(", ", TypeArguments)}>";
     }
-    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments)
+    public override string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments)
     {
         string identifier = Identifier.Content;
-        if (typeArguments.TryGetValue(Identifier.Content, out GeneralType? replaced))
+        if (typeArguments is not null && typeArguments.TryGetValue(Identifier.Content, out GeneralType? replaced))
         { identifier = replaced.ToString(); }
 
         if (!TypeArguments.HasValue)

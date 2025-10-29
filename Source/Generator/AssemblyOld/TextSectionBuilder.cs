@@ -1,4 +1,4 @@
-﻿namespace LanguageCore.Native.Generator;
+﻿namespace LanguageCore.Assembly;
 
 [ExcludeFromCodeCoverage]
 public class TextSectionBuilder : SectionBuilder

@@ -77,3 +77,6 @@ dotnet_diagnostic.CA1051.severity = none
 
 # CA1063: Implement IDisposable Correctly
 dotnet_diagnostic.CA1063.severity = none
+
+# CA1069: Enums values should not be duplicated
+dotnet_diagnostic.CA1069.severity = warning

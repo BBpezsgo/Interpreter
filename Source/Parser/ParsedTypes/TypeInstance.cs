@@ -44,7 +44,7 @@ public abstract class TypeInstance :
 
     public abstract override int GetHashCode();
     public abstract override string ToString();
-    public virtual string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments) => ToString();
+    public virtual string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments) => ToString();
 
     protected static bool TryGetAnalyzedType(GeneralType type, out TokenAnalyzedType analyzedType)
     {

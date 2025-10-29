@@ -36,15 +36,16 @@ public struct StackElementInformation
     public bool BasePointerRelative;
     public int Size;
 
+    public readonly int AbsoluteAddress(int basePointer, int absoluteOffset)
+    {
+        if (BasePointerRelative) return Address + basePointer;
+        else return Address + absoluteOffset;
+    }
+
     public readonly Range<int> GetRange(int basePointer, int absoluteOffset)
     {
-        int itemStart = Address;
-
-        if (BasePointerRelative) itemStart += basePointer;
-        else itemStart += absoluteOffset;
-
+        int itemStart = AbsoluteAddress(basePointer, absoluteOffset);
         int itemEnd = itemStart + Size;
-
         return new Range<int>(itemStart, itemEnd);
     }
 }
@@ -273,7 +274,24 @@ public readonly struct CompiledDebugInformation
     }
 
     public CollectedScopeInfo GetScopeInformation(int codePointer)
-        => GetScopeInformation(ScopeInformation.AsSpan(), codePointer);
+    {
+        return GetScopeInformation(ScopeInformation.AsSpan(), codePointer);
+    }
+
+    public CollectedScopeInfo GetAllScopeInformation(ReadOnlySpan<byte> memory, int basePointer, int codePointer)
+    {
+        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(memory, basePointer, StackOffsets);
+        List<StackElementInformation> result = new();
+        foreach (ScopeInformation scope in GetScopes(ScopeInformation.AsSpan(), codePointer))
+        { result.AddRange(scope.Stack); }
+        foreach (CallTraceItem callFrame in callTrace)
+        {
+            foreach (ScopeInformation scope in GetScopes(ScopeInformation.AsSpan(), callFrame.InstructionPointer))
+            { result.AddRange(scope.Stack); }
+        }
+        return new CollectedScopeInfo(result);
+    }
+
     public static CollectedScopeInfo GetScopeInformation(ReadOnlySpan<ScopeInformation> scopeInformation, int codePointer)
     {
         List<StackElementInformation> result = new();

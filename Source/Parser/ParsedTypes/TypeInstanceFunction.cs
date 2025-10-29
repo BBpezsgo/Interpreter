@@ -48,7 +48,7 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
     }
 
     public override string ToString() => $"{FunctionReturnType}({string.Join<TypeInstance>(", ", FunctionParameterTypes)})";
-    public override string ToString(IReadOnlyDictionary<string, GeneralType> typeArguments)
+    public override string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments)
     {
         StringBuilder result = new();
         result.Append(FunctionReturnType.ToString(typeArguments));

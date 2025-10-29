@@ -1,6 +1,6 @@
 ﻿using LanguageCore.Runtime;
 
-namespace LanguageCore.Native.Generator;
+namespace LanguageCore.Assembly;
 
 [ExcludeFromCodeCoverage]
 public class AssemblyCode
@@ -36,14 +36,14 @@ public class AssemblyCode
             case BitWidth._8:
                 throw new NotImplementedException($"8 bit mode aint supported");
             case BitWidth._16:
-                builder.AppendLine("BITS 16");
+                builder.AppendLine("[BITS 16]");
                 // builder.AppendLine("ORG 100h");
                 break;
             case BitWidth._32:
-                builder.AppendLine("BITS 32");
+                builder.AppendLine("[BITS 32]");
                 break;
             case BitWidth._64:
-                builder.AppendLine("BITS 64");
+                builder.AppendLine("[BITS 64]");
                 break;
         }
 

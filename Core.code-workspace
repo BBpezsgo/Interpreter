@@ -13,19 +13,10 @@
 			"path": "../VSCodeExtension"
 		},
 		{
-			"path": "../../Math"
-		},
-		{
-			"path": "../../Win32-Stuff"
-		},
-		{
 			"path": "../Core.wiki"
 		},
 		{
 			"path": "../SpeedTests"
-		},
-		{
-			"path": "../../Console.UI"
 		}
 	],
 	"settings": {

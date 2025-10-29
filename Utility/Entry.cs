@@ -6,6 +6,7 @@ using LanguageCore.BBLang.Generator;
 using LanguageCore.Brainfuck;
 using LanguageCore.Brainfuck.Generator;
 using LanguageCore.Compiler;
+using LanguageCore.Native.Generator;
 using LanguageCore.Runtime;
 
 namespace LanguageCore;
@@ -123,7 +124,6 @@ public static class Entry
                 try
                 {
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
-                    //File.WriteAllText("/home/BB/Projects/BBLang/Core/out.bbc", compiled.Stringify());
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
                     diagnostics.Print();
                     if (diagnostics.HasErrors) return 1;
@@ -158,8 +158,20 @@ public static class Entry
                         Console.ResetColor();
                         Console.Write(' ');
 
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.Write(instruction.Operand1.Value);
+                        int pcount = instruction.Opcode.ParameterCount();
+
+                        if (pcount >= 1)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write(instruction.Operand1.ToString());
+                        }
+
+                        if (pcount >= 2)
+                        {
+                            Console.ForegroundColor = ConsoleColor.Green;
+                            Console.Write(' ');
+                            Console.Write(instruction.Operand2.ToString());
+                        }
 
                         Console.WriteLine();
                     }
@@ -640,11 +652,11 @@ public static class Entry
                 }
                 break;
             }
-            case "assembly":
+            case "assembly-old":
             {
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
-                List<IExternalFunction> externalFunctions = Runtime.BytecodeProcessor.GetExternalFunctions();
+                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
@@ -731,6 +743,53 @@ public static class Entry
                 }
 
                 break;
+            }
+            case "assembly":
+            {
+                Output.LogDebug($"Executing \"{arguments.Source}\" ...");
+
+                List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);
+
+                CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
+                {
+                    DontOptimize = arguments.DontOptimize,
+                    ExternalFunctions = externalFunctions.ToImmutableArray(),
+                    PreprocessorVariables = PreprocessorVariables.Normal,
+                    AdditionalImports = additionalImports,
+                    SourceProviders = ImmutableArray.Create<ISourceProvider>(
+                        new FileSourceProvider()
+                        {
+                            ExtraDirectories = new string?[]
+                            {
+                                arguments.BasePath
+                            },
+                        }
+                    ),
+                };
+
+                DiagnosticsCollection diagnostics = new();
+
+                try
+                {
+                    CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
+                    using NativeFunction f = CodeGeneratorForNative.Generate(compiled, diagnostics);
+                    diagnostics.Print();
+                    if (diagnostics.HasErrors) return 1;
+                    return 0;
+                    return f.AsDelegate<CodeGeneratorForNative.JitFn>()();
+                }
+                catch (LanguageException ex)
+                {
+                    diagnostics.Print();
+                    Output.LogError(ex);
+                    return 1;
+                }
+                catch (Exception ex)
+                {
+                    diagnostics.Print();
+                    Output.LogError(ex);
+                    return 1;
+                }
             }
             /*
             case ProgramRunType.ASM:

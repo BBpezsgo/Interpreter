@@ -1,33 +1,11 @@
-﻿namespace LanguageCore.Assembly;
+﻿using LanguageCore.Compiler;
 
-[ExcludeFromCodeCoverage]
-public class ProcessException : Exception
+namespace LanguageCore.Native.Generator;
+
+public partial class CodeGeneratorForNative : CodeGenerator
 {
-    readonly string processName;
-    readonly int exitCode;
-
-    public override string Message => $"Process \"{processName}\" exited with code {exitCode}";
-    public string StandardOutput { get; }
-    public string StandardError { get; }
-
-    public ProcessException(string processName, int exitCode, string stdOutput, string stdError) : base()
+    public CodeGeneratorForNative(CompilerResult compilerResult, DiagnosticsCollection diagnostics) : base(compilerResult, diagnostics)
     {
-        this.processName = processName;
-        this.exitCode = exitCode;
-        this.StandardOutput = stdOutput;
-        this.StandardError = stdError;
-    }
-}
 
-[ExcludeFromCodeCoverage]
-public class ProcessNotStartedException : Exception
-{
-    readonly string processName;
-
-    public override string Message => $"Failed to start process \"{processName}\"";
-
-    public ProcessNotStartedException(string processName) : base()
-    {
-        this.processName = processName;
     }
 }

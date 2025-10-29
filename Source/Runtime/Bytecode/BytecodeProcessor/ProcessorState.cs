@@ -338,6 +338,30 @@ public ref partial struct ProcessorState
         return Memory.Get<T>(ptr);
     }
 
+    public readonly int GetData(Register register) => register switch
+    {
+        Register.CodePointer => Registers.CodePointer.I32(),
+        Register.StackPointer => Registers.StackPointer.I32(),
+        Register.BasePointer => Registers.BasePointer.I32(),
+        Register.EAX => Registers.EAX.I32(),
+        Register.AX => Registers.AX.I32(),
+        Register.AH => Registers.AH.I32(),
+        Register.AL => Registers.AL.I32(),
+        Register.EBX => Registers.EBX.I32(),
+        Register.BX => Registers.BX.I32(),
+        Register.BH => Registers.BH.I32(),
+        Register.BL => Registers.BL.I32(),
+        Register.ECX => Registers.ECX.I32(),
+        Register.CX => Registers.CX.I32(),
+        Register.CH => Registers.CH.I32(),
+        Register.CL => Registers.CL.I32(),
+        Register.EDX => Registers.EDX.I32(),
+        Register.DX => Registers.DX.I32(),
+        Register.DH => Registers.DH.I32(),
+        Register.DL => Registers.DL.I32(),
+        _ => throw new UnreachableException(register.ToString()),
+    };
+
     int GetData(InstructionOperand operand) => operand.Type switch
     {
         InstructionOperandType.Immediate8 => operand.Value,

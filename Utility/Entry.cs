@@ -309,16 +309,7 @@ public static class Entry
                     Console.ResetColor();
                     Console.Clear();
 
-                    ConsoleGUI.ConsoleGUI gui = new()
-                    {
-                        FilledElement = new ConsoleGUI.InterpreterElement(interpreter, (VirtualIO)io)
-                    };
-
-                    while (!gui.IsDisposed)
-                    {
-                        gui.Tick();
-                        Thread.Sleep(10);
-                    }
+                    TUI.InterpreterRenderer.Run(interpreter);
 
                     Console.Clear();
                     Console.ResetColor();

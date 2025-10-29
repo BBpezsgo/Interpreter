@@ -1,3 +1,4 @@
+#if false
 global using MemberNotNullWhenAttribute = System.Runtime.CompilerServices.MemberNotNullWhenAttribute_;
 
 [assembly: SuppressMessage("Design", "CS8604")]
@@ -95,3 +96,4 @@ namespace System.Diagnostics.CodeAnalysis
         public DynamicallyAccessedMembersAttribute(DynamicallyAccessedMemberTypes memberTypes) { }
     }
 }
+#endif

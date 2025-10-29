@@ -2,6 +2,8 @@
 This demonstrates how you can provide constants from C# to the BBC compiler.
 */
 
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Runtime.CompilerServices;
 using LanguageCore;

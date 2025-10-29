@@ -2,6 +2,9 @@
 This demonstrates how you can call functions in a script from C#.
 */
 
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Runtime.CompilerServices;
 using LanguageCore;

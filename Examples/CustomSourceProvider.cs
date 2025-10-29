@@ -2,7 +2,11 @@
 This demonstrates a simple usage of using custom source providers.
 */
 
+using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
+using System.Text;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;

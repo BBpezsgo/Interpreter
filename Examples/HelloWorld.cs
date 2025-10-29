@@ -2,6 +2,8 @@
 This demonstrates a simple usage of this project.
 */
 
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Runtime.CompilerServices;
 using LanguageCore;

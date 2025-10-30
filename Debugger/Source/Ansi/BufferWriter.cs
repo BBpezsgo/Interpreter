@@ -4,39 +4,41 @@ namespace LanguageCore.TUI;
 
 struct BufferWriter
 {
-    readonly AnsiBufferSlice Buffer;
-    int X = 0;
-    int Y = 0;
-    int Offset = 0;
+    readonly AnsiBufferSlice _buffer;
+    int _x = 0;
+    int _y = 0;
+    int _offset = 0;
+
+    public int Offset => _offset;
 
     [DebuggerStepThrough]
     public BufferWriter(AnsiBufferSlice buffer, int x, int y)
     {
-        Buffer = buffer;
-        X = x;
-        Y = y;
+        _buffer = buffer;
+        _x = x;
+        _y = y;
     }
 
     public BufferWriter PadTo(int to, AnsiColor foreground = AnsiColor.Default, AnsiColor background = AnsiColor.Default)
     {
-        if (Offset < to)
+        if (_offset < to)
         {
-            Write(' ', to - Offset, foreground, background);
+            Write(' ', to - _offset, foreground, background);
         }
         return this;
     }
 
     public BufferWriter Write(ReadOnlySpan<char> text, AnsiColor foreground = AnsiColor.Default, AnsiColor background = AnsiColor.Default)
     {
-        Buffer.Text(X + Offset, Y, text, foreground, background);
-        Offset += text.Length;
+        _buffer.Text(_x + _offset, _y, text, foreground, background);
+        _offset += text.Length;
         return this;
     }
 
     public BufferWriter Write(char text, AnsiColor foreground = AnsiColor.Default, AnsiColor background = AnsiColor.Default)
     {
-        Buffer.Text(X + Offset, Y, text, foreground, background);
-        Offset++;
+        _buffer.Text(_x + _offset, _y, text, foreground, background);
+        _offset++;
         return this;
     }
 
@@ -44,9 +46,9 @@ struct BufferWriter
     {
         for (int i = 0; i < repeat; i++)
         {
-            Buffer.Text(X + Offset + i, Y, c, foreground, background);
+            _buffer.Text(_x + _offset + i, _y, c, foreground, background);
         }
-        Offset += repeat;
+        _offset += repeat;
         return this;
     }
 }

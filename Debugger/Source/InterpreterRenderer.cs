@@ -1,13 +1,53 @@
+using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Reflection;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.TUI;
 
+struct Window
+{
+    public int Size;
+    public int Margin;
+    public int Position;
+
+    public Window(int size, int margin)
+    {
+        Size = size;
+        Margin = margin;
+        Position = 0;
+    }
+
+    public int Move(int newPosition)
+    {
+        if (newPosition <= Position + Margin)
+        {
+            Position = newPosition - Margin - 1;
+        }
+        else if (newPosition >= Position - Margin)
+        {
+            Position = newPosition - Margin - Size + 1;
+        }
+        return Position;
+    }
+}
+
 public class InterpreterRenderer
 {
+    readonly BytecodeProcessor processor;
+
+    DataMovement memLoad;
+    DataMovement memStore;
+
+    Register regLoad;
+    Register regStore;
+
+    public InterpreterRenderer(BytecodeProcessor processor)
+    {
+        this.processor = processor;
+    }
+
     enum DataMovementEdge
     {
         None,
@@ -214,796 +254,885 @@ public class InterpreterRenderer
         }
     }
 
-    public static void Run(BytecodeProcessor processor)
+    Element CreateSourceElement() => new Panel((in AnsiBufferSlice buffer) =>
     {
-        DataMovement memLoad = default;
-        DataMovement memStore = default;
+        buffer.Clear();
 
-        Register regLoad = default;
-        Register regStore = default;
-
-        Container container = new(FlowDirection.Horizontal, ElementSize.Percentage(1f), new Element[] {
-            new Panel((in AnsiBufferSlice buffer) =>
+        if (!processor.DebugInformation.IsEmpty)
+        {
+            if (processor.DebugInformation.TryGetSourceLocation(processor.Registers.CodePointer, out SourceCodeLocation sourceLocation) &&
+                processor.DebugInformation.OriginalFiles.TryGetValue(sourceLocation.Location.File, out ImmutableArray<Tokenizing.Token> tokens))
             {
-                buffer.Clear();
+                int firstVisibleLine = Math.Max(0, sourceLocation.Location.Position.Range.Start.Line - buffer.Height / 2);
+                int lastVisibleLine = firstVisibleLine + buffer.Height - 1;
 
-                static void WriteOperand(ref BufferWriter writer, in InstructionOperand operand)
+                for (int i = 0; i < tokens.Length; i++)
                 {
-                    switch (operand.Type)
+                    if (tokens[i].TokenType == Tokenizing.TokenType.Whitespace) continue;
+                    if (tokens[i].Position.Range.Start.Line < firstVisibleLine) continue;
+                    if (tokens[i].Position.Range.Start.Line > lastVisibleLine) continue;
+                    AnsiColor bg = AnsiColor.Default;
+                    AnsiColor fg = tokens[i].AnalyzedType switch
                     {
-                        case InstructionOperandType.Immediate8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write(operand.Byte.ToString(), AnsiColor.BrightGreen);
-                            break;
-                        case InstructionOperandType.Immediate16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write(operand.Char.ToString(), AnsiColor.BrightGreen);
-                            break;
-                        case InstructionOperandType.Immediate32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
-                            break;
-                        case InstructionOperandType.Immediate64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write(operand.Value.ToString(), AnsiColor.BrightGreen);
-                            break;
-                        case InstructionOperandType.Pointer8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.Pointer16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.Pointer32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.Register:
-                            switch ((Register)operand.Value)
+                        Tokenizing.TokenAnalyzedType.Attribute => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Type => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Struct => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.Keyword => AnsiColor.BrightBlue,
+                        Tokenizing.TokenAnalyzedType.FunctionName => AnsiColor.BrightYellow,
+                        Tokenizing.TokenAnalyzedType.VariableName => AnsiColor.White,
+                        Tokenizing.TokenAnalyzedType.FieldName => AnsiColor.White,
+                        Tokenizing.TokenAnalyzedType.ParameterName => AnsiColor.White,
+                        Tokenizing.TokenAnalyzedType.Statement => AnsiColor.BrightMagenta,
+                        Tokenizing.TokenAnalyzedType.BuiltinType => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.TypeParameter => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.ConstantName => AnsiColor.White,
+                        _ => tokens[i].TokenType switch
+                        {
+                            Tokenizing.TokenType.Identifier => AnsiColor.White,
+                            Tokenizing.TokenType.LiteralNumber => AnsiColor.BrightCyan,
+                            Tokenizing.TokenType.LiteralHex => AnsiColor.BrightCyan,
+                            Tokenizing.TokenType.LiteralBinary => AnsiColor.BrightCyan,
+                            Tokenizing.TokenType.LiteralString => AnsiColor.BrightYellow,
+                            Tokenizing.TokenType.LiteralCharacter => AnsiColor.BrightYellow,
+                            Tokenizing.TokenType.LiteralFloat => AnsiColor.BrightCyan,
+                            Tokenizing.TokenType.Operator => AnsiColor.BrightBlack,
+                            Tokenizing.TokenType.PreprocessIdentifier => AnsiColor.BrightBlack,
+                            Tokenizing.TokenType.PreprocessArgument => AnsiColor.BrightBlack,
+                            Tokenizing.TokenType.PreprocessSkipped => AnsiColor.BrightBlack,
+                            Tokenizing.TokenType.Comment => AnsiColor.BrightBlack,
+                            Tokenizing.TokenType.CommentMultiline => AnsiColor.BrightBlack,
+                            _ => AnsiColor.Default,
+                        }
+                    };
+
+                    buffer.Text(tokens[i].Position.Range.Start.Character, tokens[i].Position.Range.Start.Line - firstVisibleLine, tokens[i].ToOriginalString(), fg, bg);
+                }
+
+                for (int l = sourceLocation.Location.Position.Range.Start.Line; l <= sourceLocation.Location.Position.Range.End.Line; l++)
+                {
+                    if (l < firstVisibleLine) continue;
+                    if (l > lastVisibleLine) continue;
+                    int xStart = l == sourceLocation.Location.Position.Range.Start.Line ? sourceLocation.Location.Position.Range.Start.Character : 0;
+                    int xEnd = l == sourceLocation.Location.Position.Range.End.Line ? sourceLocation.Location.Position.Range.End.Character : buffer.Width - 1;
+                    for (int x = xStart; x < xEnd; x++)
+                    {
+                        if (x < 0) continue;
+                        if (x >= buffer.Width) continue;
+                        char c = buffer[x, l - firstVisibleLine].Char;
+                        buffer[x, l - firstVisibleLine] = new(c == default ? ' ' : c, AnsiColor.Black, AnsiColor.Red);
+                    }
+                }
+            }
+        }
+    }, ElementSize.Auto());
+
+    Element CreateCodeElement() => new Panel((in AnsiBufferSlice buffer) =>
+    {
+        buffer.Clear();
+
+        static void WriteOperand(ref BufferWriter writer, in InstructionOperand operand)
+        {
+            switch (operand.Type)
+            {
+                case InstructionOperandType.Immediate8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write(operand.Byte.ToString(), AnsiColor.BrightGreen);
+                    break;
+                case InstructionOperandType.Immediate16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write(operand.Char.ToString(), AnsiColor.BrightGreen);
+                    break;
+                case InstructionOperandType.Immediate32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
+                    break;
+                case InstructionOperandType.Immediate64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write(operand.Value.ToString(), AnsiColor.BrightGreen);
+                    break;
+                case InstructionOperandType.Pointer8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.Pointer16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.Pointer32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write(operand.Int.ToString(), AnsiColor.BrightGreen);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.Register:
+                    switch ((Register)operand.Value)
+                    {
+                        case Register.CodePointer: writer.Write("CP", AnsiColor.BrightBlue); break;
+                        case Register.StackPointer: writer.Write("SP", AnsiColor.BrightBlue); break;
+                        case Register.BasePointer: writer.Write("BP", AnsiColor.BrightBlue); break;
+                        case Register.EAX: writer.Write("EAX", AnsiColor.BrightBlue); break;
+                        case Register.AX: writer.Write("AX", AnsiColor.BrightBlue); break;
+                        case Register.AH: writer.Write("AH", AnsiColor.BrightBlue); break;
+                        case Register.AL: writer.Write("AL", AnsiColor.BrightBlue); break;
+                        case Register.EBX: writer.Write("EBX", AnsiColor.BrightBlue); break;
+                        case Register.BX: writer.Write("BX", AnsiColor.BrightBlue); break;
+                        case Register.BH: writer.Write("BH", AnsiColor.BrightBlue); break;
+                        case Register.BL: writer.Write("BL", AnsiColor.BrightBlue); break;
+                        case Register.ECX: writer.Write("ECX", AnsiColor.BrightBlue); break;
+                        case Register.CX: writer.Write("CX", AnsiColor.BrightBlue); break;
+                        case Register.CH: writer.Write("CH", AnsiColor.BrightBlue); break;
+                        case Register.CL: writer.Write("CL", AnsiColor.BrightBlue); break;
+                        case Register.EDX: writer.Write("EDX", AnsiColor.BrightBlue); break;
+                        case Register.DX: writer.Write("DX", AnsiColor.BrightBlue); break;
+                        case Register.DH: writer.Write("DH", AnsiColor.BrightBlue); break;
+                        case Register.DL: writer.Write("DL", AnsiColor.BrightBlue); break;
+                        case Register.RAX: writer.Write("RAX", AnsiColor.BrightBlue); break;
+                        case Register.RBX: writer.Write("RBX", AnsiColor.BrightBlue); break;
+                        case Register.RCX: writer.Write("RCX", AnsiColor.BrightBlue); break;
+                        case Register.RDX: writer.Write("RDX", AnsiColor.BrightBlue); break;
+                    }
+                    break;
+                case InstructionOperandType.PointerBP8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("BP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerBP16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("BP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerBP32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("BP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerBP64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("BP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerSP8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("SP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerSP16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("SP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerSP32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("SP", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEAX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEAX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEAX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEAX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEBX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEBX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEBX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEBX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerECX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("ECX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerECX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("ECX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerECX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("ECX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerECX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("ECX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEDX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEDX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEDX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerEDX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("EDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRAX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRAX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRAX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRAX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RAX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRBX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRBX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRBX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRBX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RBX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRCX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RCX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRCX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RCX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRCX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RCX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRCX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RCX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRDX8:
+                    writer.Write("u8", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRDX16:
+                    writer.Write("u16", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRDX32:
+                    writer.Write("u32", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                case InstructionOperandType.PointerRDX64:
+                    writer.Write("u64", AnsiColor.BrightBlack);
+                    writer.Write(' ');
+                    writer.Write('[');
+                    writer.Write("RDX", AnsiColor.BrightBlue);
+                    writer.Write(']');
+                    break;
+                default:
+                    writer.Write("?", AnsiColor.BrightBlack);
+                    break;
+            }
+        }
+
+        int position = processor.Registers.CodePointer;
+        int begin = Math.Max(0, position - (buffer.Height / 2));
+        int end = Math.Min(processor.Code.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
+        for (int i = begin; i < end; i++)
+        {
+            BufferWriter t = buffer.Text(0, i - begin);
+            t.Write(' ', Math.Max(0, 5 - i.ToString().Length));
+            t.Write($" {i} ", background: i == position ? AnsiColor.Red : AnsiColor.Default);
+            t.Write(processor.Code[i].Opcode.ToString(), foreground: AnsiColor.Yellow);
+            int pc = processor.Code[i].Opcode.ParameterCount();
+            if (pc >= 1)
+            {
+                t.Write(" ");
+                WriteOperand(ref t, processor.Code[i].Operand1);
+            }
+            if (pc >= 2)
+            {
+                t.Write(" ");
+                WriteOperand(ref t, processor.Code[i].Operand2);
+            }
+        }
+    }, ElementSize.Auto());
+
+    Element CreateRegistersElement() => new Panel((in AnsiBufferSlice buffer) =>
+    {
+        static string GetRegisterLabel(Register register) => register switch
+        {
+            Register.BasePointer => "BP",
+            Register.StackPointer => "SP",
+            Register.CodePointer => "CP",
+            _ => register.ToString(),
+        };
+
+        void WriteRegister(ref BufferWriter t, Register register)
+        {
+            if ((regLoad & (Register)0b_1111) == register)
+            {
+                t.Write($"l{GetRegisterLabel(regLoad)}: ", AnsiColor.BrightRed);
+                t.PadTo(6);
+                t.Write(processor.GetState().GetData(regLoad).ToString(), AnsiColor.BrightRed);
+            }
+            else if ((regStore & (Register)0b_1111) == register)
+            {
+                t.Write($"s{GetRegisterLabel(regStore)}: ", AnsiColor.BrightRed);
+                t.PadTo(6);
+                t.Write(processor.GetState().GetData(regStore).ToString(), AnsiColor.BrightRed);
+            }
+            else
+            {
+                t.Write($" {GetRegisterLabel(register | Register._4)}: ");
+                t.PadTo(6);
+                t.Write(processor.GetState().GetData(register | Register._4).ToString(), AnsiColor.White);
+            }
+        }
+
+        buffer.Clear();
+        BufferWriter t;
+
+        t = buffer.Text(0, 0);
+        WriteRegister(ref t, Register._A);
+
+        t = buffer.Text(buffer.Width / 2, 0);
+        WriteRegister(ref t, Register._B);
+
+        t = buffer.Text(0, 1);
+        WriteRegister(ref t, Register._C);
+
+        t = buffer.Text(buffer.Width / 2, 1);
+        WriteRegister(ref t, Register._D);
+
+        t = buffer.Text(0, 2);
+        WriteRegister(ref t, Register.BasePointer);
+
+        t = buffer.Text(buffer.Width / 2, 2);
+        WriteRegister(ref t, Register.StackPointer);
+
+        t = buffer.Text(0, 3);
+        WriteRegister(ref t, Register.CodePointer);
+
+        t = buffer.Text(buffer.Width / 2, 3);
+        t.Write("FLAGS: ");
+
+        if (processor.Registers.Flags.HasFlag(Flags.Overflow)) t.Write('O');
+        else t.Write('-');
+
+        if (processor.Registers.Flags.HasFlag(Flags.Sign)) t.Write('S');
+        else t.Write('-');
+
+        if (processor.Registers.Flags.HasFlag(Flags.Zero)) t.Write('Z');
+        else t.Write('-');
+
+        if (processor.Registers.Flags.HasFlag(Flags.Carry)) t.Write('C');
+        else t.Write('-');
+    }, ElementSize.Fixed(5));
+
+    Element CreateMemoryElement() => new Panel((in AnsiBufferSlice buffer) =>
+    {
+        buffer.Clear();
+        byte[] memb = new byte[Math.Min(buffer.Width * buffer.Height, processor.Memory.Length / 4)];
+        for (int i = 0; i < processor.Memory.Length; i++)
+        {
+            if (i / 4 >= memb.Length) break;
+            if (processor.Memory[i] == 0) continue;
+            memb[i / 4] |= (byte)(1 << (i % 4));
+        }
+
+        for (int i = 0; i < memb.Length; i++)
+        {
+            int x = i % buffer.Width;
+            int y = i / buffer.Width;
+            buffer[x, y] = new(" ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[memb[i]]);
+        }
+
+        void TryDrawDot(int address, AnsiColor color, in AnsiBufferSlice buffer)
+        {
+            int i = address / 4;
+            if (i < memb.Length)
+            {
+                int c = memb[i] | (1 << (address % 4));
+                int x = i % buffer.Width;
+                int y = i / buffer.Width;
+                buffer[x, y] = new(" ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[c], color);
+            }
+        }
+
+        TryDrawDot(processor.Registers.StackPointer, AnsiColor.BrightBlue, buffer);
+        TryDrawDot(processor.Registers.BasePointer, AnsiColor.BrightMagenta, buffer);
+        for (int i = 0; i < memLoad.Size; i++)
+        {
+            TryDrawDot(memLoad.Address + i, AnsiColor.BrightRed, buffer);
+        }
+        for (int i = 0; i < memStore.Size; i++)
+        {
+            TryDrawDot(memStore.Address + i, AnsiColor.BrightRed, buffer);
+        }
+    }, ElementSize.Percentage(0.7f));
+
+    Element CreateStackElement()
+    {
+        int prevPosition = 0;
+
+        return new Panel((in AnsiBufferSlice buffer) =>
+        {
+            buffer.Clear();
+
+            if (processor.Registers.StackPointer < (prevPosition + 4))
+            {
+                prevPosition = processor.Registers.StackPointer - 4;
+            }
+            else if (processor.Registers.StackPointer > (prevPosition + buffer.Height - 1 - 4))
+            {
+                prevPosition = processor.Registers.StackPointer - buffer.Height + 4;
+            }
+
+            CollectedScopeInfo stackDebugInfo;
+            if (!processor.DebugInformation.IsEmpty)
+            { stackDebugInfo = processor.DebugInformation.GetAllScopeInformation(processor.Memory, processor.Registers.BasePointer, processor.Registers.CodePointer); }
+            else
+            { stackDebugInfo = CollectedScopeInfo.Empty; }
+
+            ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(processor.Memory, processor.Registers.BasePointer, processor.DebugInformation.IsEmpty ? null : processor.DebugInformation.StackOffsets);
+
+            int begin = Math.Max(0, prevPosition);
+            int end = Math.Min(processor.Memory.Length, Math.Max(prevPosition + buffer.Height, begin + buffer.Height));
+            for (int i = begin; i < end; i++)
+            {
+                BufferWriter t = buffer.Text(0, i - begin);
+
+                DataMovementEdge ld = memLoad.At(i);
+                DataMovementEdge st = memStore.At(i);
+                if (ld == DataMovementEdge.None)
+                {
+                    switch (st)
+                    {
+                        case DataMovementEdge.None: t.Write(' '); break;
+                        case DataMovementEdge.Start: t.Write("s", AnsiColor.BrightRed); break;
+                        case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
+                        case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
+                    }
+                }
+                else
+                {
+                    switch (ld)
+                    {
+                        case DataMovementEdge.None: t.Write(' '); break;
+                        case DataMovementEdge.Start: t.Write("l", AnsiColor.BrightRed); break;
+                        case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
+                        case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
+                    }
+                }
+
+                if (processor.Registers.BasePointer == i) t.Write("■", AnsiColor.BrightMagenta);
+                else if (callTrace.Contains(v => v.BasePointer == i)) t.Write("■", AnsiColor.BrightBlack);
+                else t.Write(' ');
+
+                if (processor.Registers.StackPointer == i) t.Write("▶", AnsiColor.BrightBlue);
+                else t.Write(' ');
+
+                t.Write($"{i,5} ");
+                t.Write(processor.Memory[i].ToString(), processor.Memory[i] == 0 ? AnsiColor.BrightBlack : AnsiColor.White);
+
+                foreach (StackElementInformation item in stackDebugInfo.Stack)
+                {
+                    int a = item.AbsoluteAddress(processor.Registers.BasePointer, processor.StackStart);
+                    if (a == i)
+                    {
+                        t.PadTo(13);
+                        if (item.Size == 1) t.Write(' ');
+                        else t.Write('┌');
+                        WriteType(ref t, item.Type);
+                        t.Write(' ');
+                        if (item.Kind == StackElementKind.Internal)
+                        {
+                            t.Write(item.Identifier, AnsiColor.BrightBlack);
+                        }
+                        else
+                        {
+                            t.Write(item.Identifier);
+                        }
+                        switch (item.Type.FinalValue)
+                        {
+                            case BuiltinType v:
+                                switch (v.Type)
+                                {
+                                    case BasicType.U8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<byte>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<sbyte>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.U16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ushort>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<short>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.U32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<uint>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<int>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.U64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ulong>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<long>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.F32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<float>(i).ToString(), AnsiColor.BrightBlue); break;
+                                }
+                                break;
+                        }
+                        break;
+                    }
+                    else if (i > a && i < a + item.Size - 1)
+                    {
+                        t.PadTo(13);
+                        t.Write('│');
+                        break;
+                    }
+                    else if (i > a && i == a + item.Size - 1)
+                    {
+                        t.PadTo(13);
+                        t.Write('└');
+                        break;
+                    }
+                }
+            }
+        }, ElementSize.Auto());
+    }
+
+    Element CreateHeapElement() => new Panel((in AnsiBufferSlice buffer) =>
+    {
+        buffer.Clear();
+
+        CollectedScopeInfo stackDebugInfo;
+        if (!processor.DebugInformation.IsEmpty)
+        { stackDebugInfo = processor.DebugInformation.GetAllScopeInformation(processor.Memory, processor.Registers.BasePointer, processor.Registers.CodePointer); }
+        else
+        { stackDebugInfo = CollectedScopeInfo.Empty; }
+
+        int position = 0;
+        int begin = Math.Max(0, position - (buffer.Height / 2));
+        int end = Math.Min(processor.Memory.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
+        for (int i = begin; i < end; i++)
+        {
+            BufferWriter t = buffer.Text(0, i - begin);
+
+            DataMovementEdge ld = memLoad.At(i);
+            DataMovementEdge st = memStore.At(i);
+            if (ld == DataMovementEdge.None)
+            {
+                switch (st)
+                {
+                    case DataMovementEdge.None: t.Write(' '); break;
+                    case DataMovementEdge.Start: t.Write("s", AnsiColor.BrightRed); break;
+                    case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
+                    case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
+                }
+            }
+            else
+            {
+                switch (ld)
+                {
+                    case DataMovementEdge.None: t.Write(' '); break;
+                    case DataMovementEdge.Start: t.Write("l", AnsiColor.BrightRed); break;
+                    case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
+                    case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
+                }
+            }
+
+            t.Write($"{i,5} ");
+            t.Write(processor.Memory[i].ToString(), processor.Memory[i] == 0 ? AnsiColor.BrightBlack : AnsiColor.White);
+
+            foreach (StackElementInformation item in stackDebugInfo.Stack)
+            {
+                if (item.Type is not PointerType pointerType) continue;
+                int pointerAddress = item.AbsoluteAddress(processor.Registers.BasePointer, processor.StackStart);
+                int valueAddress = processor.Memory.AsSpan().Get<int>(pointerAddress);
+                if (valueAddress <= 0) continue;
+
+                if (!pointerType.To.GetSize(new RuntimeInfoProvider()
+                {
+                    PointerSize = CodeGeneratorForMain.DefaultCompilerSettings.PointerSize,
+                }, out int valueSize, out _))
+                {
+                    valueSize = 0;
+                }
+
+                if (valueAddress == i)
+                {
+                    t.PadTo(13);
+                    if (valueSize <= 1) t.Write(' ');
+                    else t.Write('┌');
+                    WriteType(ref t, pointerType.To);
+                    t.Write(' ');
+                    if (item.Kind == StackElementKind.Internal)
+                    {
+                        t.Write(item.Identifier, AnsiColor.BrightBlack);
+                    }
+                    else
+                    {
+                        t.Write(item.Identifier);
+                    }
+                    switch (pointerType.To.FinalValue)
+                    {
+                        case BuiltinType v:
+                            switch (v.Type)
                             {
-                                case Register.CodePointer: writer.Write("CP", AnsiColor.BrightBlue); break;
-                                case Register.StackPointer: writer.Write("SP", AnsiColor.BrightBlue); break;
-                                case Register.BasePointer: writer.Write("BP", AnsiColor.BrightBlue); break;
-                                case Register.EAX: writer.Write("EAX", AnsiColor.BrightBlue); break;
-                                case Register.AX: writer.Write("AX", AnsiColor.BrightBlue); break;
-                                case Register.AH: writer.Write("AH", AnsiColor.BrightBlue); break;
-                                case Register.AL: writer.Write("AL", AnsiColor.BrightBlue); break;
-                                case Register.EBX: writer.Write("EBX", AnsiColor.BrightBlue); break;
-                                case Register.BX: writer.Write("BX", AnsiColor.BrightBlue); break;
-                                case Register.BH: writer.Write("BH", AnsiColor.BrightBlue); break;
-                                case Register.BL: writer.Write("BL", AnsiColor.BrightBlue); break;
-                                case Register.ECX: writer.Write("ECX", AnsiColor.BrightBlue); break;
-                                case Register.CX: writer.Write("CX", AnsiColor.BrightBlue); break;
-                                case Register.CH: writer.Write("CH", AnsiColor.BrightBlue); break;
-                                case Register.CL: writer.Write("CL", AnsiColor.BrightBlue); break;
-                                case Register.EDX: writer.Write("EDX", AnsiColor.BrightBlue); break;
-                                case Register.DX: writer.Write("DX", AnsiColor.BrightBlue); break;
-                                case Register.DH: writer.Write("DH", AnsiColor.BrightBlue); break;
-                                case Register.DL: writer.Write("DL", AnsiColor.BrightBlue); break;
-                                case Register.RAX: writer.Write("RAX", AnsiColor.BrightBlue); break;
-                                case Register.RBX: writer.Write("RBX", AnsiColor.BrightBlue); break;
-                                case Register.RCX: writer.Write("RCX", AnsiColor.BrightBlue); break;
-                                case Register.RDX: writer.Write("RDX", AnsiColor.BrightBlue); break;
+                                case BasicType.U8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<byte>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.I8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<sbyte>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.U16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ushort>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.I16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<short>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.U32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<uint>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.I32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<int>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.U64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ulong>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.I64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<long>(i).ToString(), AnsiColor.BrightBlue); break;
+                                case BasicType.F32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<float>(i).ToString(), AnsiColor.BrightBlue); break;
                             }
                             break;
-                        case InstructionOperandType.PointerBP8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("BP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerBP16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("BP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerBP32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("BP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerBP64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("BP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerSP8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("SP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerSP16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("SP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerSP32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("SP", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEAX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEAX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEAX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEAX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEBX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEBX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEBX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEBX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerECX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("ECX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerECX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("ECX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerECX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("ECX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerECX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("ECX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEDX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEDX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEDX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerEDX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("EDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRAX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRAX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRAX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRAX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RAX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRBX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRBX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRBX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRBX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RBX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRCX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RCX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRCX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RCX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRCX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RCX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRCX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RCX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRDX8:
-                            writer.Write("u8", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRDX16:
-                            writer.Write("u16", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRDX32:
-                            writer.Write("u32", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        case InstructionOperandType.PointerRDX64:
-                            writer.Write("u64", AnsiColor.BrightBlack);
-                            writer.Write(' ');
-                            writer.Write('[');
-                            writer.Write("RDX", AnsiColor.BrightBlue);
-                            writer.Write(']');
-                            break;
-                        default:
-                            writer.Write("?", AnsiColor.BrightBlack);
-                            break;
                     }
+                    break;
                 }
-
-                int position = processor.Registers.CodePointer;
-                int begin = Math.Max(0, position - (buffer.Height / 2));
-                int end = Math.Min(processor.Code.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
-                for (int i = begin; i < end; i++)
+                else if (i > valueAddress && i < valueAddress + valueSize - 1)
                 {
-                    BufferWriter t = buffer.Text(0, i - begin);
-                    t.Write(' ', Math.Max(0, 5 - i.ToString().Length));
-                    t.Write($" {i} ", background: i == position ? AnsiColor.Red : AnsiColor.Default);
-                    t.Write(processor.Code[i].Opcode.ToString(), foreground: AnsiColor.Yellow);
-                    int pc = processor.Code[i].Opcode.ParameterCount();
-                    if (pc >= 1)
-                    {
-                        t.Write(" ");
-                        WriteOperand(ref t, processor.Code[i].Operand1);
-                    }
-                    if (pc >= 2)
-                    {
-                        t.Write(" ");
-                        WriteOperand(ref t, processor.Code[i].Operand2);
-                    }
+                    t.PadTo(13);
+                    t.Write('│');
+                    break;
                 }
-            }, ElementSize.Percentage(0.3f))
-            .WithBorders("Code"),
-            new Panel((in AnsiBufferSlice buffer) =>
+                else if (i > valueAddress && i == valueAddress + valueSize - 1)
+                {
+                    t.PadTo(13);
+                    t.Write('└');
+                    break;
+                }
+            }
+
+        }
+    }, ElementSize.Auto());
+
+    Element CreateStackTraceElement() => new Panel((in AnsiBufferSlice buffer) =>
+    {
+        buffer.Clear();
+
+        CollectedScopeInfo stackDebugInfo;
+        if (!processor.DebugInformation.IsEmpty)
+        { stackDebugInfo = processor.DebugInformation.GetAllScopeInformation(processor.Memory, processor.Registers.BasePointer, processor.Registers.CodePointer); }
+        else
+        { stackDebugInfo = CollectedScopeInfo.Empty; }
+
+        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(processor.Memory, processor.Registers.BasePointer, processor.DebugInformation.IsEmpty ? null : processor.DebugInformation.StackOffsets);
+
+        int position = callTrace.Length - 1;
+        int begin = Math.Max(0, position - (buffer.Height / 2));
+        int end = Math.Min(callTrace.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
+        for (int i = begin; i < end; i++)
+        {
+            BufferWriter t = buffer.Text(0, i - begin);
+            CallTraceItem frame = callTrace[i];
+            FunctionInformation function = processor.DebugInformation.GetFunctionInformation(frame.InstructionPointer);
+            if (!function.IsValid)
             {
-                buffer.Clear();
-                byte[] memb = new byte[Math.Min(buffer.Width * buffer.Height, processor.Memory.Length / 4)];
-                for (int i = 0; i < processor.Memory.Length; i++)
-                {
-                    if (i / 4 >= memb.Length) break;
-                    if (processor.Memory[i] == 0) continue;
-                    memb[i / 4] |= (byte)(1 << (i % 4));
-                }
+                t.Write(frame.InstructionPointer.ToString());
+                continue;
+            }
 
-                for (int i = 0; i < memb.Length; i++)
+            if (function.Function is ICompiledFunctionDefinition compiledFunction)
+            {
+                t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
+                t.Write('(');
+                for (int j = 0; j < compiledFunction.Parameters.Count; j++)
                 {
-                    int x = i % buffer.Width;
-                    int y = i / buffer.Width;
-                    buffer[x, y] = new(" ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[memb[i]]);
-                }
-
-                void TryDrawDot(int address, AnsiColor color, in AnsiBufferSlice buffer)
-                {
-                    int i = address / 4;
-                    if (i < memb.Length)
+                    if (j > 0) t.Write(", ");
+                    for (int k = 0; k < compiledFunction.Parameters[j].Modifiers.Length; k++)
                     {
-                        int c = memb[i] | (1 << (address % 4));
-                        int x = i % buffer.Width;
-                        int y = i / buffer.Width;
-                        buffer[x, y] = new(" ▘▝▀▖▌▞▛▗▚▐▜▄▙▟█"[c], color);
+                        t.Write(compiledFunction.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
+                        t.Write(' ');
                     }
+                    WriteType(ref t, GeneralType.InsertTypeParameters(compiledFunction.ParameterTypes[j], function.TypeArguments) ?? compiledFunction.ParameterTypes[j]);
+                    t.Write(' ');
+                    t.Write(compiledFunction.Parameters[j].Identifier.Content);
                 }
+                t.Write(')');
+            }
+            else if (function.Function is not null)
+            {
+                t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
+                t.Write('(');
+                for (int j = 0; j < function.Function.Parameters.Count; j++)
+                {
+                    if (j > 0) t.Write(", ");
+                    for (int k = 0; k < function.Function.Parameters[j].Modifiers.Length; k++)
+                    {
+                        t.Write(function.Function.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
+                        t.Write(' ');
+                    }
+                    t.Write(function.Function.Parameters[j].Type.ToString(function.TypeArguments), AnsiColor.Green);
+                    t.Write(' ');
+                    t.Write(function.Function.Parameters[j].Identifier.Content);
+                }
+                t.Write(')');
+            }
+            else
+            {
+                t.Write(function.Function?.GetType().Name ?? "?");
+            }
+        }
+    }, ElementSize.Auto());
 
-                TryDrawDot(processor.Registers.StackPointer, AnsiColor.BrightBlue, buffer);
-                TryDrawDot(processor.Registers.BasePointer, AnsiColor.BrightMagenta, buffer);
-                for (int i = 0; i < memLoad.Size; i++)
-                {
-                    TryDrawDot(memLoad.Address + i, AnsiColor.BrightRed, buffer);
-                }
-                for (int i = 0; i < memStore.Size; i++)
-                {
-                    TryDrawDot(memStore.Address + i, AnsiColor.BrightRed, buffer);
-                }
-            }, ElementSize.Percentage(0.7f))
-            .WithBorders("Memory")
+    public void Run()
+    {
+        Container container = new(FlowDirection.Horizontal, ElementSize.Percentage(1f), new Element[] {
+            new Container(FlowDirection.Vertical, ElementSize.Percentage(0.3f), new Element[]
+            {
+                CreateSourceElement().WithBorders("Source"),
+                CreateCodeElement().WithBorders("Code"),
+            }),
+            CreateMemoryElement().WithBorders("Memory")
             .Invisible(),
             new Container(FlowDirection.Vertical, ElementSize.Percentage(0.7f), new Element[]
             {
-                new Panel((in AnsiBufferSlice buffer) =>
-                {
-                    static string GetRegisterLabel(Register register) => register switch
-                    {
-                        Register.BasePointer => "BP",
-                        Register.StackPointer => "SP",
-                        Register.CodePointer => "CP",
-                        _ => register.ToString(),
-                    };
-
-                    void WriteRegister(ref BufferWriter t, Register register)
-                    {
-                        if ((regLoad & (Register)0b_1111) == register)
-                        {
-                            t.Write($"l{GetRegisterLabel(regLoad)}: ", AnsiColor.BrightRed);
-                            t.PadTo(6);
-                            t.Write(processor.GetState().GetData(regLoad).ToString(), AnsiColor.BrightRed);
-                        }
-                        else if ((regStore & (Register)0b_1111) == register)
-                        {
-                            t.Write($"s{GetRegisterLabel(regStore)}: ", AnsiColor.BrightRed);
-                            t.PadTo(6);
-                            t.Write(processor.GetState().GetData(regStore).ToString(), AnsiColor.BrightRed);
-                        }
-                        else
-                        {
-                            t.Write($" {GetRegisterLabel(register | Register._4)}: ");
-                            t.PadTo(6);
-                            t.Write(processor.GetState().GetData(register | Register._4).ToString(), AnsiColor.White);
-                        }
-                    }
-
-                    buffer.Clear();
-                    BufferWriter t;
-
-                    t = buffer.Text(0, 0);
-                    WriteRegister(ref t, Register._A);
-
-                    t = buffer.Text(buffer.Width / 2, 0);
-                    WriteRegister(ref t, Register._B);
-
-                    t = buffer.Text(0, 1);
-                    WriteRegister(ref t, Register._C);
-
-                    t = buffer.Text(buffer.Width / 2, 1);
-                    WriteRegister(ref t, Register._D);
-
-                    t = buffer.Text(0, 2);
-                    WriteRegister(ref t, Register.BasePointer);
-
-                    t = buffer.Text(buffer.Width / 2, 2);
-                    WriteRegister(ref t, Register.StackPointer);
-
-                    t = buffer.Text(0, 3);
-                    WriteRegister(ref t, Register.CodePointer);
-
-                    t = buffer.Text(buffer.Width / 2, 3);
-                    t.Write("FLAGS: ");
-
-                    if (processor.Registers.Flags.HasFlag(Flags.Overflow)) t.Write('O');
-                    else t.Write('-');
-
-                    if (processor.Registers.Flags.HasFlag(Flags.Sign)) t.Write('S');
-                    else t.Write('-');
-
-                    if (processor.Registers.Flags.HasFlag(Flags.Zero)) t.Write('Z');
-                    else t.Write('-');
-
-                    if (processor.Registers.Flags.HasFlag(Flags.Carry)) t.Write('C');
-                    else t.Write('-');
-                }, ElementSize.Fixed(5))
-                .WithBorders("Registers"),
+                CreateRegistersElement().WithBorders("Registers"),
                 new Container(FlowDirection.Horizontal, ElementSize.Auto(), new Element[]
                 {
-                    new Panel((in AnsiBufferSlice buffer) =>
-                    {
-                        buffer.Clear();
-
-                        CollectedScopeInfo stackDebugInfo;
-                        if (!processor.DebugInformation.IsEmpty)
-                        { stackDebugInfo = processor.DebugInformation.GetAllScopeInformation(processor.Memory, processor.Registers.BasePointer, processor.Registers.CodePointer); }
-                        else
-                        { stackDebugInfo = CollectedScopeInfo.Empty; }
-
-                        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(processor.Memory, processor.Registers.BasePointer, processor.DebugInformation.IsEmpty ? null : processor.DebugInformation.StackOffsets);
-
-                        int position = processor.Registers.StackPointer;
-                        int begin = Math.Max(0, position - (buffer.Height / 2));
-                        int end = Math.Min(processor.Memory.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
-                        for (int i = begin; i < end; i++)
-                        {
-                            BufferWriter t = buffer.Text(0, i - begin);
-
-                            DataMovementEdge ld = memLoad.At(i);
-                            DataMovementEdge st = memStore.At(i);
-                            if (ld == DataMovementEdge.None)
-                            {
-                                switch (st)
-                                {
-                                    case DataMovementEdge.None: t.Write(' '); break;
-                                    case DataMovementEdge.Start: t.Write("s", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
-                                }
-                            }
-                            else
-                            {
-                                switch (ld)
-                                {
-                                    case DataMovementEdge.None: t.Write(' '); break;
-                                    case DataMovementEdge.Start: t.Write("l", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
-                                }
-                            }
-
-                            if (processor.Registers.BasePointer == i) t.Write("■", AnsiColor.BrightMagenta);
-                            else if (callTrace.Contains(v => v.BasePointer == i)) t.Write("■", AnsiColor.BrightBlack);
-                            else t.Write(' ');
-
-                            if (processor.Registers.StackPointer == i) t.Write("▶", AnsiColor.BrightBlue);
-                            else t.Write(' ');
-
-                            t.Write($"{i, 5} ");
-                            t.Write(processor.Memory[i].ToString(), processor.Memory[i] == 0 ? AnsiColor.BrightBlack : AnsiColor.White);
-
-                            foreach (StackElementInformation item in stackDebugInfo.Stack)
-                            {
-                                int a = item.AbsoluteAddress(processor.Registers.BasePointer, processor.StackStart);
-                                if (a == i)
-                                {
-                                    t.PadTo(13);
-                                    if (item.Size == 1) t.Write(' ');
-                                    else t.Write('┌');
-                                    WriteType(ref t, item.Type);
-                                    t.Write(' ');
-                                    if (item.Kind == StackElementKind.Internal)
-                                    {
-                                        t.Write(item.Identifier, AnsiColor.BrightBlack);
-                                    }
-                                    else
-                                    {
-                                        t.Write(item.Identifier);
-                                    }
-                                    switch (item.Type.FinalValue)
-                                    {
-                                        case BuiltinType v:
-                                            switch (v.Type)
-                                            {
-                                                case BasicType.U8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<byte>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<sbyte>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.U16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ushort>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<short>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.U32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<uint>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<int>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.U64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ulong>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<long>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.F32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<float>(i).ToString(), AnsiColor.BrightBlue); break;
-                                            }
-                                            break;
-                                    }
-                                    break;
-                                }
-                                else if (i > a && i < a + item.Size - 1)
-                                {
-                                    t.PadTo(13);
-                                    t.Write('│');
-                                    break;
-                                }
-                                else if (i > a && i == a + item.Size - 1)
-                                {
-                                    t.PadTo(13);
-                                    t.Write('└');
-                                    break;
-                                }
-                            }
-                        }
-                    }, ElementSize.Auto())
-                    .WithBorders("Stack"),
-                    new Panel((in AnsiBufferSlice buffer) =>
-                    {
-                        buffer.Clear();
-
-                        CollectedScopeInfo stackDebugInfo;
-                        if (!processor.DebugInformation.IsEmpty)
-                        { stackDebugInfo = processor.DebugInformation.GetAllScopeInformation(processor.Memory, processor.Registers.BasePointer, processor.Registers.CodePointer); }
-                        else
-                        { stackDebugInfo = CollectedScopeInfo.Empty; }
-
-                        int position = 0;
-                        int begin = Math.Max(0, position - (buffer.Height / 2));
-                        int end = Math.Min(processor.Memory.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
-                        for (int i = begin; i < end; i++)
-                        {
-                            BufferWriter t = buffer.Text(0, i - begin);
-
-                            DataMovementEdge ld = memLoad.At(i);
-                            DataMovementEdge st = memStore.At(i);
-                            if (ld == DataMovementEdge.None)
-                            {
-                                switch (st)
-                                {
-                                    case DataMovementEdge.None: t.Write(' '); break;
-                                    case DataMovementEdge.Start: t.Write("s", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
-                                }
-                            }
-                            else
-                            {
-                                switch (ld)
-                                {
-                                    case DataMovementEdge.None: t.Write(' '); break;
-                                    case DataMovementEdge.Start: t.Write("l", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.Middle: t.Write("╎", AnsiColor.BrightRed); break;
-                                    case DataMovementEdge.End: t.Write("╎", AnsiColor.BrightRed); break;
-                                }
-                            }
-
-                            t.Write($"{i, 5} ");
-                            t.Write(processor.Memory[i].ToString(), processor.Memory[i] == 0 ? AnsiColor.BrightBlack : AnsiColor.White);
-
-                            foreach (StackElementInformation item in stackDebugInfo.Stack)
-                            {
-                                if (item.Type is not PointerType pointerType) continue;
-                                int pointerAddress = item.AbsoluteAddress(processor.Registers.BasePointer, processor.StackStart);
-                                int valueAddress = processor.Memory.AsSpan().Get<int>(pointerAddress);
-                                if (valueAddress <= 0) continue;
-
-                                if (!pointerType.To.GetSize(new RuntimeInfoProvider()
-                                {
-                                    PointerSize = CodeGeneratorForMain.DefaultCompilerSettings.PointerSize,
-                                }, out int valueSize, out _))
-                                {
-                                    valueSize = 0;
-                                }
-
-                                if (valueAddress == i)
-                                {
-                                    t.PadTo(13);
-                                    if (valueSize <= 1) t.Write(' ');
-                                    else t.Write('┌');
-                                    WriteType(ref t, pointerType.To);
-                                    t.Write(' ');
-                                    if (item.Kind == StackElementKind.Internal)
-                                    {
-                                        t.Write(item.Identifier, AnsiColor.BrightBlack);
-                                    }
-                                    else
-                                    {
-                                        t.Write(item.Identifier);
-                                    }
-                                    switch (pointerType.To.FinalValue)
-                                    {
-                                        case BuiltinType v:
-                                            switch (v.Type)
-                                            {
-                                                case BasicType.U8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<byte>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<sbyte>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.U16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ushort>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<short>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.U32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<uint>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<int>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.U64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ulong>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.I64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<long>(i).ToString(), AnsiColor.BrightBlue); break;
-                                                case BasicType.F32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<float>(i).ToString(), AnsiColor.BrightBlue); break;
-                                            }
-                                            break;
-                                    }
-                                    break;
-                                }
-                                else if (i > valueAddress && i < valueAddress + valueSize - 1)
-                                {
-                                    t.PadTo(13);
-                                    t.Write('│');
-                                    break;
-                                }
-                                else if (i > valueAddress && i == valueAddress + valueSize - 1)
-                                {
-                                    t.PadTo(13);
-                                    t.Write('└');
-                                    break;
-                                }
-                            }
-
-                        }
-                    }, ElementSize.Auto())
-                    .WithBorders("Heap"),
-                    new Panel((in AnsiBufferSlice buffer) =>
-                    {
-                        buffer.Clear();
-
-                        CollectedScopeInfo stackDebugInfo;
-                        if (!processor.DebugInformation.IsEmpty)
-                        { stackDebugInfo = processor.DebugInformation.GetAllScopeInformation(processor.Memory, processor.Registers.BasePointer, processor.Registers.CodePointer); }
-                        else
-                        { stackDebugInfo = CollectedScopeInfo.Empty; }
-
-                        ReadOnlySpan<CallTraceItem> callTrace = DebugUtils.TraceStack(processor.Memory, processor.Registers.BasePointer, processor.DebugInformation.IsEmpty ? null : processor.DebugInformation.StackOffsets);
-
-                        int position = callTrace.Length - 1;
-                        int begin = Math.Max(0, position - (buffer.Height / 2));
-                        int end = Math.Min(callTrace.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
-                        for (int i = begin; i < end; i++)
-                        {
-                            BufferWriter t = buffer.Text(0, i - begin);
-                            CallTraceItem frame = callTrace[i];
-                            FunctionInformation function = processor.DebugInformation.GetFunctionInformation(frame.InstructionPointer);
-                            if (!function.IsValid)
-                            {
-                                t.Write(frame.InstructionPointer.ToString());
-                                continue;
-                            }
-
-                            if (function.Function is ICompiledFunctionDefinition compiledFunction)
-                            {
-                                t.Write(function.Function.Identifier.Content);
-                                t.Write('(');
-                                for (int j = 0; j < compiledFunction.Parameters.Count; j++)
-                                {
-                                    if (j > 0) t.Write(", ");
-                                    for (int k = 0; k < compiledFunction.Parameters[j].Modifiers.Length; k++)
-                                    {
-                                        t.Write(compiledFunction.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
-                                        t.Write(' ');
-                                    }
-                                    WriteType(ref t, GeneralType.InsertTypeParameters(compiledFunction.ParameterTypes[j], function.TypeArguments) ?? compiledFunction.ParameterTypes[j]);
-                                    t.Write(' ');
-                                    t.Write(compiledFunction.Parameters[j].Identifier.Content);
-                                }
-                                t.Write(')');
-                            }
-                            else if (function.Function is not null)
-                            {
-                                t.Write(function.Function.Identifier.Content);
-                                t.Write('(');
-                                for (int j = 0; j < function.Function.Parameters.Count; j++)
-                                {
-                                    if (j > 0) t.Write(", ");
-                                    for (int k = 0; k < function.Function.Parameters[j].Modifiers.Length; k++)
-                                    {
-                                        t.Write(function.Function.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
-                                        t.Write(' ');
-                                    }
-                                    t.Write(function.Function.Parameters[j].Type.ToString(function.TypeArguments), AnsiColor.Green);
-                                    t.Write(' ');
-                                    t.Write(function.Function.Parameters[j].Identifier.Content);
-                                }
-                                t.Write(')');
-                            }
-                            else
-                            {
-                                t.Write(function.Function?.GetType().Name ?? "?");
-                            }
-                        }
-                    }, ElementSize.Auto())
-                    .WithBorders("Call Stack"),
+                    CreateStackElement().WithBorders("Stack"),
+                    CreateHeapElement().WithBorders("Heap"),
+                    CreateStackTraceElement().WithBorders("Call Stack"),
                 }),
             }),
         });

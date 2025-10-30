@@ -98,6 +98,7 @@ PrintLine("hello, world");
 ### Core Library
 
 - [System.Collections.Immutable](https://www.nuget.org/packages/System.Collections.Immutable)
+
 > [!NOTE]
 > With .NET 9 this is already installed.
 
@@ -115,9 +116,11 @@ PrintLine("hello, world");
 
 - Import the `/Unity/package.json` to the Unity project.
 - Make sure to make a symlink to the Sources directory. Run this inside the `/Unity` directory:
+
 ```sh
 ln -s ../Source Runtime
 ```
+
 > [!NOTE]
 > If you are on Windows, move and rename the `/Source` directory to `/Unity/Runtime`.
 

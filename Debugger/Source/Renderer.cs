@@ -29,6 +29,8 @@ class Renderer
 
         root.Render(new AnsiBufferSlice(Buffer, Buffer.Width, Buffer.Height, 0, 0));
 
+        if (Console.IsOutputRedirected) return;
+
         Console.Write("\e[H");
         int currentForeground = 0;
         int currentBackground = 0;

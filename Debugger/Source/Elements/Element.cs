@@ -31,7 +31,7 @@ readonly struct ElementSize
 
 abstract class Element
 {
-    public readonly ElementSize Size;
+    public ElementSize Size;
     public bool Visible;
 
     [DebuggerStepThrough]
@@ -42,9 +42,6 @@ abstract class Element
     }
 
     public abstract void Render(in AnsiBufferSlice buffer);
-
-    [DebuggerStepThrough]
-    public Borders WithBorders(string? label) => new(this, label, Size);
 }
 
 static class ElementExtensions
@@ -53,6 +50,16 @@ static class ElementExtensions
     public static T Invisible<T>(this T e) where T : Element
     {
         e.Visible = false;
+        return e;
+    }
+
+    [DebuggerStepThrough]
+    public static Borders WithBorders(this Element e, string? label) => new(e, label, e.Size);
+
+    [DebuggerStepThrough]
+    public static T WithSize<T>(this T e, ElementSize size) where T : Element
+    {
+        e.Size = size;
         return e;
     }
 }

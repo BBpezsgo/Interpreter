@@ -63,27 +63,27 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
 
     #region PrecompileVariables2
-    int PrecompileVariables(CompiledBlock block, bool ignoreRedefinition)
-    { return PrecompileVariables(block.Statements, ignoreRedefinition); }
-    int PrecompileVariables(IEnumerable<CompiledStatement>? statements, bool ignoreRedefinition)
+    int PrecompileVariables(CompiledBlock block, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
+    { return PrecompileVariables(block.Statements, ignoreRedefinition, debugInfo); }
+    int PrecompileVariables(IEnumerable<CompiledStatement>? statements, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
     {
         if (statements == null) return 0;
 
         int result = 0;
         foreach (CompiledStatement statement in statements)
-        { result += PrecompileVariables(statement, ignoreRedefinition); }
+        { result += PrecompileVariables(statement, ignoreRedefinition, debugInfo); }
         return result;
     }
-    int PrecompileVariables(CompiledStatement statement, bool ignoreRedefinition)
+    int PrecompileVariables(CompiledStatement statement, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
     {
         if (statement is not CompiledVariableDeclaration instruction)
         { return 0; }
 
-        return PrecompileVariable(instruction, ignoreRedefinition);
+        return PrecompileVariable(instruction, ignoreRedefinition, debugInfo);
     }
-    int PrecompileVariable(CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition)
-        => PrecompileVariable(CompiledVariables, variableDeclaration, ignoreRedefinition);
-    int PrecompileVariable(Stack<BrainfuckVariable> variables, CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition, GeneralType? type = null)
+    int PrecompileVariable(CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
+        => PrecompileVariable(CompiledVariables, variableDeclaration, ignoreRedefinition, null, debugInfo);
+    int PrecompileVariable(Stack<BrainfuckVariable> variables, CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition, GeneralType? type = null, List<Runtime.StackElementInformation>? debugInfo = null)
     {
         //if (variables.Any(other =>
         //        other.Identifier == variableDeclaration.Identifier &&
@@ -156,6 +156,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         {
                             IsInitialized = true
                         });
+                        debugInfo?.Add(new()
+                        {
+                            Identifier = variableDeclaration.Identifier,
+                            Address = address2,
+                            Size = size,
+                            Kind = Runtime.StackElementKind.Variable,
+                            Type = variableDeclaration.Type,
+                        });
 
                         for (int i = 0; i < literal.Value.Length; i++)
                         { Code.ARRAY_SET_CONST(address2, i, new CompiledValue(literal.Value[i])); }
@@ -175,6 +183,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     int address2 = Stack.PushVirtual(size, variableDeclaration);
                     variables.Push(new BrainfuckVariable(address2, false, true, variableDeclaration.Cleanup, size, variableDeclaration));
+                    debugInfo?.Add(new()
+                    {
+                        Identifier = variableDeclaration.Identifier,
+                        Address = address2,
+                        Size = size,
+                        Kind = Runtime.StackElementKind.Variable,
+                        Type = variableDeclaration.Type,
+                    });
                 }
                 return 1;
             }
@@ -195,6 +211,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration);
             variables.Push(new BrainfuckVariable(address, false, true, variableDeclaration.Cleanup, type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration));
+            debugInfo?.Add(new()
+            {
+                Identifier = variableDeclaration.Identifier,
+                Address = address,
+                Size = type.GetSize(this, Diagnostics, variableDeclaration),
+                Kind = Runtime.StackElementKind.Variable,
+                Type = variableDeclaration.Type,
+            });
             return 1;
         }
         else
@@ -213,11 +237,27 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 int address2 = Stack.PushVirtual(size, variableDeclaration);
                 variables.Push(new BrainfuckVariable(address2, false, true, variableDeclaration.Cleanup, size, variableDeclaration));
+                debugInfo?.Add(new()
+                {
+                    Identifier = variableDeclaration.Identifier,
+                    Address = address2,
+                    Size = size,
+                    Kind = Runtime.StackElementKind.Variable,
+                    Type = variableDeclaration.Type,
+                });
                 return 1;
             }
 
             int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration);
             variables.Push(new BrainfuckVariable(address, false, true, variableDeclaration.Cleanup, type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration));
+            debugInfo?.Add(new()
+            {
+                Identifier = variableDeclaration.Identifier,
+                Address = address,
+                Size = type.GetSize(this, Diagnostics, variableDeclaration),
+                Kind = Runtime.StackElementKind.Variable,
+                Type = variableDeclaration.Type,
+            });
             return 1;
         }
     }
@@ -2071,9 +2111,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using ConsoleProgressBar progressBar = new(ConsoleColor.DarkGray, ShowProgress);
 
+        Runtime.ScopeInformation scopeInformation = new()
+        {
+            Location = new Runtime.SourceCodeLocation()
+            {
+                Instructions = (Code.Length, Code.Length),
+                Location = block.Location,
+            },
+            Stack = new List<Runtime.StackElementInformation>(),
+        };
+
         using (DebugBlock(block.Location.Before()))
         {
-            VariableCleanupStack.Push(PrecompileVariables(block, false));
+            VariableCleanupStack.Push(PrecompileVariables(block, false, scopeInformation.Stack));
 
             if (Returns.Count > 0)
             {
@@ -2113,6 +2163,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             CleanupVariables(VariableCleanupStack.Pop());
         }
+
+        scopeInformation.Location.Instructions.End = Code.Length;
+        DebugInfo?.ScopeInformation.Add(scopeInformation);
+
         if (branchDepth != Code.BranchDepth)
         { Diagnostics.Add(Diagnostic.Internal($"Unbalanced branches", block)); }
     }
@@ -2791,6 +2845,33 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
 
+        Runtime.ScopeInformation scopeInformation = new()
+        {
+            Location = new Runtime.SourceCodeLocation()
+            {
+                Instructions = (Code.Length, Code.Length),
+                Location = FunctionBodies[function].Location,
+            },
+            Stack = new List<Runtime.StackElementInformation>(),
+        };
+
+        scopeInformation.Stack.Add(new Runtime.StackElementInformation()
+        {
+            Address = returnVariable.Address,
+            Identifier = returnVariable.Identifier,
+            Kind = Runtime.StackElementKind.Internal,
+            Size = returnVariable.Size,
+            Type = returnVariable.Type,
+        });
+        scopeInformation.Stack.AddRange(compiledParameters.Select(v => new Runtime.StackElementInformation()
+        {
+            Address = v.Address,
+            Identifier = v.Identifier,
+            Kind = Runtime.StackElementKind.Parameter,
+            Size = v.Size,
+            Type = v.Type,
+        }));
+
         ControlFlowBlock? returnBlock = BeginReturnBlock(new Location(function.Block.Brackets.Start.Position, function.Block.File), StatementCompiler.FindControlFlowUsage(FunctionBodies[function]));
 
         GenerateCodeForStatement(FunctionBodies[function]);
@@ -2836,6 +2917,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
             }
         }
+
+        scopeInformation.Location.Instructions.End = Code.Length - 1;
+        DebugInfo?.ScopeInformation.Add(scopeInformation);
 
         PopStackFrame(frame);
 
@@ -2938,6 +3022,33 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CompiledVariables.PushIf(returnVariable);
         CompiledVariables.PushRange(compiledParameters);
 
+        Runtime.ScopeInformation scopeInformation = new()
+        {
+            Location = new Runtime.SourceCodeLocation()
+            {
+                Instructions = (Code.Length, Code.Length),
+                Location = FunctionBodies[function].Location,
+            },
+            Stack = new List<Runtime.StackElementInformation>(),
+        };
+
+        scopeInformation.Stack.Add(new Runtime.StackElementInformation()
+        {
+            Address = returnVariable.Address,
+            Identifier = returnVariable.Identifier,
+            Kind = Runtime.StackElementKind.Internal,
+            Size = returnVariable.Size,
+            Type = returnVariable.Type,
+        });
+        scopeInformation.Stack.AddRange(compiledParameters.Select(v => new Runtime.StackElementInformation()
+        {
+            Address = v.Address,
+            Identifier = v.Identifier,
+            Kind = Runtime.StackElementKind.Parameter,
+            Size = v.Size,
+            Type = v.Type,
+        }));
+
         ControlFlowBlock? returnBlock = BeginReturnBlock(new Location(function.Block.Brackets.Start.Position, function.Block.File), StatementCompiler.FindControlFlowUsage(FunctionBodies[function]));
 
         GenerateCodeForStatement(FunctionBodies[function]);
@@ -2986,6 +3097,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
             }
         }
+
+        scopeInformation.Location.Instructions.End = Code.Length - 1;
+        DebugInfo?.ScopeInformation.Add(scopeInformation);
 
         PopStackFrame(frame);
 

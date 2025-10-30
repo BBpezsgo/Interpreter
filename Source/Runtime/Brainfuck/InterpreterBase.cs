@@ -61,7 +61,7 @@ public abstract class InterpreterBase
 
 public abstract class InterpreterBase<TCode> : InterpreterBase
 {
-    protected ImmutableArray<TCode> Code;
+    public ImmutableArray<TCode> Code;
 
     public bool IsDone => _codePointer >= Code.Length || _codePointer < 0;
 

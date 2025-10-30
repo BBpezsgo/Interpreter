@@ -309,7 +309,7 @@ public static class Entry
                     Console.ResetColor();
                     Console.Clear();
 
-                    TUI.InterpreterRenderer.Run(interpreter);
+                    new InterpreterRenderer(interpreter).Run();
 
                     Console.Clear();
                     Console.ResetColor();
@@ -524,12 +524,8 @@ public static class Entry
 
                 if (arguments.Debug)
                 {
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    { throw new PlatformNotSupportedException($"Console rendering is only supported on Windows"); }
-
-                    throw new NotImplementedException();
-                    // interpreter.RunWithUI(true, -100);
-                    // Console.ReadKey();
+                    new BrainfuckRenderer(interpreter).Run();
+                    Console.ReadKey();
                 }
                 else
                 {

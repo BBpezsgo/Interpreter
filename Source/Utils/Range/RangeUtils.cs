@@ -4,29 +4,29 @@ public static class RangeUtils
 {
     public static bool Overlaps(MutableRange<int> a, MutableRange<int> b)
     {
-        int maxStart = General.Max(a.Start, b.Start);
-        int minEnd = General.Min(a.End, b.End);
+        int maxStart = Math.Max(a.Start, b.Start);
+        int minEnd = Math.Min(a.End, b.End);
         return maxStart <= minEnd;
     }
 
     public static bool Overlaps(MutableRange<SinglePosition> a, MutableRange<SinglePosition> b)
     {
-        SinglePosition maxStart = General.Max(a.Start, b.Start);
-        SinglePosition minEnd = General.Min(a.End, b.End);
+        SinglePosition maxStart = SinglePosition.Max(a.Start, b.Start);
+        SinglePosition minEnd = SinglePosition.Min(a.End, b.End);
         return maxStart <= minEnd;
     }
 
     public static bool Overlaps(Range<int> a, Range<int> b)
     {
-        int maxStart = General.Max(a.Start, b.Start);
-        int minEnd = General.Min(a.End, b.End);
+        int maxStart = Math.Max(a.Start, b.Start);
+        int minEnd = Math.Min(a.End, b.End);
         return maxStart <= minEnd;
     }
 
     public static bool Overlaps(Range<SinglePosition> a, Range<SinglePosition> b)
     {
-        SinglePosition maxStart = General.Max(a.Start, b.Start);
-        SinglePosition minEnd = General.Min(a.End, b.End);
+        SinglePosition maxStart = SinglePosition.Max(a.Start, b.Start);
+        SinglePosition minEnd = SinglePosition.Min(a.End, b.End);
         return maxStart <= minEnd;
     }
 
@@ -43,8 +43,8 @@ public static class RangeUtils
             b = new Range<int>(b.End, b.Start);
         }
 
-        int start = General.Max(a.Start, b.Start);
-        int end = General.Min(a.End, b.End);
+        int start = Math.Max(a.Start, b.Start);
+        int end = Math.Min(a.End, b.End);
 
         if (isBackward)
         { return new Range<int>(end, start); }
@@ -56,7 +56,7 @@ public static class RangeUtils
         => new(Math.Min(a.Start, b), Math.Max(a.End, b));
 
     public static Range<SinglePosition> Union(Range<SinglePosition> a, Range<SinglePosition> b)
-        => new(General.Min(a.Start, b.Start), General.Max(a.End, b.End));
+        => new(SinglePosition.Min(a.Start, b.Start), SinglePosition.Max(a.End, b.End));
 
     public static Range<int> Union(Range<int> a, Range<int> b)
         => new(Math.Min(a.Start, b.Start), Math.Max(a.End, b.End));

@@ -50,12 +50,12 @@ public class FieldDefinition :
         Attributes = other.Attributes;
     }
 
-    public FieldDefinition(Token identifier, TypeInstance type, IEnumerable<Token> modifiers, AttributeUsage[] attributes)
+    public FieldDefinition(Token identifier, TypeInstance type, ImmutableArray<Token> modifiers, ImmutableArray<AttributeUsage> attributes)
     {
         Identifier = identifier;
         Type = type;
-        Modifiers = modifiers.ToImmutableArray();
-        Attributes = attributes.ToImmutableArray();
+        Modifiers = modifiers;
+        Attributes = attributes;
     }
 
     public override string ToString() => $"{(Modifiers.IsEmpty ? string.Empty : $"{string.Join(' ', Modifiers)} ")}{Type} {Identifier}";

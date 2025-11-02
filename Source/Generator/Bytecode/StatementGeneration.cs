@@ -556,7 +556,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall_External(CompiledExternalFunctionCall caller)
     {
-        AddComment($"Call \"{((ISimpleReadable)caller.Declaration).ToReadable()}\" {{");
+        AddComment($"Call \"{caller.Declaration.ToReadable()}\" {{");
 
         if (caller.Function.ReturnValueSize > 0 && caller.SaveValue)
         {
@@ -608,7 +608,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 #if UNITY_BURST
                         IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
                         unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
-                        UnityEngine.Debug.LogWarning($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
+                        //UnityEngine.Debug.LogWarning($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
 #else
                         externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
                         Debug.WriteLine($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
@@ -643,7 +643,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 //{
                 //    ILGenerator.GenerateImplMarshaled(f, out _);
                 //}
-                Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to generate MSIL for function {f.Function}", caller, ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error).ToArray()));
+                Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to generate MSIL for function {f.Function}", caller).WithSuberrors(ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error)));
                 ILGenerator.Diagnostics.Clear();
             }
         }
@@ -726,10 +726,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }))
         {
-            Diagnostics.Add(Diagnostic.Critical(
-                $"Argument types of caller \"{anyCall}\" doesn't match with callee \"{functionType}\"",
-                anyCall,
-                argumentError?.ToError(anyCall)));
+            Diagnostics.Add(Diagnostic.Critical($"Argument types of caller \"{anyCall}\" doesn't match with callee \"{functionType}\"", anyCall).WithSuberrors(argumentError?.ToError(anyCall)));
             return;
         }
 

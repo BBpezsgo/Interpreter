@@ -250,17 +250,17 @@ public class RuntimeException : LanguageExceptionWithoutContext
                 }
                 else
                 {
-                    KeyValuePair<CompiledField, int>[] fields = _fields.ToArray();
-                    for (int i = 0; i < fields.Length; i++)
+                    bool comma = true;
+                    foreach ((CompiledField field, int offset) in _fields)
                     {
-                        if (i > 0) result.Append(", ");
-                        (CompiledField field, int offset) = fields[i];
+                        if (comma) comma = false;
+                        else result.Append(", ");
                         result.Append(field.Identifier.Content);
                         result.Append(": ");
                         Range<int> fieldRange = new(range.Start + offset, range.Start + offset + field.Type.GetSize(runtimeInfoProvider));
                         AppendValue(fieldRange, field.Type, depth + 1);
                     }
-                    if (fields.Length > 0) result.Append(' ');
+                    if (_fields.Count > 0) result.Append(' ');
                 }
                 result.Append('}');
             }

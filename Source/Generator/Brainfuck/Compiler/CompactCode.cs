@@ -154,20 +154,20 @@ public static class CompactCode
         _ => '\0',
     };
 
-    public static OpCodes[] ToOpCode(string c)
+    public static ImmutableArray<OpCodes> ToOpCode(string c)
     {
         OpCodes[] result = new OpCodes[c.Length];
         for (int i = 0; i < c.Length; i++)
         { result[i] = CompactCode.ToOpCode(c[i]); }
-        return result;
+        return result.AsImmutableUnsafe();
     }
 
-    public static char[] FromOpCode(OpCodes[] c)
+    public static ImmutableArray<char> FromOpCode(OpCodes[] c)
     {
         char[] result = new char[c.Length];
         for (int i = 0; i < c.Length; i++)
         { result[i] = CompactCode.FromOpCode(c[i]); }
-        return result;
+        return result.AsImmutableUnsafe();
     }
 
     static readonly ImmutableArray<OpCodesCompact> Duplicatable = ImmutableArray.Create(
@@ -209,7 +209,7 @@ public static class CompactCode
         return true;
     }
 
-    public static CompactCodeSegment[] Generate(ReadOnlySpan<char> code, bool showProgress, DebugInformation? debugInfo)
+    public static ImmutableArray<CompactCodeSegment> Generate(ReadOnlySpan<char> code, bool showProgress, DebugInformation? debugInfo)
     {
         using ConsoleProgressLabel progressLabel = new("Compacting code ...", ConsoleColor.DarkGray, showProgress);
         using ConsoleProgressBar progress = new(ConsoleColor.DarkGray, showProgress);
@@ -249,6 +249,6 @@ public static class CompactCode
             result.Add(new CompactCodeSegment(c));
         }
 
-        return result.ToArray();
+        return result.ToImmutableArray();
     }
 }

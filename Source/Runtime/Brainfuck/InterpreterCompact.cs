@@ -5,7 +5,7 @@ public class InterpreterCompact : InterpreterBase<CompactCodeSegment>
     public InterpreterCompact(OutputCallback? onOutput = null, InputCallback? onInput = null)
         : base(onOutput, onInput) { }
 
-    protected override CompactCodeSegment[] ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInformation)
+    protected override ImmutableArray<CompactCodeSegment> ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInformation)
     {
         code = BrainfuckCode.RemoveNoncodes(code, showProgress, debugInformation);
         return CompactCode.Generate(code, showProgress, debugInformation);

@@ -164,14 +164,15 @@ public sealed class Parser
         }
 
         return new ParserResult(
-            Functions,
-            Operators,
-            Structs.Values,
-            Usings,
-            AliasDefinitions,
-            TopLevelStatements,
+            Functions.ToImmutableArray(),
+            Operators.ToImmutableArray(),
+            Structs.Values.ToImmutableArray(),
+            Usings.ToImmutableArray(),
+            AliasDefinitions.ToImmutableArray(),
+            TopLevelStatements.ToImmutableArray(),
             OriginalTokens,
-            Tokens);
+            Tokens.ToImmutableArray()
+        );
     }
 
     Statement ParseStatementInternal()
@@ -238,7 +239,7 @@ public sealed class Parser
         if (!ExpectOperator(";"))
         { throw new SyntaxException($"Please put a \";\" here (after \"{DeclarationKeywords.Using}\")", keyword.Position.After(), File); }
 
-        usingDefinition = new UsingDefinition(keyword, tokens, File);
+        usingDefinition = new UsingDefinition(keyword, tokens.ToImmutableArray(), File);
 
         return true;
     }
@@ -268,7 +269,7 @@ public sealed class Parser
         { TopLevelStatements.Add(statement); }
         else
         {
-            Diagnostics.Add(Diagnostic.Error($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File, diagnostics.Compile().ToArray()));
+            Diagnostics.Add(Diagnostic.Error($"Expected something but not \"{CurrentToken}\"", CurrentToken!, File).WithSuberrors(diagnostics.Compile()));
             return false;
         }
 
@@ -280,9 +281,9 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         function = null;
 
-        AttributeUsage[] attributes = ExpectAttributes();
+        ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
         {
@@ -357,9 +358,9 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         aliasDefinition = null;
 
-        AttributeUsage[] attributes = ExpectAttributes();
+        ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(DeclarationKeywords.Alias, out Token? keyword))
         {
@@ -434,7 +435,7 @@ public sealed class Parser
             { expectParameter = true; }
         }
 
-        templateInfo = new(keyword, new TokenPair(startBracket, endBracket), parameters);
+        templateInfo = new(keyword, new TokenPair(startBracket, endBracket), parameters.ToImmutableArray());
 
         return true;
     }
@@ -444,11 +445,11 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         function = null;
 
-        AttributeUsage[] attributes = ExpectAttributes();
+        ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
         ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? possibleType, out _))
         {
@@ -504,7 +505,7 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         function = null;
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(out Token? possibleNameT))
         {
@@ -559,7 +560,7 @@ public sealed class Parser
         int parseStart = CurrentTokenIndex;
         function = null;
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.None, out TypeInstance? type))
         {
@@ -602,11 +603,11 @@ public sealed class Parser
     {
         int startTokenIndex = CurrentTokenIndex;
 
-        AttributeUsage[] attributes = ExpectAttributes();
+        ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
         ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(DeclarationKeywords.Struct, out Token? keyword))
         {
@@ -667,7 +668,7 @@ public sealed class Parser
             }
             else
             {
-                Diagnostics.Add(Diagnostic.Critical("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken!.Position.After(), File, diagnostics.Compile().ToArray()));
+                Diagnostics.Add(Diagnostic.Critical("Expected field definition or \"}\"", CurrentToken?.Position ?? PreviousToken!.Position.After(), File).WithSuberrors(diagnostics.Compile()));
                 return false;
             }
 
@@ -686,11 +687,11 @@ public sealed class Parser
             bracketEnd,
             attributes,
             modifiers,
-            fields,
-            methods,
-            generalMethods,
-            operators,
-            constructors,
+            fields.ToImmutableArray(),
+            methods.ToImmutableArray(),
+            generalMethods.ToImmutableArray(),
+            operators.ToImmutableArray(),
+            constructors.ToImmutableArray(),
             File)
         {
             Template = templateInfo,
@@ -720,7 +721,7 @@ public sealed class Parser
         Token? bracketEnd;
         while (!ExpectOperator(")", out bracketEnd) || expectParameter)
         {
-            Token[] parameterModifiers = ExpectModifiers();
+            ImmutableArray<Token> parameterModifiers = ExpectModifiers();
             CheckParameterModifiers(parameterModifiers, parameters.Count, allowedParameterModifiers);
 
             if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? parameterType))
@@ -763,8 +764,7 @@ public sealed class Parser
                 return false;
             }
 
-            ParameterDefinition parameterDefinition = new(parameterModifiers, parameterType, parameterIdentifier, defaultValue);
-            parameters.Add(parameterDefinition);
+            parameters.Add(new ParameterDefinition(parameterModifiers, parameterType, parameterIdentifier, defaultValue));
 
             if (ExpectOperator(")", out bracketEnd))
             { break; }
@@ -779,7 +779,7 @@ public sealed class Parser
             { expectParameter = true; }
         }
 
-        parameterDefinitions = new ParameterDefinitionCollection(parameters, new TokenPair(bracketStart, bracketEnd));
+        parameterDefinitions = new ParameterDefinitionCollection(parameters.ToImmutableArray(), new TokenPair(bracketStart, bracketEnd));
         return true;
     }
 
@@ -838,7 +838,7 @@ public sealed class Parser
             return false;
         }
 
-        List<StatementWithValue> values = new();
+        ImmutableArray<StatementWithValue>.Builder? values = null;
 
         Token? bracketEnd;
 
@@ -847,6 +847,7 @@ public sealed class Parser
         {
             if (ExpectExpression(out StatementWithValue? v))
             {
+                values ??= ImmutableArray.CreateBuilder<StatementWithValue>();
                 values.Add(v);
 
                 if (!ExpectOperator(","))
@@ -867,7 +868,7 @@ public sealed class Parser
             if (endlessSafe >= 69420) { throw new EndlessLoopException(); }
         }
 
-        listValue = new LiteralList(values, new TokenPair(bracketStart, bracketEnd), File);
+        listValue = new LiteralList(values?.DrainToImmutable() ?? ImmutableArray<StatementWithValue>.Empty, new TokenPair(bracketStart, bracketEnd), File);
         return true;
     }
 
@@ -1046,7 +1047,7 @@ public sealed class Parser
             if (ExpectOperator("(", out Token? bracketStart2))
             {
                 bool expectParameter = false;
-                List<StatementWithValue> parameters = new();
+                ImmutableArray<StatementWithValue>.Builder parameters = ImmutableArray.CreateBuilder<StatementWithValue>();
 
                 int endlessSafe = 0;
                 Token? bracketEnd2;
@@ -1070,7 +1071,7 @@ public sealed class Parser
                     { throw new EndlessLoopException(); }
                 }
 
-                ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, parameters, new TokenPair(bracketStart2, bracketEnd2), File);
+                ConstructorCall newStructStatement = new(keywordNew, instanceTypeName, parameters.DrainToImmutable(), new TokenPair(bracketStart2, bracketEnd2), File);
 
                 statementWithValue = newStructStatement;
             }
@@ -1255,7 +1256,7 @@ public sealed class Parser
             return false;
         }
 
-        List<Statement> statements = new();
+        ImmutableArray<Statement>.Builder statements = ImmutableArray.CreateBuilder<Statement>();
 
         int endlessSafe = 0;
         Token? bracketEnd;
@@ -1276,7 +1277,7 @@ public sealed class Parser
             if (endlessSafe > 500) throw new EndlessLoopException();
         }
 
-        block = new Block(statements, new TokenPair(bracketStart, bracketEnd), File);
+        block = new Block(statements.DrainToImmutable(), new TokenPair(bracketStart, bracketEnd), File);
 
         if (consumeSemicolon && ExpectOperator(";", out Token? semicolon))
         { block.Semicolon = semicolon; }
@@ -1289,11 +1290,9 @@ public sealed class Parser
         variableDeclaration = null;
         int startTokenIndex = CurrentTokenIndex;
 
-        AttributeUsage[] attributes = ExpectAttributes();
+        ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
-        List<Token> modifiers = new();
-        while (ExpectIdentifier(out Token? modifier, VariableModifiers))
-        { modifiers.Add(modifier); }
+        ImmutableArray<Token> modifiers = ExpectModifiers(VariableModifiers);
 
         TypeInstance? possibleType;
         if (ExpectIdentifier(StatementKeywords.Var, out Token? implicitTypeKeyword))
@@ -1406,8 +1405,8 @@ public sealed class Parser
 
         if (!ExpectIfSegmentStatement(StatementKeywords.If, BaseBranch.IfPart.If, true, out BaseBranch? ifStatement)) return false;
 
-        List<BaseBranch> branches = new()
-        { ifStatement };
+        ImmutableArray<BaseBranch>.Builder branches = ImmutableArray.CreateBuilder<BaseBranch>();
+        branches.Add(ifStatement);
 
         int endlessSafe = 0;
         while (true)
@@ -1425,7 +1424,7 @@ public sealed class Parser
             branches.Add(elseStatement);
         }
 
-        ifContainer = new IfContainer(branches, File);
+        ifContainer = new IfContainer(branches.DrainToImmutable(), File);
         return true;
     }
 
@@ -1798,8 +1797,8 @@ public sealed class Parser
         { CurrentTokenIndex = startTokenIndex; return false; }
 
         bool expectParameter = false;
-        List<StatementWithValue> parameters = new();
-        List<Token> commas = new();
+        ImmutableArray<StatementWithValue>.Builder parameters = ImmutableArray.CreateBuilder<StatementWithValue>();
+        ImmutableArray<Token>.Builder commas = ImmutableArray.CreateBuilder<Token>();
 
         int endlessSafe = 0;
         Token? bracketEnd;
@@ -1834,7 +1833,7 @@ public sealed class Parser
             { throw new EndlessLoopException(); }
         }
 
-        anyCall = new AnyCall(prevStatement, parameters, commas, new TokenPair(bracketStart, bracketEnd), File);
+        anyCall = new AnyCall(prevStatement, parameters.DrainToImmutable(), commas.DrainToImmutable(), new TokenPair(bracketStart, bracketEnd), File);
         return true;
     }
 
@@ -1853,7 +1852,7 @@ public sealed class Parser
 
         possibleFunctionName.AnalyzedType = TokenAnalyzedType.Statement;
 
-        List<StatementWithValue> parameters = new();
+        ImmutableArray<StatementWithValue>.Builder? parameters = null;
 
         int endlessSafe = 16;
         while (true)
@@ -1862,16 +1861,17 @@ public sealed class Parser
 
             if (!ExpectExpression(out StatementWithValue? parameter)) break;
 
+            parameters ??= ImmutableArray.CreateBuilder<StatementWithValue>();
             parameters.Add(parameter);
         }
 
-        keywordCall = new(possibleFunctionName, parameters, File);
+        keywordCall = new(possibleFunctionName, parameters?.DrainToImmutable() ?? ImmutableArray<StatementWithValue>.Empty, File);
 
         if (keywordCall.Arguments.Length < minParameterCount)
-        { Diagnostics.Add(Diagnostic.Error($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
+        { Diagnostics.Add(Diagnostic.Error($"This keyword-call (\"{possibleFunctionName}\") requires minimum {minParameterCount} parameters but you passed {parameters?.Count ?? 0}", keywordCall, File)); }
 
         if (keywordCall.Arguments.Length > maxParameterCount)
-        { Diagnostics.Add(Diagnostic.Error($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters.Count}", keywordCall, File)); }
+        { Diagnostics.Add(Diagnostic.Error($"This keyword-call (\"{possibleFunctionName}\") requires maximum {maxParameterCount} parameters but you passed {parameters?.Count ?? 0}", keywordCall, File)); }
 
         return true;
     }
@@ -1891,7 +1891,7 @@ public sealed class Parser
 
         attributeT.AnalyzedType = TokenAnalyzedType.Attribute;
 
-        List<Literal> parameters = new();
+        List<Literal>? parameters = null;
         if (ExpectOperator("(", out Token? bracketParametersStart))
         {
             int endlessSafe = 50;
@@ -1902,6 +1902,7 @@ public sealed class Parser
                 { throw new SyntaxException("Expected parameter", bracketParametersStart, File); }
                 ExpectOperator(",");
 
+                parameters ??= new();
                 parameters.Add(param);
 
                 endlessSafe--;
@@ -1913,15 +1914,18 @@ public sealed class Parser
         if (!ExpectOperator("]"))
         { throw new SyntaxException("Unbalanced ]", bracketStart, File); }
 
-        attribute = new AttributeUsage(attributeT, parameters, File);
+        attribute = new AttributeUsage(attributeT, parameters?.ToImmutableArray() ?? ImmutableArray<Literal>.Empty, File);
         return true;
     }
-    AttributeUsage[] ExpectAttributes()
+    ImmutableArray<AttributeUsage> ExpectAttributes()
     {
-        List<AttributeUsage> attributes = new();
+        ImmutableArray<AttributeUsage>.Builder? attributes = null;
         while (ExpectAttribute(out AttributeUsage? attr))
-        { attributes.Add(attr); }
-        return attributes.ToArray();
+        {
+            attributes ??= ImmutableArray.CreateBuilder<AttributeUsage>();
+            attributes.Add(attr);
+        }
+        return attributes?.DrainToImmutable() ?? ImmutableArray<AttributeUsage>.Empty;
     }
 
     bool ExpectField([NotNullWhen(true)] out FieldDefinition? field, OrderedDiagnosticCollection diagnostic)
@@ -1930,9 +1934,9 @@ public sealed class Parser
 
         int startTokenIndex = CurrentTokenIndex;
 
-        AttributeUsage[] attributes = ExpectAttributes();
+        ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
-        Token[] modifiers = ExpectModifiers();
+        ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? possibleType))
         {
@@ -1965,15 +1969,18 @@ public sealed class Parser
 
     #region Basic parsing
 
-    Token[] ExpectModifiers()
+    ImmutableArray<Token> ExpectModifiers() => ExpectModifiers(AllModifiers);
+
+    ImmutableArray<Token> ExpectModifiers(ImmutableArray<string> modifiers)
     {
-        List<Token> result = new();
+        ImmutableArray<Token>.Builder? result = null;
         int endlessSafe = 16;
 
         while (true)
         {
-            if (ExpectIdentifier(out Token? modifier, AllModifiers))
+            if (ExpectIdentifier(out Token? modifier, modifiers))
             {
+                result ??= ImmutableArray.CreateBuilder<Token>();
                 modifier.AnalyzedType = TokenAnalyzedType.Keyword;
                 result.Add(modifier);
             }
@@ -1984,7 +1991,7 @@ public sealed class Parser
             { throw new EndlessLoopException(); }
         }
 
-        return result.ToArray();
+        return result?.DrainToImmutable() ?? ImmutableArray<Token>.Empty;
     }
 
     void CheckParameterModifiers(IEnumerable<Token> modifiers, int parameterIndex, ImmutableArray<string> validModifiers)
@@ -2195,7 +2202,7 @@ public sealed class Parser
                     { continue; }
                 }
 
-                type = new TypeInstanceSimple(possibleType, File, genericTypes);
+                type = new TypeInstanceSimple(possibleType, File, genericTypes.ToImmutableArray());
                 withGenerics = true;
             }
             else if (!withGenerics && ExpectOperator("("))
@@ -2224,7 +2231,7 @@ public sealed class Parser
                     { continue; }
                 }
 
-                type = new TypeInstanceFunction(type, parameterTypes, File);
+                type = new TypeInstanceFunction(type, parameterTypes.ToImmutableArray(), File);
             }
             else if (ExpectOperator("[", out _))
             {

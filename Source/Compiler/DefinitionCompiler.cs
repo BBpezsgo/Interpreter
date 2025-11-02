@@ -25,7 +25,7 @@ public partial class StatementCompiler
         { GenericParameters.Pop(); }
 
         // Oh no wtf
-        return new CompiledStruct(@struct.Fields.Select(v => new CompiledField(BuiltinType.Any, null!, v)), @struct);
+        return new CompiledStruct(@struct.Fields.Select(v => new CompiledField(BuiltinType.Any, null!, v)).ToImmutableArray(), @struct);
     }
 
     void CompileStructFields(CompiledStruct @struct)
@@ -37,19 +37,19 @@ public partial class StatementCompiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        CompiledField[] compiledFields = new CompiledField[@struct.Fields.Length];
+        ImmutableArray<CompiledField>.Builder compiledFields = ImmutableArray.CreateBuilder<CompiledField>(@struct.Fields.Length);
 
         for (int i = 0; i < @struct.Fields.Length; i++)
         {
             FieldDefinition field = @struct.Fields[i];
 
-            compiledFields[i] = new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field);
+            compiledFields.Add(new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field));
         }
 
         if (@struct.Template is not null)
         { GenericParameters.Pop(); }
 
-        @struct.SetFields(compiledFields);
+        @struct.SetFields(compiledFields.MoveToImmutable());
     }
 
     void CompileFunctionAttributes(FunctionThingDefinition function)
@@ -60,7 +60,6 @@ public partial class StatementCompiler
         {
             type = GeneralType.From(typeInstance = haveType.Type, FindType);
         }
-        GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
 
         foreach (AttributeUsage attribute in function.Attributes)
         {
@@ -135,7 +134,7 @@ public partial class StatementCompiler
                         if (i >= function.Parameters.Count) break;
 
                         Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
-                        GeneralType passedParameterType = parameterTypes[i];
+                        GeneralType passedParameterType = GeneralType.From(function.Parameters.Parameters[i].Type, FindType);
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (definedParameterType.Invoke(passedParameterType))
@@ -270,7 +269,7 @@ public partial class StatementCompiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
+        ImmutableArray<GeneralType> parameterTypes = GeneralType.FromArray(function.Parameters.Parameters, FindType);
 
         CompileFunctionAttributes(function);
 
@@ -329,7 +328,7 @@ public partial class StatementCompiler
         GeneralType type = GeneralType.From(function.Type, FindType);
         function.Type.SetAnalyzedType(type);
 
-        GeneralType[] parameterTypes = GeneralType.FromArray(function.Parameters, FindType).ToArray();
+        ImmutableArray<GeneralType> parameterTypes = GeneralType.FromArray(function.Parameters.Parameters, FindType);
 
         CompileFunctionAttributes(function);
 
@@ -347,7 +346,7 @@ public partial class StatementCompiler
 
         return new CompiledGeneralFunctionDefinition(
             returnType,
-            GeneralType.FromArray(function.Parameters, FindType),
+            GeneralType.FromArray(function.Parameters.Parameters, FindType),
             context,
             function
         );
@@ -369,7 +368,7 @@ public partial class StatementCompiler
 
         CompiledConstructorDefinition result = new(
             type,
-            GeneralType.FromArray(function.Parameters, FindType),
+            GeneralType.FromArray(function.Parameters.Parameters, FindType),
             context,
             function);
 
@@ -464,28 +463,26 @@ public partial class StatementCompiler
                 continue;
             }
 
-            foreach (ParameterDefinition parameter in method.Parameters)
+            foreach (ParameterDefinition parameter in method.Parameters.Parameters)
             {
                 if (parameter.Modifiers.Contains(ModifierKeywords.This))
                 { Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, @struct.File)); }
             }
 
-            List<ParameterDefinition> parameters = method.Parameters.ToList();
-            parameters.Insert(0,
-                new ParameterDefinition(
-                    ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                    TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(@struct.Identifier.Content, method.File, @struct.Template?.Parameters), method.File),
-                    Token.CreateAnonymous(StatementKeywords.This),
-                    null,
-                    method)
-                );
+            IEnumerable<ParameterDefinition> parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
+                ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
+                TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(@struct.Identifier.Content, method.File, @struct.Template?.Parameters), method.File),
+                Token.CreateAnonymous(StatementKeywords.This),
+                null,
+                method
+            ));
 
             FunctionDefinition copy = new(
                 method.Attributes,
                 method.Modifiers,
                 method.Type,
                 method.Identifier,
-                new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
                 method.Template,
                 method.File)
             {
@@ -539,34 +536,34 @@ public partial class StatementCompiler
         CompiledField stateField;
         CompiledField functionField;
 
-        @struct.SetFields(new CompiledField[]
-        {
+        @struct.SetFields(ImmutableArray.Create<CompiledField>(
             stateField = new(
                 new PointerType(BuiltinType.Any),
                 @struct,
                 new FieldDefinition(
                     Token.CreateAnonymous("_state"),
                     null,
-                    Enumerable.Empty<Token>(),
-                    Array.Empty<AttributeUsage>()
+                    ImmutableArray<Token>.Empty,
+                    ImmutableArray<AttributeUsage>.Empty
                 )
             ),
             functionField = new(
                 new FunctionType(
                     BuiltinType.U8,
-                    new GeneralType[] {
+                    ImmutableArray.Create<GeneralType>(
                         new PointerType(BuiltinType.Any),
                         new PointerType(generatorType)
-                    }),
+                    )
+                ),
                 @struct,
                 new FieldDefinition(
                     nextFunction.Identifier,
                     null,
-                    Enumerable.Empty<Token>(),
-                    Array.Empty<AttributeUsage>()
+                    ImmutableArray<Token>.Empty,
+                    ImmutableArray<AttributeUsage>.Empty
                 )
-            ),
-        });
+            )
+        ));
 
         if (!nextFunction.Type.SameAs(BuiltinType.U8))
         {
@@ -595,49 +592,45 @@ public partial class StatementCompiler
 
         CompiledConstructorDefinition constructor = new(
             new StructType(@struct, @struct.File),
-            new GeneralType[]
-            {
+            ImmutableArray.Create<GeneralType>(
                 new PointerType(new StructType(@struct, @struct.File)),
-                new FunctionType(BuiltinType.U8, new GeneralType[]
-                {
+                new FunctionType(BuiltinType.U8, ImmutableArray.Create<GeneralType>(
                     new PointerType(BuiltinType.Any),
-                    new PointerType(generatorType),
-                }),
-                new PointerType(BuiltinType.Any),
-            },
+                    new PointerType(generatorType)
+                )),
+                new PointerType(BuiltinType.Any)
+            ),
             @struct,
             new ConstructorDefinition(
-                new TypeInstanceSimple(@struct.Identifier, @struct.File, new TypeInstance[] { new TypeInstanceSimple(genericParameter, @struct.File) }),
-                Enumerable.Empty<Token>(),
+                new TypeInstanceSimple(@struct.Identifier, @struct.File, ImmutableArray.Create<TypeInstance>(new TypeInstanceSimple(genericParameter, @struct.File))),
+                ImmutableArray<Token>.Empty,
                 new ParameterDefinitionCollection(
-                    new ParameterDefinition[]
-                    {
-                        new(
-                            new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                    ImmutableArray.Create<ParameterDefinition>(
+                        new ParameterDefinition(
+                            ImmutableArray.Create<Token>(Token.CreateAnonymous(ModifierKeywords.This)),
                             new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(@struct.Identifier.Content), @struct.File), Token.CreateAnonymous("*"), @struct.File),
                             Token.CreateAnonymous("this"),
                             null
                         ),
-                        new(
-                            Enumerable.Empty<Token>(),
+                        new ParameterDefinition(
+                            ImmutableArray<Token>.Empty,
                             new TypeInstanceFunction(
                                 new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.U8, TokenType.Identifier), @struct.File),
-                                new TypeInstance[]
-                                {
+                                ImmutableArray.Create<TypeInstance>(
                                     new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File),
                                     new TypeInstancePointer(new TypeInstanceSimple(genericParameter, @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File)
-                                },
+                                ),
                                 @struct.File),
                             Token.CreateAnonymous("func"),
                             null
                         ),
-                        new(
-                            Enumerable.Empty<Token>(),
+                        new ParameterDefinition(
+                            ImmutableArray<Token>.Empty,
                             new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*"), @struct.File),
                             Token.CreateAnonymous("state"),
                             null
-                        ),
-                    },
+                        )
+                    ),
                     TokenPair.CreateAnonymous("(", ")")
                 ),
                 @struct.File
@@ -647,8 +640,7 @@ public partial class StatementCompiler
             })
         {
             Block = new Block(
-                new Statement[]
-                {
+                ImmutableArray.Create<Statement>(
                     new Assignment(
                         Token.CreateAnonymous("="),
                         new Field(
@@ -668,8 +660,8 @@ public partial class StatementCompiler
                         ),
                         new Identifier(Token.CreateAnonymous("func"), @struct.File),
                         @struct.File
-                    ),
-                },
+                    )
+                ),
                 TokenPair.CreateAnonymous("{", "}"),
                 @struct.File
             ),
@@ -788,7 +780,7 @@ public partial class StatementCompiler
 
             foreach (GeneralFunctionDefinition method in compiledStruct.GeneralFunctions)
             {
-                foreach (ParameterDefinition parameter in method.Parameters)
+                foreach (ParameterDefinition parameter in method.Parameters.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     {
@@ -801,19 +793,18 @@ public partial class StatementCompiler
 
                 if (method.Identifier.Content == BuiltinFunctionIdentifiers.Destructor)
                 {
-                    List<ParameterDefinition> parameters = method.Parameters.ToList();
-                    parameters.Insert(0, new ParameterDefinition(
+                    IEnumerable<ParameterDefinition> parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
                         null,
-                        method)
-                    );
+                        method
+                    ));
 
                     GeneralFunctionDefinition copy = new(
                         method.Identifier,
                         method.Modifiers,
-                        new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                        new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
                         method.File)
                     {
                         Context = method.Context,
@@ -824,19 +815,18 @@ public partial class StatementCompiler
 
                     CompiledGeneralFunctionDefinition methodWithRef = CompileGeneralFunctionDefinition(copy, returnType, compiledStruct);
 
-                    parameters = method.Parameters.ToList();
-                    parameters.Insert(0, new ParameterDefinition(
+                    parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                         Token.CreateAnonymous(StatementKeywords.This),
                         null,
-                        method)
-                    );
+                        method
+                    ));
 
                     copy = new GeneralFunctionDefinition(
                         method.Identifier,
                         method.Modifiers,
-                        new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                        new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
                         method.File)
                     {
                         Context = method.Context,
@@ -862,8 +852,6 @@ public partial class StatementCompiler
                 }
                 else
                 {
-                    List<ParameterDefinition> parameters = method.Parameters.ToList();
-
                     CompiledGeneralFunctionDefinition methodWithRef = CompileGeneralFunctionDefinition(method, returnType, compiledStruct);
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
@@ -878,28 +866,26 @@ public partial class StatementCompiler
 
             foreach (FunctionDefinition method in compiledStruct.Functions)
             {
-                foreach (ParameterDefinition parameter in method.Parameters)
+                foreach (ParameterDefinition parameter in method.Parameters.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     { Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File)); }
                 }
 
-                List<ParameterDefinition> parameters = method.Parameters.ToList();
-                parameters.Insert(0,
-                    new ParameterDefinition(
-                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
-                        Token.CreateAnonymous(StatementKeywords.This),
-                        null,
-                        method)
-                    );
+                IEnumerable<ParameterDefinition> parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
+                    ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
+                    TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
+                    Token.CreateAnonymous(StatementKeywords.This),
+                    null,
+                    method
+                ));
 
                 FunctionDefinition copy = new(
                     method.Attributes,
                     method.Modifiers,
                     method.Type,
                     method.Identifier,
-                    new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
+                    new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
                     method.Template,
                     method.File)
                 {
@@ -920,7 +906,7 @@ public partial class StatementCompiler
 
             foreach (ConstructorDefinition constructor in compiledStruct.Constructors)
             {
-                foreach (ParameterDefinition parameter in constructor.Parameters)
+                foreach (ParameterDefinition parameter in constructor.Parameters.Parameters)
                 {
                     if (parameter.Modifiers.Contains(ModifierKeywords.This))
                     {
@@ -929,20 +915,18 @@ public partial class StatementCompiler
                     }
                 }
 
-                List<ParameterDefinition> parameters = constructor.Parameters.ToList();
-                parameters.Insert(0,
-                    new ParameterDefinition(
-                        ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
-                        TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, constructor.File, compiledStruct.Template?.Parameters), constructor.File),
-                        Token.CreateAnonymous(StatementKeywords.This),
-                        null,
-                        constructor)
-                    );
+                IEnumerable<ParameterDefinition> parameters = constructor.Parameters.Parameters.Prepend(new ParameterDefinition(
+                    ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
+                    TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, constructor.File, compiledStruct.Template?.Parameters), constructor.File),
+                    Token.CreateAnonymous(StatementKeywords.This),
+                    null,
+                    constructor
+                ));
 
                 ConstructorDefinition constructorWithThisParameter = new(
                     constructor.Type,
                     constructor.Modifiers,
-                    new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
+                    new ParameterDefinitionCollection(parameters.ToImmutableArray(), constructor.Parameters.Brackets),
                     constructor.File)
                 {
                     Block = constructor.Block,
@@ -1003,7 +987,7 @@ public partial class StatementCompiler
             null,
             Diagnostics,
             PreprocessorVariables,
-            new string[] { "Primitives", "System" },
+            ImmutableArray.Create("Primitives", "System"),
             Settings.SourceProviders,
             Settings.TokenizerSettings
         );
@@ -1016,8 +1000,15 @@ public partial class StatementCompiler
         return CompileInternal(file, res.ParsedFiles);
     }
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _m3 = new("LanguageCore.Compiler");
+#endif
     CompilerResult CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
     {
+#if UNITY
+        using var _1 = _m3.Auto();
+#endif
+
         CompiledFrame dummyFrame = Frames.Push(CompiledFrame.Empty);
 
         CompileDefinitions(file, parsedFiles);
@@ -1038,7 +1029,7 @@ public partial class StatementCompiler
             CompiledAliases.ToImmutableArray(),
             ExternalFunctions,
             CompiledStructs.ToImmutableArray(),
-            TopLevelStatements,
+            TopLevelStatements.ToImmutableArray(),
             file,
             false,
             CompiledTopLevelStatements.ToImmutable(),

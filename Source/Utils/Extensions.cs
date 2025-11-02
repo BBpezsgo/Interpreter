@@ -6,10 +6,10 @@ namespace LanguageCore;
 
 public static class Extensions
 {
-    public static ImmutableArray<TItem> Or<TItem>(this ImmutableArray<TItem> self, TItem value)
+    public static ImmutableArray<TItem> DefaultIfEmpty<TItem>(this ImmutableArray<TItem> self, TItem @default)
     {
         if (self.IsDefaultOrEmpty)
-        { return ImmutableArray.Create(value); }
+        { return ImmutableArray.Create(@default); }
         return self;
     }
 

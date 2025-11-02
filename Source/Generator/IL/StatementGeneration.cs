@@ -2131,8 +2131,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     void EmitFunctionBody(ImmutableArray<CompiledStatement> statements, GeneralType returnType, ILProxy il, ref bool successful)
     {
-        KeyValuePair<CompiledVariableDeclaration, LocalBuilder>[] savedLocals = LocalBuilders.ToArray();
-        Label[] savedLoopLabels = LoopLabels.ToArray();
+        ImmutableArray<KeyValuePair<CompiledVariableDeclaration, LocalBuilder>> savedLocals = LocalBuilders.ToImmutableArray();
+        ImmutableArray<Label> savedLoopLabels = LoopLabels.ToImmutableArray();
 
         LocalBuilders.Clear();
         LoopLabels.Clear();
@@ -2241,7 +2241,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Diagnostics.Add(DiagnosticWithoutContext.Critical(returnTypeError.Message));
             return false;
         }
-        if (!ToType(function.ParameterTypes.ToImmutableArray(), out Type[]? parameterTypes, out PossibleDiagnostic? parameterTypesError))
+        if (!ToType(function.ParameterTypes, out Type[]? parameterTypes, out PossibleDiagnostic? parameterTypesError))
         {
             Diagnostics.Add(DiagnosticWithoutContext.Critical(parameterTypesError.Message));
             return false;
@@ -2352,7 +2352,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         if (!EmitFunction(function.Function, out DynamicMethod? builder)) return false;
         if (!WrapWithMarshaling(builder, out DynamicMethod? marshaledBuilder)) return false;
 
-        for (int i = 0; i < function.Function.Parameters.Count; i++)
+        for (int i = 0; i < function.Function.Parameters.Length; i++)
         {
             if (!CheckMarshalSafety(function.Function.ParameterTypes[i], out PossibleDiagnostic? safetyError1))
             {
@@ -2598,7 +2598,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (!successful && !Diagnostics.HasErrors)
         {
-            Diagnostics.Add(DiagnosticWithoutContext.Critical($"Failed to generate valid MSIL"));
+            Diagnostics.Add(DiagnosticWithoutContext.Internal($"Failed to generate valid MSIL"));
         }
 
         StringBuilder builder = new();

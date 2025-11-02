@@ -8,25 +8,25 @@ public class CompiledStruct : StructDefinition,
     public new ImmutableArray<CompiledField> Fields { get; private set; }
     public List<Reference<TypeInstance>> References { get; }
 
-    public CompiledStruct(IEnumerable<CompiledField> fields, StructDefinition definition) : base(definition)
+    public CompiledStruct(ImmutableArray<CompiledField> fields, StructDefinition definition) : base(definition)
     {
-        Fields = fields.ToImmutableArray();
+        Fields = fields;
         foreach (CompiledField field in fields) field.Context = this;
 
         References = new List<Reference<TypeInstance>>();
     }
 
-    public CompiledStruct(IEnumerable<CompiledField> fields, CompiledStruct other) : base(other)
+    public CompiledStruct(ImmutableArray<CompiledField> fields, CompiledStruct other) : base(other)
     {
-        Fields = fields.ToImmutableArray();
+        Fields = fields;
         foreach (CompiledField field in fields) field.Context = this;
 
         References = new List<Reference<TypeInstance>>(other.References);
     }
 
-    public void SetFields(IEnumerable<CompiledField> fields)
+    public void SetFields(ImmutableArray<CompiledField> fields)
     {
-        Fields = fields.ToImmutableArray();
+        Fields = fields;
         foreach (CompiledField field in fields) field.Context = this;
     }
 

@@ -44,7 +44,7 @@ public partial class Tokenizer
 
     readonly string Text;
 
-    public static TokenizerResult Tokenize(string text, DiagnosticsCollection diagnostics, IEnumerable<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null)
+    public static TokenizerResult Tokenize(string text, DiagnosticsCollection diagnostics, ImmutableHashSet<string>? preprocessorVariables = null, Uri? file = null, TokenizerSettings? settings = null)
         => new Tokenizer(text, settings ?? TokenizerSettings.Default, file, preprocessorVariables, diagnostics)
         .TokenizeInternal();
 
@@ -57,10 +57,10 @@ public partial class Tokenizer
 
         EndToken(Text.Length);
 
-        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters);
+        return new TokenizerResult(NormalizeTokens(Tokens, Settings).ToImmutableArray(), UnicodeCharacters.ToImmutableArray());
     }
 
-    public Tokenizer(string text, TokenizerSettings settings, Uri? file, IEnumerable<string>? preprocessorVariables, DiagnosticsCollection diagnostics)
+    public Tokenizer(string text, TokenizerSettings settings, Uri? file, ImmutableHashSet<string>? preprocessorVariables, DiagnosticsCollection diagnostics)
     {
         Text = text;
 
@@ -76,7 +76,7 @@ public partial class Tokenizer
         SavedUnicode = null;
         File = file;
 
-        PreprocessorVariables = preprocessorVariables is null ? new HashSet<string>() : new HashSet<string>(preprocessorVariables);
+        PreprocessorVariables = preprocessorVariables ?? ImmutableHashSet<string>.Empty;
         PreprocessorConditions = new Stack<PreprocessThing>();
     }
 

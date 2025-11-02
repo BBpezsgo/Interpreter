@@ -1463,10 +1463,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (!GetVariable(ReturnVariableName, statement.Location.File, out BrainfuckVariable? returnVariable, out PossibleDiagnostic? notFoundError))
             {
-                Diagnostics.Add(Diagnostic.Critical(
-                    $"Can't return value for some reason :(",
-                    statement,
-                    notFoundError.ToError(statement)));
+                Diagnostics.Add(Diagnostic.Internal($"Can't return value for some reason :(", statement).WithSuberrors(notFoundError.ToError(statement)));
                 return;
             }
 
@@ -1475,7 +1472,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (Returns.Count == 0)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Can't return for some reason :(", statement));
+            Diagnostics.Add(Diagnostic.Internal($"Can't return for some reason :(", statement));
             return;
         }
 
@@ -2855,14 +2852,17 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Stack = new List<Runtime.StackElementInformation>(),
         };
 
-        scopeInformation.Stack.Add(new Runtime.StackElementInformation()
+        if (returnVariable is not null)
         {
-            Address = returnVariable.Address,
-            Identifier = returnVariable.Identifier,
-            Kind = Runtime.StackElementKind.Internal,
-            Size = returnVariable.Size,
-            Type = returnVariable.Type,
-        });
+            scopeInformation.Stack.Add(new Runtime.StackElementInformation()
+            {
+                Address = returnVariable.Address,
+                Identifier = returnVariable.Identifier,
+                Kind = Runtime.StackElementKind.Internal,
+                Size = returnVariable.Size,
+                Type = returnVariable.Type,
+            });
+        }
         scopeInformation.Stack.AddRange(compiledParameters.Select(v => new Runtime.StackElementInformation()
         {
             Address = v.Address,

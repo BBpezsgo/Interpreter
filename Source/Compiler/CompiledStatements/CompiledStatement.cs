@@ -515,7 +515,7 @@ public class CompiledEvaluatedValue : CompiledStatementWithValue
 
 public class CompiledInstructionLabelDeclaration : CompiledStatement
 {
-    public static readonly FunctionType Type = new(BuiltinType.Void, Enumerable.Empty<GeneralType>());
+    public static readonly FunctionType Type = new(BuiltinType.Void, ImmutableArray<GeneralType>.Empty);
     public required string Identifier { get; init; }
     public HashSet<InstructionLabelAddressGetter> Getters { get; } = new();
 

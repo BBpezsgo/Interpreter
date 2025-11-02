@@ -44,7 +44,7 @@ public partial class StatementCompiler
 
         ExternalFunctions = settings.ExternalFunctions;
         ExternalConstants = settings.ExternalConstants;
-        PreprocessorVariables = settings.PreprocessorVariables ?? Enumerable.Empty<string>();
-        UserDefinedAttributes = (settings.UserDefinedAttributes ?? Enumerable.Empty<UserDefinedAttribute>()).ToImmutableArray();
+        PreprocessorVariables = settings.PreprocessorVariables;
+        UserDefinedAttributes = settings.UserDefinedAttributes.IsDefault ? ImmutableArray<UserDefinedAttribute>.Empty : settings.UserDefinedAttributes;
     }
 }

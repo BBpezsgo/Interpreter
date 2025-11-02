@@ -2,20 +2,20 @@
 
 public static class PreprocessorVariables
 {
-    public static readonly ImmutableArray<string> Normal = ImmutableArray.Create(
+    public static readonly ImmutableHashSet<string> Normal = ImmutableHashSet.Create(
         "BYTECODE"
-        );
+    );
 
-    public static readonly ImmutableArray<string> IL = ImmutableArray.Create(
+    public static readonly ImmutableHashSet<string> IL = ImmutableHashSet.Create(
         "IL"
-        );
+    );
 
-    public static readonly ImmutableArray<string> Interactive = ImmutableArray.Create(
+    public static readonly ImmutableHashSet<string> Interactive = ImmutableHashSet.Create(
         "BYTECODE",
         "INTERACTIVE"
-        );
+    );
 
-    public static readonly ImmutableArray<string> Brainfuck = ImmutableArray.Create(
+    public static readonly ImmutableHashSet<string> Brainfuck = ImmutableHashSet.Create(
         "BRAINFUCK"
-        );
+    );
 }

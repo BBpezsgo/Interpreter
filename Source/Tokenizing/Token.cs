@@ -63,15 +63,6 @@ public class Token :
     public static Token CreateAnonymous(string content, TokenType type, Position position)
         => new(type, content, true, position);
 
-    public static explicit operator Token(string v)
-        => Token.CreateAnonymous(v);
-    public static explicit operator Token(int v)
-        => Token.CreateAnonymous(v.ToString(CultureInfo.InvariantCulture), TokenType.LiteralNumber);
-    public static explicit operator Token(float v)
-        => Token.CreateAnonymous(v.ToString(CultureInfo.InvariantCulture), TokenType.LiteralFloat);
-    public static explicit operator Token(char v)
-        => Token.CreateAnonymous(char.ToString(v), TokenType.LiteralCharacter);
-
     #endregion
 
     public override bool Equals(object? obj) => obj is Token other && Equals(other);

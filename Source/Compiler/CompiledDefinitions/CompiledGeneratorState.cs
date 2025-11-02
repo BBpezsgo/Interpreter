@@ -44,11 +44,11 @@ public class CompiledGeneratorState
             new FieldDefinition(
                 Token.CreateAnonymous(variableName),
                 null!, // FIXME
-                Enumerable.Empty<Token>(),
-                Array.Empty<AttributeUsage>()
+                ImmutableArray<Token>.Empty,
+                ImmutableArray<AttributeUsage>.Empty
             )
         );
-        Struct.SetFields(newFields);
+        Struct.SetFields(newFields.ToImmutableArray());
         return newFields[^1];
     }
 
@@ -57,30 +57,29 @@ public class CompiledGeneratorState
         // FIXME
         Uri file = null!;
         Struct = new CompiledStruct(
-            new CompiledField[]
-            {
+            ImmutableArray.Create<CompiledField>(
                 StateField = new(
                     BuiltinType.I32,
                     null!, // its ok
                     new FieldDefinition(
                         Token.CreateAnonymous("_state"),
                         new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.I32), file),
-                        Enumerable.Empty<Token>(),
-                        Array.Empty<AttributeUsage>()
+                        ImmutableArray<Token>.Empty,
+                        ImmutableArray<AttributeUsage>.Empty
                     )
                 )
-            },
+            ),
             new StructDefinition(
                 Token.Empty,
                 Token.Empty,
                 Token.Empty,
-                Enumerable.Empty<AttributeUsage>(),
-                Enumerable.Empty<Token>(),
-                Enumerable.Empty<FieldDefinition>(),
-                Enumerable.Empty<FunctionDefinition>(),
-                Enumerable.Empty<GeneralFunctionDefinition>(),
-                Enumerable.Empty<FunctionDefinition>(),
-                Enumerable.Empty<ConstructorDefinition>(),
+                ImmutableArray<AttributeUsage>.Empty,
+                ImmutableArray<Token>.Empty,
+                ImmutableArray<FieldDefinition>.Empty,
+                ImmutableArray<FunctionDefinition>.Empty,
+                ImmutableArray<GeneralFunctionDefinition>.Empty,
+                ImmutableArray<FunctionDefinition>.Empty,
+                ImmutableArray<ConstructorDefinition>.Empty,
                 file
             )
         );

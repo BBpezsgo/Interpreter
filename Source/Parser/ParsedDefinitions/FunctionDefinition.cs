@@ -47,8 +47,8 @@ public class FunctionDefinition : FunctionThingDefinition,
     }
 
     public FunctionDefinition(
-        IEnumerable<AttributeUsage> attributes,
-        IEnumerable<Token> modifiers,
+        ImmutableArray<AttributeUsage> attributes,
+        ImmutableArray<Token> modifiers,
         TypeInstance type,
         Token identifier,
         ParameterDefinitionCollection parameters,
@@ -56,7 +56,7 @@ public class FunctionDefinition : FunctionThingDefinition,
         Uri file)
         : base(modifiers, identifier, parameters, templateInfo, file)
     {
-        Attributes = attributes.ToImmutableArray();
+        Attributes = attributes;
         Type = type;
     }
 

@@ -45,13 +45,13 @@ public class StructDefinition :
         Token name,
         Token bracketStart,
         Token bracketEnd,
-        IEnumerable<AttributeUsage> attributes,
-        IEnumerable<Token> modifiers,
-        IEnumerable<FieldDefinition> fields,
-        IEnumerable<FunctionDefinition> methods,
-        IEnumerable<GeneralFunctionDefinition> generalMethods,
-        IEnumerable<FunctionDefinition> operators,
-        IEnumerable<ConstructorDefinition> constructors,
+        ImmutableArray<AttributeUsage> attributes,
+        ImmutableArray<Token> modifiers,
+        ImmutableArray<FieldDefinition> fields,
+        ImmutableArray<FunctionDefinition> methods,
+        ImmutableArray<GeneralFunctionDefinition> generalMethods,
+        ImmutableArray<FunctionDefinition> operators,
+        ImmutableArray<ConstructorDefinition> constructors,
         Uri file)
     {
         foreach (FunctionDefinition method in methods) method.Context = this;
@@ -63,13 +63,13 @@ public class StructDefinition :
         Identifier = name;
         BracketStart = bracketStart;
         BracketEnd = bracketEnd;
-        Fields = fields.ToImmutableArray();
-        Functions = methods.ToImmutableArray();
-        GeneralFunctions = generalMethods.ToImmutableArray();
-        Attributes = attributes.ToImmutableArray();
-        Operators = operators.ToImmutableArray();
-        Constructors = constructors.ToImmutableArray();
-        Modifiers = modifiers.ToImmutableArray();
+        Fields = fields;
+        Functions = methods;
+        GeneralFunctions = generalMethods;
+        Attributes = attributes;
+        Operators = operators;
+        Constructors = constructors;
+        Modifiers = modifiers;
 
         File = file;
     }

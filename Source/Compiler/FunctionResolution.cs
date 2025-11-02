@@ -99,12 +99,12 @@ public partial class StatementCompiler
         public void ReplaceArgumentsIfNeeded(ref ImmutableArray<StatementWithValue> arguments)
         {
             if (Arguments.IsDefault) return;
-            StatementWithValue[] newArguments = new StatementWithValue[arguments.Length];
+            ImmutableArray<StatementWithValue>.Builder newArguments = ImmutableArray.CreateBuilder<StatementWithValue>(arguments.Length);
             for (int i = 0; i < arguments.Length; i++)
             {
-                newArguments[i] = Arguments[i] ?? arguments[i];
+                newArguments.Add(Arguments[i] ?? arguments[i]);
             }
-            arguments = newArguments.ToImmutableArray();
+            arguments = newArguments.MoveToImmutable();
         }
 
         public void Deconstruct(
@@ -290,20 +290,20 @@ public partial class StatementCompiler
         readableName = query.ToReadable() ?? readableName;
         if (query.Arguments.HasValue)
         {
-            GeneralType[] argumentTypes = new GeneralType[query.Arguments.Value.Length];
+            ImmutableArray<GeneralType>.Builder argumentTypes = ImmutableArray.CreateBuilder<GeneralType>(query.Arguments.Value.Length);
             for (int i = 0; i < query.Arguments.Value.Length; i++)
             {
                 if (!query.Converter.Invoke(query.Arguments.Value[i], null, null, out GeneralType? converted))
                 {
                     goto bad;
                 }
-                argumentTypes[i] = converted;
+                argumentTypes.Add(converted);
             }
             FunctionQuery<TFunction, TPassedIdentifier, TDefinedIdentifier, GeneralType> typeConvertedQuery = new()
             {
                 AddCompilable = query.AddCompilable,
                 ArgumentCount = query.ArgumentCount,
-                Arguments = argumentTypes.ToImmutableArray(),
+                Arguments = argumentTypes.MoveToImmutable(),
                 Converter = FunctionArgumentConverter,
                 Identifier = query.Identifier,
                 RelevantFile = query.RelevantFile,
@@ -326,7 +326,7 @@ public partial class StatementCompiler
 
             if (best.Errors.Count > 0)
             {
-                error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", best.Errors.ToArray());
+                error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", best.Errors.ToImmutableArray());
                 return false;
             }
 
@@ -354,7 +354,7 @@ public partial class StatementCompiler
 
             if (!best.IsParameterCountMatches)
             {
-                error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", new PossibleDiagnostic($"Wrong number of arguments passed: expected {best.Function.ParameterTypes.Count} but got {query.ArgumentCount}"));
+                error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", new PossibleDiagnostic($"Wrong number of arguments passed: expected {best.Function.ParameterTypes.Length} but got {query.ArgumentCount}"));
                 return false;
             }
 
@@ -434,7 +434,7 @@ public partial class StatementCompiler
         };
 
         int partial = 0;
-        for (int i = 0; i < function.Parameters.Count; i++)
+        for (int i = 0; i < function.Parameters.Length; i++)
         {
             if (function.Parameters[i].DefaultValue is null) partial = i + 1;
             else break;
@@ -484,17 +484,17 @@ public partial class StatementCompiler
         {
             if (query.ArgumentCount.Value < partial)
             {
-                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.ParameterTypes.Count} but passed {query.ArgumentCount.Value}"));
+                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.ParameterTypes.Length} but passed {query.ArgumentCount.Value}"));
                 return result;
             }
 
-            if (query.ArgumentCount.Value > function.ParameterTypes.Count)
+            if (query.ArgumentCount.Value > function.ParameterTypes.Length)
             {
-                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.ParameterTypes.Count} but passed {query.ArgumentCount.Value}"));
+                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.ParameterTypes.Length} but passed {query.ArgumentCount.Value}"));
                 return result;
             }
 
-            result.UsedUpDefaultParameterValues = function.ParameterTypes.Count - query.ArgumentCount.Value;
+            result.UsedUpDefaultParameterValues = function.ParameterTypes.Length - query.ArgumentCount.Value;
         }
 
         result.IsParameterCountMatches = true;
@@ -624,7 +624,7 @@ public partial class StatementCompiler
             }
             else
             {
-                int checkCount = Math.Min(function.ParameterTypes.Count, query.Arguments.Value.Length);
+                int checkCount = Math.Min(function.ParameterTypes.Length, query.Arguments.Value.Length);
 
                 StatementWithValue?[] argumentValues = new StatementWithValue?[checkCount];
 
@@ -683,7 +683,7 @@ public partial class StatementCompiler
             {
                 result.ParameterTypeMatch = TypeMatch.Equals;
 
-                int checkCount = Math.Min(function.ParameterTypes.Count, query.Arguments.Value.Length);
+                int checkCount = Math.Min(function.ParameterTypes.Length, query.Arguments.Value.Length);
                 StatementWithValue?[] arguments = new StatementWithValue?[checkCount];
                 for (int i = 0; i < checkCount; i++)
                 {

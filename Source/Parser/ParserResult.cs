@@ -20,34 +20,34 @@ public readonly struct ParserResult
     public bool IsEmpty { get; private init; }
 
     public static ParserResult Empty => new(
-        Enumerable.Empty<FunctionDefinition>(),
-        Enumerable.Empty<FunctionDefinition>(),
-        Enumerable.Empty<StructDefinition>(),
-        Enumerable.Empty<UsingDefinition>(),
-        Enumerable.Empty<AliasDefinition>(),
-        Enumerable.Empty<Statement>(),
-        Enumerable.Empty<Token>(),
-        Enumerable.Empty<Token>())
+        ImmutableArray<FunctionDefinition>.Empty,
+        ImmutableArray<FunctionDefinition>.Empty,
+        ImmutableArray<StructDefinition>.Empty,
+        ImmutableArray<UsingDefinition>.Empty,
+        ImmutableArray<AliasDefinition>.Empty,
+        ImmutableArray<Statement>.Empty,
+        ImmutableArray<Token>.Empty,
+        ImmutableArray<Token>.Empty)
     { IsEmpty = true };
 
     public ParserResult(
-        IEnumerable<FunctionDefinition> functions,
-        IEnumerable<FunctionDefinition> operators,
-        IEnumerable<StructDefinition> structs,
-        IEnumerable<UsingDefinition> usings,
-        IEnumerable<AliasDefinition> aliasDefinitions,
-        IEnumerable<Statement> topLevelStatements,
-        IEnumerable<Token> originalTokens,
-        IEnumerable<Token> tokens)
+        ImmutableArray<FunctionDefinition> functions,
+        ImmutableArray<FunctionDefinition> operators,
+        ImmutableArray<StructDefinition> structs,
+        ImmutableArray<UsingDefinition> usings,
+        ImmutableArray<AliasDefinition> aliasDefinitions,
+        ImmutableArray<Statement> topLevelStatements,
+        ImmutableArray<Token> originalTokens,
+        ImmutableArray<Token> tokens)
     {
-        Functions = functions.ToImmutableArray();
-        Operators = operators.ToImmutableArray();
-        Structs = structs.ToImmutableArray();
-        AliasDefinitions = aliasDefinitions.ToImmutableArray();
-        Usings = usings.ToImmutableArray();
-        TopLevelStatements = topLevelStatements.ToImmutableArray();
-        OriginalTokens = originalTokens.ToImmutableArray();
-        Tokens = tokens.ToImmutableArray();
+        Functions = functions;
+        Operators = operators;
+        Structs = structs;
+        AliasDefinitions = aliasDefinitions;
+        Usings = usings;
+        TopLevelStatements = topLevelStatements;
+        OriginalTokens = originalTokens;
+        Tokens = tokens;
 
         IsEmpty = false;
     }

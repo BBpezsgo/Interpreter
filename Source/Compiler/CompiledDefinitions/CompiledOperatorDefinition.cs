@@ -22,21 +22,21 @@ public class CompiledOperatorDefinition : FunctionDefinition,
     public List<Reference<StatementWithValue>> References { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
-    IReadOnlyList<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters;
-    IReadOnlyList<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
+    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
+    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
 
-    public CompiledOperatorDefinition(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledOperatorDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         Type = type;
-        ParameterTypes = parameterTypes.ToImmutableArray();
+        ParameterTypes = parameterTypes;
         Context = context;
         References = new List<Reference<StatementWithValue>>();
     }
 
-    public CompiledOperatorDefinition(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledOperatorDefinition other) : base(other)
+    public CompiledOperatorDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledOperatorDefinition other) : base(other)
     {
         Type = type;
-        ParameterTypes = parameterTypes.ToImmutableArray();
+        ParameterTypes = parameterTypes;
         Context = other.Context;
         References = new List<Reference<StatementWithValue>>(other.References);
     }
@@ -45,7 +45,7 @@ public class CompiledOperatorDefinition : FunctionDefinition,
 
     public CompiledOperatorDefinition InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {
-        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        ImmutableArray<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
         return new CompiledOperatorDefinition(newType, newParameters, this);
     }

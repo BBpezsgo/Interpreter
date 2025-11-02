@@ -79,6 +79,6 @@ public static unsafe class MemoryUtils
 
     #endregion
 
-    public static byte[] ToBytes<T>(this T v) where T : unmanaged => new Span<byte>(&v, sizeof(T)).ToArray();
+    public static byte[] ToBytes<T>(this T v) where T : unmanaged => AsBytes(ref v).ToArray();
     public static Span<byte> AsBytes<T>(ref this T v) where T : unmanaged => new(Unsafe.AsPointer(ref v), sizeof(T));
 }

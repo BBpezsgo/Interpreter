@@ -16,8 +16,8 @@ public class CompiledLambda : CompiledStatementWithValue,
     public Uri File { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
-    IReadOnlyList<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters;
-    IReadOnlyList<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
+    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
+    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
 
     public CompiledLambda(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledBlock block, ParameterDefinitionCollection parameters, Uri file)
     {
@@ -34,5 +34,5 @@ public class CompiledLambda : CompiledStatementWithValue,
     }
 
     public string ToReadable() => Type.ToString();
-    public override string Stringify(int depth = 0) => $"({string.Join(", ", Parameters.Select(v => $"{v.Type} {v.Identifier}"))}) => {Block.Stringify(depth)}";
+    public override string Stringify(int depth = 0) => $"({string.Join(", ", Parameters.Parameters.Select(v => $"{v.Type} {v.Identifier}"))}) => {Block.Stringify(depth)}";
 }

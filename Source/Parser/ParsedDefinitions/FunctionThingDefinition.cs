@@ -46,16 +46,16 @@ public abstract class FunctionThingDefinition :
     }
 
     protected FunctionThingDefinition(
-        IEnumerable<Token> modifiers,
+        ImmutableArray<Token> modifiers,
         Token identifier,
         ParameterDefinitionCollection parameters,
         TemplateInfo? template,
         Uri file)
     {
         parameters.Context = this;
-        foreach (ParameterDefinition parameter in parameters) parameter.Context = this;
+        foreach (ParameterDefinition parameter in parameters.Parameters) parameter.Context = this;
 
-        Modifiers = modifiers.ToImmutableArray();
+        Modifiers = modifiers;
         Identifier = identifier;
         Parameters = parameters;
         Template = template;

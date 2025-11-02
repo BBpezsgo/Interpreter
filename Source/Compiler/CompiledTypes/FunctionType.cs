@@ -16,7 +16,7 @@ public class FunctionType : GeneralType,
     public FunctionType(ICompiledFunctionDefinition function)
     {
         ReturnType = function.Type;
-        Parameters = function.ParameterTypes.ToImmutableArray();
+        Parameters = function.ParameterTypes;
     }
 
     public FunctionType(FunctionType other)
@@ -25,10 +25,10 @@ public class FunctionType : GeneralType,
         Parameters = other.Parameters;
     }
 
-    public FunctionType(GeneralType returnType, IEnumerable<GeneralType> parameters)
+    public FunctionType(GeneralType returnType, ImmutableArray<GeneralType> parameters)
     {
         ReturnType = returnType;
-        Parameters = parameters.ToImmutableArray();
+        Parameters = parameters;
     }
 
     public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)

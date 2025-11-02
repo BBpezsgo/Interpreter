@@ -80,3 +80,9 @@ dotnet_diagnostic.CA1063.severity = none
 
 # CA1069: Enums values should not be duplicated
 dotnet_diagnostic.CA1069.severity = warning
+
+# CA2009: Do not call ToImmutableCollection on an ImmutableCollection value
+dotnet_diagnostic.CA2009.severity = warning
+
+# Default severity for analyzer diagnostics with category 'Reliability'
+dotnet_analyzer_diagnostic.category-Reliability.severity = warning

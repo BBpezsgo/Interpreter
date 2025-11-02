@@ -13,10 +13,10 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
         new Position(Identifier)
         .Union(TypeArguments);
 
-    public TypeInstanceSimple(Token identifier, Uri file, IEnumerable<TypeInstance>? typeArguments = null) : base(file)
+    public TypeInstanceSimple(Token identifier, Uri file, ImmutableArray<TypeInstance>? typeArguments = null) : base(file)
     {
         Identifier = identifier;
-        TypeArguments = typeArguments?.ToImmutableArray();
+        TypeArguments = typeArguments;
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceSimple other && Equals(other);
@@ -52,28 +52,24 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
         };
     }
 
-    public static TypeInstanceSimple CreateAnonymous(string name, Uri file)
-        => new(Token.CreateAnonymous(name), file);
-
-    public static TypeInstanceSimple CreateAnonymous(string name, Uri file, IEnumerable<TypeInstance>? typeArguments)
+    public static TypeInstanceSimple CreateAnonymous(string name, Uri file, ImmutableArray<TypeInstance>? typeArguments = null)
         => new(Token.CreateAnonymous(name), file, typeArguments);
 
-    public static TypeInstanceSimple CreateAnonymous(string name, Uri file, IEnumerable<Token>? typeArguments)
+    public static TypeInstanceSimple CreateAnonymous(string name, Uri file, ImmutableArray<Token>? typeArguments)
     {
         TypeInstance[]? genericTypesConverted;
         if (typeArguments == null)
         { genericTypesConverted = null; }
         else
         {
-            Token[] genericTypesA = typeArguments.ToArray();
-            genericTypesConverted = new TypeInstance[genericTypesA.Length];
-            for (int i = 0; i < genericTypesA.Length; i++)
+            genericTypesConverted = new TypeInstance[typeArguments.Value.Length];
+            for (int i = 0; i < typeArguments.Value.Length; i++)
             {
-                genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(genericTypesA[i].Content, file);
+                genericTypesConverted[i] = TypeInstanceSimple.CreateAnonymous(typeArguments.Value[i].Content, file);
             }
         }
 
-        return new TypeInstanceSimple(Token.CreateAnonymous(name), file, genericTypesConverted);
+        return new TypeInstanceSimple(Token.CreateAnonymous(name), file, genericTypesConverted?.ToImmutableArray());
     }
 
     public override string ToString()

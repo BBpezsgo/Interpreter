@@ -41,7 +41,7 @@ public readonly struct CompilerResult
                 _ => "???",
             });
             res.Append('(');
-            for (int i = 0; i < function.Parameters.Count; i++)
+            for (int i = 0; i < function.Parameters.Length; i++)
             {
                 if (i > 0) res.Append(", ");
                 res.Append(function.ParameterTypes[i].ToString());
@@ -95,44 +95,44 @@ public readonly struct CompilerResult
     }
 
     public static CompilerResult MakeEmpty(Uri file) => new(
-        Enumerable.Empty<ParsedFile>(),
-        Enumerable.Empty<CompiledFunctionDefinition>(),
-        Enumerable.Empty<CompiledGeneralFunctionDefinition>(),
-        Enumerable.Empty<CompiledOperatorDefinition>(),
-        Enumerable.Empty<CompiledConstructorDefinition>(),
-        Enumerable.Empty<CompiledAlias>(),
-        Enumerable.Empty<IExternalFunction>(),
-        Enumerable.Empty<CompiledStruct>(),
-        Enumerable.Empty<(ImmutableArray<Statement>, Uri)>(),
+        ImmutableArray<ParsedFile>.Empty,
+        ImmutableArray<CompiledFunctionDefinition>.Empty,
+        ImmutableArray<CompiledGeneralFunctionDefinition>.Empty,
+        ImmutableArray<CompiledOperatorDefinition>.Empty,
+        ImmutableArray<CompiledConstructorDefinition>.Empty,
+        ImmutableArray<CompiledAlias>.Empty,
+        ImmutableArray<IExternalFunction>.Empty,
+        ImmutableArray<CompiledStruct>.Empty,
+        ImmutableArray<(ImmutableArray<Statement>, Uri)>.Empty,
         file,
         false,
         ImmutableArray<CompiledStatement>.Empty,
         ImmutableArray<CompiledFunction>.Empty);
 
     public CompilerResult(
-        IEnumerable<ParsedFile> tokens,
-        IEnumerable<CompiledFunctionDefinition> functions,
-        IEnumerable<CompiledGeneralFunctionDefinition> generalFunctions,
-        IEnumerable<CompiledOperatorDefinition> operators,
-        IEnumerable<CompiledConstructorDefinition> constructors,
-        IEnumerable<CompiledAlias> aliases,
-        IEnumerable<IExternalFunction> externalFunctions,
-        IEnumerable<CompiledStruct> structs,
-        IEnumerable<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
+        ImmutableArray<ParsedFile> tokens,
+        ImmutableArray<CompiledFunctionDefinition> functions,
+        ImmutableArray<CompiledGeneralFunctionDefinition> generalFunctions,
+        ImmutableArray<CompiledOperatorDefinition> operators,
+        ImmutableArray<CompiledConstructorDefinition> constructors,
+        ImmutableArray<CompiledAlias> aliases,
+        ImmutableArray<IExternalFunction> externalFunctions,
+        ImmutableArray<CompiledStruct> structs,
+        ImmutableArray<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file,
         bool isInteractive,
         ImmutableArray<CompiledStatement> compiledStatements,
         ImmutableArray<CompiledFunction> functions2)
     {
-        RawTokens = tokens.ToImmutableArray();
-        FunctionDefinitions = functions.ToImmutableArray();
-        GeneralFunctionDefinitions = generalFunctions.ToImmutableArray();
-        OperatorDefinitions = operators.ToImmutableArray();
-        ConstructorDefinitions = constructors.ToImmutableArray();
-        Aliases = aliases.ToImmutableArray();
-        ExternalFunctions = externalFunctions.ToImmutableArray();
-        Structs = structs.ToImmutableArray();
-        RawStatements = topLevelStatements.ToImmutableArray();
+        RawTokens = tokens;
+        FunctionDefinitions = functions;
+        GeneralFunctionDefinitions = generalFunctions;
+        OperatorDefinitions = operators;
+        ConstructorDefinitions = constructors;
+        Aliases = aliases;
+        ExternalFunctions = externalFunctions;
+        Structs = structs;
+        RawStatements = topLevelStatements;
         File = file;
         IsInteractive = isInteractive;
         Statements = compiledStatements;

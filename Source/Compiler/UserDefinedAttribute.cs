@@ -11,10 +11,10 @@ public class UserDefinedAttribute
     public CanUseOn CanUseOn { get; }
     public AttributeVerifier? Verifier { get; }
 
-    public UserDefinedAttribute(string name, IEnumerable<LiteralType>? parameters, CanUseOn canUseOn, AttributeVerifier? verifier)
+    public UserDefinedAttribute(string name, ImmutableArray<LiteralType> parameters, CanUseOn canUseOn, AttributeVerifier? verifier)
     {
         Name = name;
-        Parameters = (parameters ?? Enumerable.Empty<LiteralType>()).ToImmutableArray();
+        Parameters = parameters;
         CanUseOn = canUseOn;
         Verifier = verifier;
     }

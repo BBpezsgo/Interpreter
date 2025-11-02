@@ -24,16 +24,19 @@ public readonly struct Position :
         AbsoluteRange = absoluteRange;
     }
 
-    public Position(params IPositioned?[] elements)
+    public Position(params IPositioned?[] elements) : this((IEnumerable<IPositioned?>)elements) { }
+    public Position(IPositioned item1)
     {
-        if (elements.Length == 0) throw new ArgumentException($"Number of elements must be more than zero", nameof(elements));
+        Range = item1.Position.Range;
+        AbsoluteRange = item1.Position.AbsoluteRange;
+    }
+    public Position(IEnumerable<IPositioned?> elements)
+    {
+        Range = UnknownPosition.Range;
+        AbsoluteRange = UnknownPosition.AbsoluteRange;
 
-        Range = Position.UnknownPosition.Range;
-        AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
-
-        for (int i = 0; i < elements.Length; i++)
+        foreach (IPositioned? element in elements)
         {
-            IPositioned? element = elements[i];
             if (element is null) continue;
             if (element is Tokenizing.Token token && token.IsAnonymous) continue;
             Position position = element.Position;
@@ -44,24 +47,14 @@ public readonly struct Position :
 
         Position result = this;
 
-        for (int i = 1; i < elements.Length; i++)
-        { result = result.Union(elements[i]); }
+        foreach (IPositioned? v in elements.Skip(1))
+        {
+            result = result.Union(v);
+        }
 
         Range = result.Range;
         AbsoluteRange = result.AbsoluteRange;
     }
-    public Position(IPositioned item1)
-    {
-        Range = Position.UnknownPosition.Range;
-        AbsoluteRange = Position.UnknownPosition.AbsoluteRange;
-
-        if (item1 is null || (item1 is Tokenizing.Token token && token.IsAnonymous)) return;
-
-        Position position = item1.Position;
-        Range = position.Range;
-        AbsoluteRange = position.AbsoluteRange;
-    }
-    public Position(IEnumerable<IPositioned?> elements) : this(elements.ToArray()) { }
 
     public string ToStringRange()
     {

@@ -33,19 +33,22 @@ public class DiagnosticWithoutContext :
     [DoesNotReturn]
     public void Throw() => throw new LanguageExceptionWithoutContext(Message);
 
+    public static DiagnosticWithoutContext Internal(string message, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, @break);
+
     public static DiagnosticWithoutContext Critical(string message, bool @break = true)
         => new(DiagnosticsLevel.Error, message, @break);
 
     public static DiagnosticWithoutContext Error(string message, bool @break = true)
         => new(DiagnosticsLevel.Error, message, @break);
 
-    public static DiagnosticWithoutContext Warning(string message, bool @break = true)
+    public static DiagnosticWithoutContext Warning(string message, bool @break = false)
         => new(DiagnosticsLevel.Warning, message, @break);
 
-    public static DiagnosticWithoutContext Information(string message, bool @break = true)
+    public static DiagnosticWithoutContext Information(string message, bool @break = false)
         => new(DiagnosticsLevel.Information, message, @break);
 
-    public static DiagnosticWithoutContext Hint(string message, bool @break = true)
+    public static DiagnosticWithoutContext Hint(string message, bool @break = false)
         => new(DiagnosticsLevel.Hint, message, @break);
 
     public DiagnosticWithoutContext Break()

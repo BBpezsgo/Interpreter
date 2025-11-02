@@ -46,14 +46,14 @@ public class SourceCodeManager
 {
     readonly HashSet<Uri> CompiledUris;
     readonly DiagnosticsCollection Diagnostics;
-    readonly IEnumerable<string> PreprocessorVariables;
+    readonly ImmutableHashSet<string> PreprocessorVariables;
     readonly ImmutableArray<ISourceProvider> SourceProviders;
     readonly TokenizerSettings TokenizerSettings;
 
     readonly List<PendingFile> PendingFiles;
     readonly List<ParsedFile> ParsedFiles;
 
-    public SourceCodeManager(DiagnosticsCollection diagnostics, IEnumerable<string> preprocessorVariables, ImmutableArray<ISourceProvider> sourceProviders, TokenizerSettings? tokenizerSettings)
+    public SourceCodeManager(DiagnosticsCollection diagnostics, ImmutableHashSet<string> preprocessorVariables, ImmutableArray<ISourceProvider> sourceProviders, TokenizerSettings? tokenizerSettings)
     {
         CompiledUris = new();
         Diagnostics = diagnostics;
@@ -207,7 +207,7 @@ public class SourceCodeManager
                         if (initiator is not null) initiator.CompiledUri = resolvedUri.ToString();
                         if (res.Stream is null)
                         {
-                            Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position, initiator?.File));
+                            Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position ?? Position.UnknownPosition, initiator?.File));
                             return false;
                         }
                         PendingFiles.Add(new PendingFile(resolvedUri, initiator, res.Stream, initiatorIndex.Next()));
@@ -341,7 +341,7 @@ public class SourceCodeManager
         }
     }
 
-    SourceCodeManagerResult Entry(string? file, IEnumerable<string>? additionalImports)
+    SourceCodeManagerResult Entry(string? file, ImmutableArray<string> additionalImports)
     {
         Uri? resolvedEntry = null;
 
@@ -362,7 +362,7 @@ public class SourceCodeManager
             }
         }
 
-        if (additionalImports is not null)
+        if (!additionalImports.IsDefault)
         {
             foreach (string additionalImport in additionalImports)
             {
@@ -407,8 +407,8 @@ public class SourceCodeManager
     public static SourceCodeManagerResult Collect(
         string? file,
         DiagnosticsCollection diagnostics,
-        IEnumerable<string> preprocessorVariables,
-        IEnumerable<string>? additionalImports,
+        ImmutableHashSet<string> preprocessorVariables,
+        ImmutableArray<string> additionalImports,
         ImmutableArray<ISourceProvider> sourceProviders,
         TokenizerSettings? tokenizerSettings)
     {

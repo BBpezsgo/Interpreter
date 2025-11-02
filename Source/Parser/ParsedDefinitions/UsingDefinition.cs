@@ -31,14 +31,14 @@ public class UsingDefinition :
     }
 
     public Position Position =>
-        new Position(Path.Or(Keyword))
+        new Position(Path.DefaultIfEmpty(Keyword))
         .Union(Keyword);
 
     public Location Location => new(Position, File);
 
-    public UsingDefinition(Token keyword, IEnumerable<Token> path, Uri file)
+    public UsingDefinition(Token keyword, ImmutableArray<Token> path, Uri file)
     {
-        Path = path.ToImmutableArray();
+        Path = path;
         Keyword = keyword;
         File = file;
     }

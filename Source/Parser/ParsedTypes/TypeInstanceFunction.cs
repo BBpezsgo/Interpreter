@@ -10,10 +10,10 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
         new Position(FunctionReturnType)
         .Union(FunctionParameterTypes);
 
-    public TypeInstanceFunction(TypeInstance returnType, IEnumerable<TypeInstance> parameters, Uri file) : base(file)
+    public TypeInstanceFunction(TypeInstance returnType, ImmutableArray<TypeInstance> parameters, Uri file) : base(file)
     {
         FunctionReturnType = returnType;
-        FunctionParameterTypes = parameters.ToImmutableArray();
+        FunctionParameterTypes = parameters;
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceFunction other && Equals(other);

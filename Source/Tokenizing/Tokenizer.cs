@@ -224,7 +224,7 @@ public partial class Tokenizer
     }
 
     readonly Stack<PreprocessThing> PreprocessorConditions;
-    readonly HashSet<string> PreprocessorVariables;
+    readonly ImmutableHashSet<string> PreprocessorVariables;
 
     bool IsPreprocessSkipping
     {
@@ -564,7 +564,7 @@ public partial class Tokenizer
             CurrentToken.TokenType == PreparationTokenType.LiteralNumber &&
             CurrentToken.Content.Equals("0"))
         {
-            if (!CurrentToken.Content.ToString().EndsWith('0'))
+            if (!CurrentToken.EndsWith('0'))
             { Diagnostics.Add(Diagnostic.Critical($"Am I stupid or this is not a binary number?", CurrentToken.Position, File)); }
             CurrentToken.Content.Append(currChar);
             CurrentToken.TokenType = PreparationTokenType.LiteralBinary;
@@ -676,7 +676,7 @@ public partial class Tokenizer
                 CurrentToken.Content.Append(currChar);
             }
         }
-        else if (DoubleOperators.Contains(CurrentToken.ToString() + currChar))
+        else if (CurrentToken.Content.Length == 1 && DoubleOperators.Any(v => v[0] == CurrentToken.Content[0] && v[1] == currChar))
         {
             CurrentToken.Content.Append(currChar);
             EndToken(offsetTotal);
@@ -722,7 +722,7 @@ public partial class Tokenizer
             }
             else if (CurrentToken.TokenType == PreparationTokenType.LiteralString)
             {
-                EndToken(offsetTotal, true/* Include the '"' in position */);
+                EndToken(offsetTotal, true /* Include the '"' in position */);
             }
         }
         else if (currChar == '\'')

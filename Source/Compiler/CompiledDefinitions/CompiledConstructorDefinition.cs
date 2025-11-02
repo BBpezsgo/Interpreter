@@ -23,24 +23,24 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
     public new CompiledStruct Context { get; set; }
     public List<Reference<ConstructorCall>> References { get; }
 
-    IReadOnlyList<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters;
-    IReadOnlyList<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
+    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
+    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
     GeneralType IIdentifiable<GeneralType>.Identifier => Type;
 
     string? IExternalFunctionDefinition.ExternalFunctionName => null;
 
-    public CompiledConstructorDefinition(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
+    public CompiledConstructorDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {
         Type = type;
-        ParameterTypes = parameterTypes.ToImmutableArray();
+        ParameterTypes = parameterTypes;
         Context = context;
         References = new List<Reference<ConstructorCall>>();
     }
 
-    public CompiledConstructorDefinition(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledConstructorDefinition other) : base(other)
+    public CompiledConstructorDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledConstructorDefinition other) : base(other)
     {
         Type = type;
-        ParameterTypes = parameterTypes.ToImmutableArray();
+        ParameterTypes = parameterTypes;
         Context = other.Context;
         References = new List<Reference<ConstructorCall>>(other.References);
     }
@@ -67,7 +67,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
 
     public CompiledConstructorDefinition InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {
-        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        ImmutableArray<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
         return new CompiledConstructorDefinition(newType, newParameters, this);
     }

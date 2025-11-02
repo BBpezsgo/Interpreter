@@ -15,9 +15,9 @@ public struct CompilerSettings
     public required ImmutableArray<ISourceProvider> SourceProviders { get; set; }
 
     public Tokenizing.TokenizerSettings? TokenizerSettings { get; set; }
-    public IEnumerable<string>? PreprocessorVariables { get; set; }
-    public IEnumerable<string>? AdditionalImports { get; set; }
-    public IEnumerable<UserDefinedAttribute>? UserDefinedAttributes { get; set; }
+    public ImmutableHashSet<string> PreprocessorVariables { get; set; }
+    public ImmutableArray<string> AdditionalImports { get; set; }
+    public ImmutableArray<UserDefinedAttribute> UserDefinedAttributes { get; set; }
     public bool CompileEverything { get; set; }
 
     [SetsRequiredMembers]

@@ -15,15 +15,15 @@ public class AttributeUsage :
     public Uri File { get; }
 
     public Position Position =>
-        new Position(Parameters.As<IPositioned>().Or(Identifier))
+        new Position(Parameters.As<IPositioned>().DefaultIfEmpty(Identifier))
         .Union(Identifier);
 
     public Location Location => new(Position, File);
 
-    public AttributeUsage(Token identifier, IEnumerable<Literal> parameters, Uri file)
+    public AttributeUsage(Token identifier, ImmutableArray<Literal> parameters, Uri file)
     {
         Identifier = identifier;
-        Parameters = parameters.ToImmutableArray();
+        Parameters = parameters;
         File = file;
     }
 

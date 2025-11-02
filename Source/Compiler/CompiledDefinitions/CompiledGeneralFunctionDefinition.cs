@@ -21,21 +21,21 @@ public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
     public List<Reference<Statement?>> References { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
-    IReadOnlyList<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters;
-    IReadOnlyList<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
+    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
+    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
 
-    public CompiledGeneralFunctionDefinition(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledStruct context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledGeneralFunctionDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledStruct context, GeneralFunctionDefinition functionDefinition) : base(functionDefinition)
     {
         Type = type;
-        ParameterTypes = parameterTypes.ToImmutableArray();
+        ParameterTypes = parameterTypes;
         Context = context;
         References = new List<Reference<Statement?>>();
     }
 
-    public CompiledGeneralFunctionDefinition(GeneralType type, IEnumerable<GeneralType> parameterTypes, CompiledGeneralFunctionDefinition other) : base(other)
+    public CompiledGeneralFunctionDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledGeneralFunctionDefinition other) : base(other)
     {
         Type = type;
-        ParameterTypes = parameterTypes.ToImmutableArray();
+        ParameterTypes = parameterTypes;
         Context = other.Context;
         References = new List<Reference<Statement?>>(other.References);
     }
@@ -84,7 +84,7 @@ public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
 
     public CompiledGeneralFunctionDefinition InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {
-        IEnumerable<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
+        ImmutableArray<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
         return new CompiledGeneralFunctionDefinition(newType, newParameters, this);
     }

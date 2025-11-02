@@ -17,116 +17,101 @@ public class Diagnostic :
     bool _isDebugged;
 #endif
 
-    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool _break, IEnumerable<Diagnostic?>? suberrors)
+    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool _break, ImmutableArray<Diagnostic> suberrors)
     {
         Level = level;
         Message = message;
         Position = position;
         File = file;
-        SubErrors = suberrors is null ? ImmutableArray<Diagnostic>.Empty : suberrors.Where(v => v is not null).ToImmutableArray()!;
+        SubErrors = suberrors;
 
         if (_break)
         { Break(); }
     }
 
-    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, IEnumerable<Diagnostic?>? suberrors)
-        : this(level, message, position, file, level <= DiagnosticsLevel.Error, suberrors)
-    { }
+    LanguageException ToException()
+    {
+        if (SubErrors.Length == 0) return new(Message, Position, File, ImmutableArray<LanguageException>.Empty);
+        ImmutableArray<LanguageException>.Builder suberrors = ImmutableArray.CreateBuilder<LanguageException>(SubErrors.Length);
+        foreach (Diagnostic suberror in SubErrors) suberrors.Add(suberror.ToException());
+        return new(Message, Position, File, suberrors.MoveToImmutable());
+    }
 
-    LanguageException ToException() => new(Message, Position, File, SubErrors.Select(v => v.ToException()));
+    public Diagnostic WithSuberrors(Diagnostic? suberror) => suberror is null ? this : new(Level, Message, Position, File, false, ImmutableArray.Create(suberror));
+    public Diagnostic WithSuberrors(params Diagnostic?[] suberrors) => WithSuberrors(suberrors.Where(v => v is not null).ToImmutableArray()!);
+    public Diagnostic WithSuberrors(IEnumerable<Diagnostic?> suberrors) => WithSuberrors(suberrors.Where(v => v is not null).ToImmutableArray()!);
+    public Diagnostic WithSuberrors(ImmutableArray<Diagnostic> suberrors) => suberrors.IsDefaultOrEmpty ? this : new(Level, Message, Position, File, false, suberrors);
 
     [DoesNotReturn]
     public void Throw() => throw ToException();
 
-    public static Diagnostic Internal(string message, IPositioned? position, Uri? file, bool @break = true, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, suberrors);
+    public static Diagnostic Internal(string message, IPositioned? position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Internal(string message, IPositioned? position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, true, suberrors);
+    public static Diagnostic Internal(string message, Position position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position, file, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Critical(string message, IPositioned? position, Uri? file, bool @break = true, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, suberrors);
+    public static Diagnostic Internal(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Critical(string message, IPositioned? position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, true, suberrors);
 
-    public static Diagnostic Error(string message, IPositioned position, Uri? file, bool @break = true, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position.Position, file, @break, suberrors);
+    public static Diagnostic Critical(string message, IPositioned? position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Error(string message, IPositioned position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position.Position, file, true, suberrors);
+    public static Diagnostic Critical(string message, Position position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position, file, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Warning(string message, IPositioned position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Warning, message, position.Position, file, false, suberrors);
+    public static Diagnostic Critical(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Information(string message, IPositioned position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Information, message, position.Position, file, false, suberrors);
 
-    public static Diagnostic Hint(string message, IPositioned position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Hint, message, position.Position, file, false, suberrors);
+    public static Diagnostic Error(string message, IPositioned? position, Uri? file, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Internal(string message, Position position, Uri? file, bool @break = false, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position, file, @break, suberrors);
+    public static Diagnostic Error(string message, Position position, Uri? file, bool @break = false)
+        => new(DiagnosticsLevel.Error, message, position, file, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Internal(string message, Position position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position, file, true, suberrors);
+    public static Diagnostic Error(string message, ILocated location, bool @break = true)
+        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Critical(string message, Position position, Uri? file, bool @break = false, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position, file, @break, suberrors);
 
-    public static Diagnostic Critical(string message, Position position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position, file, true, suberrors);
+    public static Diagnostic Warning(string message, IPositioned? position, Uri? file)
+        => new(DiagnosticsLevel.Warning, message, position?.Position ?? Position.UnknownPosition, file, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Error(string message, Position position, Uri? file, bool @break = false, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position, file, @break, suberrors);
+    public static Diagnostic Warning(string message, Position position, Uri? file)
+        => new(DiagnosticsLevel.Warning, message, position, file, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Error(string message, Position position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position, file, true, suberrors);
+    public static Diagnostic Warning(string message, ILocated location)
+        => new(DiagnosticsLevel.Warning, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Warning(string message, Position position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Warning, message, position, file, false, suberrors);
 
-    public static Diagnostic Information(string message, Position position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Information, message, position, file, false, suberrors);
+    public static Diagnostic Information(string message, IPositioned? position, Uri? file)
+        => new(DiagnosticsLevel.Information, message, position?.Position ?? Position.UnknownPosition, file, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Hint(string message, Position position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Hint, message, position, file, false, suberrors);
+    public static Diagnostic Information(string message, Position position, Uri? file)
+        => new(DiagnosticsLevel.Information, message, position, file, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Internal(string message, Position? position, Uri? file, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, position ?? Position.UnknownPosition, file, true, suberrors);
+    public static Diagnostic Information(string message, ILocated location)
+        => new(DiagnosticsLevel.Information, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Internal(string message, ILocated location, bool @break = true, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, suberrors);
 
-    public static Diagnostic Internal(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, true, suberrors);
+    public static Diagnostic Hint(string message, IPositioned? position, Uri? file)
+        => new(DiagnosticsLevel.Hint, message, position?.Position ?? Position.UnknownPosition, file, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Critical(string message, ILocated location, bool @break = true, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, suberrors);
+    public static Diagnostic Hint(string message, Position position, Uri? file)
+        => new(DiagnosticsLevel.Hint, message, position, file, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Critical(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, true, suberrors);
+    public static Diagnostic Hint(string message, ILocated location)
+        => new(DiagnosticsLevel.Hint, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Error(string message, ILocated location, bool @break = true, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, suberrors);
 
-    public static Diagnostic Error(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, true, suberrors);
+    public static Diagnostic OptimizationNotice(string message, ILocated location)
+        => new(DiagnosticsLevel.OptimizationNotice, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Warning(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Warning, message, location.Location.Position, location.Location.File, false, suberrors);
 
-    public static Diagnostic Information(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Information, message, location.Location.Position, location.Location.File, false, suberrors);
+    public static Diagnostic FailedOptimization(string message, ILocated location)
+        => new(DiagnosticsLevel.FailedOptimization, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
-    public static Diagnostic Hint(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.Hint, message, location.Location.Position, location.Location.File, false, suberrors);
-
-    public static Diagnostic OptimizationNotice(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.OptimizationNotice, message, location.Location.Position, location.Location.File, false, suberrors);
-
-    public static Diagnostic FailedOptimization(string message, ILocated location, params Diagnostic?[] suberrors)
-        => new(DiagnosticsLevel.FailedOptimization, message, location.Location.Position, location.Location.File, false, suberrors);
 
     public Diagnostic Break()
     {
@@ -157,4 +142,8 @@ public class Diagnostic :
         if (File != other.File) return false;
         return true;
     }
+
+    public override bool Equals(object? obj) => obj is Diagnostic other && Equals(other);
+
+    public override int GetHashCode() => Message.GetHashCode();
 }

@@ -5,7 +5,7 @@ public class Interpreter : InterpreterBase<OpCodes>
     public Interpreter(OutputCallback? onOutput = null, InputCallback? onInput = null)
         : base(onOutput, onInput) { }
 
-    protected override OpCodes[] ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInformation)
+    protected override ImmutableArray<OpCodes> ParseCode(string code, bool showProgress, Runtime.DebugInformation? debugInformation)
     {
         code = BrainfuckCode.RemoveNoncodes(code, showProgress, debugInformation);
         return CompactCode.ToOpCode(code);

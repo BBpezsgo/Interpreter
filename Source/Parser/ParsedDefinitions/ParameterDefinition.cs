@@ -39,9 +39,9 @@ public class ParameterDefinition :
         DefaultValue = other.DefaultValue;
     }
 
-    public ParameterDefinition(IEnumerable<Token> modifiers, TypeInstance type, Token identifier, StatementWithValue? defaultValue, FunctionThingDefinition? context = null)
+    public ParameterDefinition(ImmutableArray<Token> modifiers, TypeInstance type, Token identifier, StatementWithValue? defaultValue, FunctionThingDefinition? context = null)
     {
-        Modifiers = modifiers.ToImmutableArray();
+        Modifiers = modifiers;
         Type = type;
         Identifier = identifier;
         Context = context;

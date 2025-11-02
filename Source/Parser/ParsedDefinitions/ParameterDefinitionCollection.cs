@@ -5,7 +5,6 @@ namespace LanguageCore.Parser;
 
 public class ParameterDefinitionCollection :
     IPositioned,
-    IReadOnlyList<ParameterDefinition>,
     IInContext<FunctionThingDefinition>,
     IInFile
 {
@@ -25,7 +24,7 @@ public class ParameterDefinitionCollection :
     public ParameterDefinition this[int index] => Parameters[index];
     public ParameterDefinition this[Index index] => Parameters[index];
 
-    readonly ImmutableArray<ParameterDefinition> Parameters;
+    public readonly ImmutableArray<ParameterDefinition> Parameters;
 
     public ParameterDefinitionCollection(ParameterDefinitionCollection other)
     {
@@ -34,14 +33,11 @@ public class ParameterDefinitionCollection :
         Context = other.Context;
     }
 
-    public ParameterDefinitionCollection(IEnumerable<ParameterDefinition> parameterDefinitions, TokenPair brackets)
+    public ParameterDefinitionCollection(ImmutableArray<ParameterDefinition> parameterDefinitions, TokenPair brackets)
     {
-        Parameters = parameterDefinitions.ToImmutableArray();
+        Parameters = parameterDefinitions;
         Brackets = brackets;
     }
-
-    public IEnumerator<ParameterDefinition> GetEnumerator() => ((IEnumerable<ParameterDefinition>)Parameters).GetEnumerator();
-    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable)Parameters).GetEnumerator();
 
     public bool TypeEquals(ParameterDefinitionCollection? other)
     {
@@ -52,9 +48,7 @@ public class ParameterDefinitionCollection :
         return true;
     }
 
-    public ParameterDefinition[] ToArray() => Parameters.ToArray();
-
-    public static ParameterDefinitionCollection CreateAnonymous(IEnumerable<ParameterDefinition> parameterDefinitions)
+    public static ParameterDefinitionCollection CreateAnonymous(ImmutableArray<ParameterDefinition> parameterDefinitions)
         => new(parameterDefinitions, TokenPair.CreateAnonymous(new Position(parameterDefinitions), "(", ")"));
 
     public override string ToString()
@@ -100,6 +94,4 @@ public class ParameterDefinitionCollection :
 
         return result.ToString();
     }
-
-    public static implicit operator ImmutableArray<ParameterDefinition>(ParameterDefinitionCollection parameters) => parameters.Parameters;
 }

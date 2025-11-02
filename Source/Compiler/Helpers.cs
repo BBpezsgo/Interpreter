@@ -53,7 +53,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     readonly Stack<ImmutableArray<Token>> GenericParameters = new();
     readonly ImmutableArray<UserDefinedAttribute> UserDefinedAttributes;
-    readonly IEnumerable<string> PreprocessorVariables;
+    readonly ImmutableHashSet<string> PreprocessorVariables;
     readonly ImmutableArray<CompiledStatement>.Builder CompiledTopLevelStatements = ImmutableArray.CreateBuilder<CompiledStatement>();
 
     readonly List<(FunctionThingDefinition Function, CompiledGeneratorState State)> GeneratorStates = new();
@@ -1843,21 +1843,21 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (GetInstructionLabel(identifier.Content, out _, out PossibleDiagnostic? instructionLabelNotFound))
         {
-            return OnGotStatementType(identifier, new FunctionType(BuiltinType.Void, Enumerable.Empty<GeneralType>()));
+            return OnGotStatementType(identifier, new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty));
         }
 
         if (FindType(identifier.Token, identifier.File, out GeneralType? result))
         { return OnGotStatementType(identifier, result); }
 
-        Diagnostics.Add(Diagnostic.Critical(
-            $"Symbol \"{identifier.Content}\" not found",
-            identifier,
-            parameterNotFoundError.ToError(identifier),
-            variableNotFoundError.ToError(identifier),
-            globalVariableNotFoundError.ToError(identifier),
-            constantNotFoundError.ToError(identifier),
-            functionNotFoundError.ToError(identifier),
-            instructionLabelNotFound.ToError(identifier)));
+        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{identifier.Content}\" not found", identifier)
+            .WithSuberrors(
+                parameterNotFoundError.ToError(identifier),
+                variableNotFoundError.ToError(identifier),
+                globalVariableNotFoundError.ToError(identifier),
+                constantNotFoundError.ToError(identifier),
+                functionNotFoundError.ToError(identifier),
+                instructionLabelNotFound.ToError(identifier)
+            ));
         return BuiltinType.Void;
     }
     PointerType FindStatementType(AddressGetter addressGetter)
@@ -1995,12 +1995,21 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Inlining
 
+    static ImmutableArray<StatementWithValue> InlineMacro(ImmutableArray<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
+    {
+        ImmutableArray<StatementWithValue>.Builder result = ImmutableArray.CreateBuilder<StatementWithValue>(statements.Length);
+        foreach (StatementWithValue statement in statements)
+        {
+            result.Add(InlineMacro(statement, parameters));
+        }
+        return result.MoveToImmutable();
+    }
     static IEnumerable<StatementWithValue> InlineMacro(IEnumerable<StatementWithValue> statements, Dictionary<string, StatementWithValue> parameters)
         => statements.Select(statement => InlineMacro(statement, parameters));
     static bool InlineMacro(FunctionThingDefinition function, ImmutableArray<StatementWithValue> parameters, [NotNullWhen(true)] out Statement? inlined)
     {
         Dictionary<string, StatementWithValue> _parameters =
-            function.Parameters
+            function.Parameters.Parameters
             .Select((value, index) => (value.Identifier.Content, parameters[index]))
             .ToDictionary(v => v.Content, v => v.Item2);
 
@@ -2036,7 +2045,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = null;
 
-        List<Statement> statements = new(block.Statements.Length);
+        ImmutableArray<Statement>.Builder statements = ImmutableArray.CreateBuilder<Statement>(block.Statements.Length);
+
         for (int i = 0; i < block.Statements.Length; i++)
         {
             Statement statement = block.Statements[i];
@@ -2049,7 +2059,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 keywordCall.Identifier.Content == StatementKeywords.Return)
             { break; }
         }
-        inlined = new Block(statements.ToArray(), block.Brackets, block.File)
+
+        inlined = new Block(statements.MoveToImmutable(), block.Brackets, block.File)
         {
             Semicolon = block.Semicolon,
         };
@@ -2086,7 +2097,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
     static FunctionCall InlineMacro(FunctionCall functionCall, Dictionary<string, StatementWithValue> parameters)
     {
-        IEnumerable<StatementWithValue> _parameters = InlineMacro(functionCall.Arguments, parameters);
+        ImmutableArray<StatementWithValue> _parameters = InlineMacro(functionCall.Arguments, parameters);
         StatementWithValue? prevStatement = functionCall.PrevStatement;
         if (prevStatement != null)
         { prevStatement = InlineMacro(prevStatement, parameters); }
@@ -2118,7 +2129,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         => newInstance;
     static LiteralList InlineMacro(LiteralList literalList, Dictionary<string, StatementWithValue> parameters)
         => new(
-            values: literalList.Values.Select(v => InlineMacro(v, parameters)),
+            values: InlineMacro(literalList.Values, parameters),
             brackets: literalList.Brackets,
             file: literalList.File)
         {
@@ -2130,7 +2141,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         TypeInstanceFunction v => new TypeInstanceFunction(
             InlineMacro(v.FunctionReturnType, parameters),
-            v.FunctionParameterTypes.Select(p => InlineMacro(p, parameters)),
+            v.FunctionParameterTypes.Select(p => InlineMacro(p, parameters)).ToImmutableArray(),
             v.File
         ),
         TypeInstancePointer v => new TypeInstancePointer(
@@ -2232,14 +2243,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     static bool InlineMacro(IfContainer statement, Dictionary<string, StatementWithValue> parameters, [NotNullWhen(true)] out IfContainer? inlined)
     {
         inlined = null;
-        BaseBranch[] branches = new BaseBranch[statement.Branches.Length];
-        for (int i = 0; i < branches.Length; i++)
+        ImmutableArray<BaseBranch>.Builder branches = ImmutableArray.CreateBuilder<BaseBranch>(statement.Branches.Length);
+
+        for (int i = 0; i < statement.Branches.Length; i++)
         {
             if (!InlineMacro(statement.Branches[i], parameters, out BaseBranch? inlinedBranch))
             { return false; }
-            branches[i] = inlinedBranch;
+            branches.Add(inlinedBranch);
         }
-        inlined = new IfContainer(branches, statement.File)
+
+        inlined = new IfContainer(branches.MoveToImmutable(), statement.File)
         { Semicolon = statement.Semicolon, };
         return true;
     }
@@ -3123,11 +3136,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
         if (!Inline(statement.Next, context, out CompiledStatement? inlinedNext)) return false;
 
+        if (inlinedNext is not CompiledBranch nextBranch) throw new UnreachableException();
+
         inlined = new CompiledIf()
         {
             Condition = inlinedCondition,
             Body = inlinedBody,
-            Next = (CompiledBranch?)inlinedNext,
+            Next = nextBranch,
             Location = statement.Location,
         };
         return true;
@@ -3149,7 +3164,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        List<CompiledStatement> statements = new(statement.Statements.Length);
+        ImmutableArray<CompiledStatement>.Builder statements = ImmutableArray.CreateBuilder<CompiledStatement>(statement.Statements.Length);
         foreach (CompiledStatement v in statement.Statements)
         {
             if (!Inline(v, context, out CompiledStatement? inlinedStatement))
@@ -3163,7 +3178,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         inlined = new CompiledBlock()
         {
-            Statements = statements.ToImmutableArray(),
+            Statements = statements.DrainToImmutable(),
             Location = statement.Location,
         };
         return true;
@@ -3773,7 +3788,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (TryEvaluate(found, parameters, context, out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+        if (TryEvaluate(found, parameters, context, out CompiledValue? returnValue, out ImmutableArray<RuntimeStatement2> runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -3950,7 +3965,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
     }
 
-    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -3966,7 +3981,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledStatementWithValue> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledStatementWithValue> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -3984,10 +3999,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryEvaluate(CompiledFunction function, ImmutableArray<CompiledValue> parameterValues, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out RuntimeStatement2[]? runtimeStatements)
+    bool TryEvaluate(CompiledFunction function, ImmutableArray<CompiledValue> parameterValues, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
     {
         value = null;
-        runtimeStatements = null;
+        runtimeStatements = default;
 
         {
             CompiledValue[] castedParameterValues = new CompiledValue[parameterValues.Length];
@@ -4041,7 +4056,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
 
-        runtimeStatements = context.RuntimeStatements.ToArray();
+        runtimeStatements = context.RuntimeStatements.ToImmutableArray();
 
         return true;
     }

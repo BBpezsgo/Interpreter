@@ -10,6 +10,6 @@ public interface ICompiledFunctionDefinition :
     IMsilCompatible
 {
     bool ReturnSomething { get; }
-    IReadOnlyList<ParameterDefinition> Parameters { get; }
-    IReadOnlyList<GeneralType> ParameterTypes { get; }
+    ImmutableArray<ParameterDefinition> Parameters { get; }
+    ImmutableArray<GeneralType> ParameterTypes { get; }
 }

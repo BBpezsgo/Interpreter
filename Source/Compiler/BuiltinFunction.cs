@@ -20,10 +20,4 @@ public class BuiltinFunction
         Type = type;
         Parameters = parameters;
     }
-
-    public BuiltinFunction(Predicate<GeneralType> type, IEnumerable<Predicate<GeneralType>> parameters)
-    {
-        Type = type;
-        Parameters = parameters.ToImmutableArray();
-    }
 }

@@ -116,7 +116,7 @@ public abstract class GeneralType :
         Uri? file = null)
     {
         GeneralType returnType = GeneralType.From(type.FunctionReturnType, typeFinder, constComputer, file);
-        IEnumerable<GeneralType> parameters = GeneralType.FromArray(type.FunctionParameterTypes, typeFinder, constComputer, file);
+        ImmutableArray<GeneralType> parameters = GeneralType.FromArray(type.FunctionParameterTypes, typeFinder, constComputer, file);
 
         FunctionType result = new(returnType, parameters);
         type.SetAnalyzedType(result);
@@ -164,8 +164,8 @@ public abstract class GeneralType :
         {
             if (type.TypeArguments.HasValue)
             {
-                IEnumerable<GeneralType> typeParameters = GeneralType.FromArray(type.TypeArguments.Value, typeFinder, constComputer, file);
-                result = new StructType(resultStructType.Struct, type.File, typeParameters.ToImmutableList());
+                ImmutableArray<GeneralType> typeParameters = GeneralType.FromArray(type.TypeArguments.Value, typeFinder, constComputer, file);
+                result = new StructType(resultStructType.Struct, type.File, typeParameters);
             }
             else
             {
@@ -182,24 +182,34 @@ public abstract class GeneralType :
         return result;
     }
 
-    public static IEnumerable<GeneralType> FromArray(
-        IEnumerable<TypeInstance>? types,
+    public static ImmutableArray<GeneralType> FromArray(
+        ImmutableArray<TypeInstance> types,
         FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? file = null)
     {
-        if (types is null) yield break;
-
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (TypeInstance item in types)
-        { yield return GeneralType.From(item, typeFinder, constComputer, file); }
+        {
+            result.Add(GeneralType.From(item, typeFinder, constComputer, file));
+        }
+        return result.MoveToImmutable();
     }
 
-    public static IEnumerable<GeneralType> FromArray(
-        IEnumerable<IHaveType>? types,
+    public static ImmutableArray<GeneralType> FromArray<T>(
+        ImmutableArray<T> types,
         FindType typeFinder,
         ComputeValue? constComputer = null,
         Uri? file = null)
-        => GeneralType.FromArray(types?.Select(v => v.Type), typeFinder, constComputer, file);
+        where T : IHaveType
+    {
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
+        foreach (T item in types)
+        {
+            result.Add(GeneralType.From(item.Type, typeFinder, constComputer, file));
+        }
+        return result.MoveToImmutable();
+    }
 
     [Obsolete]
     public static bool operator ==(GeneralType? a, GeneralType? b)
@@ -413,7 +423,7 @@ public abstract class GeneralType :
             case FunctionType functionType:
             {
                 GeneralType returnType = InsertTypeParameters(functionType.ReturnType, typeArguments);
-                IEnumerable<GeneralType> parameters = InsertTypeParameters(functionType.Parameters, typeArguments);
+                ImmutableArray<GeneralType> parameters = InsertTypeParameters(functionType.Parameters, typeArguments);
                 return new FunctionType(returnType, parameters);
             }
 
@@ -422,11 +432,13 @@ public abstract class GeneralType :
         }
     }
 
-    public static IEnumerable<GeneralType> InsertTypeParameters(IEnumerable<GeneralType> types, IReadOnlyDictionary<string, GeneralType> typeArguments)
+    public static ImmutableArray<GeneralType> InsertTypeParameters(ImmutableArray<GeneralType> types, IReadOnlyDictionary<string, GeneralType> typeArguments)
     {
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (GeneralType type in types)
         {
-            yield return GeneralType.InsertTypeParameters(type, typeArguments) ?? type;
+            result.Add(GeneralType.InsertTypeParameters(type, typeArguments) ?? type);
         }
+        return result.MoveToImmutable();
     }
 }

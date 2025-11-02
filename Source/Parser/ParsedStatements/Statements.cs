@@ -1,4 +1,5 @@
-﻿using LanguageCore.Compiler;
+﻿using System.Runtime.InteropServices;
+using LanguageCore.Compiler;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser.Statements;
@@ -150,9 +151,9 @@ public class Block : Statement
 
     public override Position Position => new(Brackets);
 
-    public Block(IEnumerable<Statement> statements, TokenPair brackets, Uri file) : base(file)
+    public Block(ImmutableArray<Statement> statements, TokenPair brackets, Uri file) : base(file)
     {
-        Statements = statements.ToImmutableArray();
+        Statements = statements;
         Brackets = brackets;
     }
 
@@ -194,7 +195,7 @@ public class Block : Statement
     {
         if (statement is Block block) return block;
         return new Block(
-            new Statement[] { statement },
+            ImmutableArray.Create(statement),
             TokenPair.CreateAnonymous(statement.Position, "{", "}"),
             statement.File
         );
@@ -269,10 +270,10 @@ public class LiteralList : StatementWithValue
 
     public override Position Position => new(Brackets);
 
-    public LiteralList(IEnumerable<StatementWithValue> values, TokenPair brackets, Uri file) : base(file)
+    public LiteralList(ImmutableArray<StatementWithValue> values, TokenPair brackets, Uri file) : base(file)
     {
         Brackets = brackets;
-        Values = values.ToImmutableArray();
+        Values = values;
     }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -353,18 +354,18 @@ public class VariableDeclaration : Statement,
     }
 
     public VariableDeclaration(
-        IEnumerable<AttributeUsage> attributes,
-        IEnumerable<Token> modifiers,
+        ImmutableArray<AttributeUsage> attributes,
+        ImmutableArray<Token> modifiers,
         TypeInstance type,
         Identifier variableName,
         StatementWithValue? initialValue,
         Uri file) : base(file)
     {
-        Attributes = attributes.ToImmutableArray();
+        Attributes = attributes;
         Type = type;
         Identifier = variableName;
         InitialValue = initialValue;
-        Modifiers = modifiers.ToImmutableArray();
+        Modifiers = modifiers;
     }
 
     public override string ToString()
@@ -462,14 +463,14 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
 
     public AnyCall(
         StatementWithValue prevStatement,
-        IEnumerable<StatementWithValue> parameters,
-        IEnumerable<Token> commas,
+        ImmutableArray<StatementWithValue> parameters,
+        ImmutableArray<Token> commas,
         TokenPair brackets,
         Uri file) : base(file)
     {
         PrevStatement = prevStatement;
-        Arguments = parameters.ToImmutableArray();
-        Commas = commas.ToImmutableArray();
+        Arguments = parameters;
+        Commas = commas;
         Brackets = brackets;
     }
 
@@ -557,13 +558,13 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
     public FunctionCall(
         StatementWithValue? prevStatement,
         Identifier identifier,
-        IEnumerable<StatementWithValue> arguments,
+        ImmutableArray<StatementWithValue> arguments,
         TokenPair brackets,
         Uri file) : base(file)
     {
         PrevStatement = prevStatement;
         Identifier = identifier;
-        Arguments = arguments.ToImmutableArray();
+        Arguments = arguments;
         Brackets = brackets;
     }
 
@@ -650,11 +651,11 @@ public class KeywordCall : Statement, IReadable
 
     public KeywordCall(
         Token identifier,
-        IEnumerable<StatementWithValue> arguments,
+        ImmutableArray<StatementWithValue> arguments,
         Uri file) : base(file)
     {
         IdentifierToken = identifier;
-        Arguments = arguments.ToImmutableArray();
+        Arguments = arguments;
     }
 
     public override string ToString()
@@ -1253,35 +1254,6 @@ public class Literal : StatementWithValue
         return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
 
-    public bool TryConvert<T>([NotNullWhen(true)] out T? value)
-    {
-        value = default;
-
-        LiteralType type;
-
-        if (typeof(T) == typeof(int))
-        { type = LiteralType.Integer; }
-        else if (typeof(T) == typeof(float))
-        { type = LiteralType.Float; }
-        else if (typeof(T) == typeof(string))
-        { type = LiteralType.String; }
-        else
-        { return false; }
-
-        if (type != Type)
-        { return false; }
-
-        value = type switch
-        {
-            LiteralType.Integer => (T)(object)GetInt(),
-            LiteralType.Float => (T)(object)GetFloat(),
-            LiteralType.String => (T)(object)Value,
-            LiteralType.Char => (T)(object)Value[0],
-            _ => throw new UnreachableException(),
-        };
-        return true;
-    }
-
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
     {
         if (includeThis) yield return this;
@@ -1498,10 +1470,10 @@ public class IfContainer : Statement
     public override Position Position => new(Branches);
 
     public IfContainer(
-        IEnumerable<BaseBranch> parts,
+        ImmutableArray<BaseBranch> parts,
         Uri file) : base(file)
     {
-        Branches = parts.ToImmutableArray();
+        Branches = parts;
     }
 
     public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
@@ -1666,13 +1638,13 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public ConstructorCall(
         Token keyword,
         TypeInstance typeName,
-        IEnumerable<StatementWithValue> arguments,
+        ImmutableArray<StatementWithValue> arguments,
         TokenPair brackets,
         Uri file) : base(file)
     {
         Keyword = keyword;
         Type = typeName;
-        Arguments = arguments.ToImmutableArray();
+        Arguments = arguments;
         Brackets = brackets;
     }
 

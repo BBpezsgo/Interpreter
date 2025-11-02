@@ -741,8 +741,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     BrainfuckGeneratorResult GenerateCode(CompilerResult compilerResult)
     {
         VariableDeclaration implicitReturnValueVariable = new(
-            Enumerable.Empty<AttributeUsage>(),
-            Enumerable.Empty<Tokenizing.Token>(),
+            ImmutableArray<AttributeUsage>.Empty,
+            ImmutableArray<Tokenizing.Token>.Empty,
             new TypeInstanceSimple(Tokenizing.Token.CreateAnonymous("u8"), compilerResult.File),
             new Identifier(Tokenizing.Token.CreateAnonymous(ReturnVariableName), compilerResult.File),
             null,

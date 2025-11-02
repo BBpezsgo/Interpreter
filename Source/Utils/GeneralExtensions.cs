@@ -1,4 +1,6 @@
-﻿namespace LanguageCore;
+﻿using System.Runtime.InteropServices;
+
+namespace LanguageCore;
 
 public static class GeneralExtensions
 {
@@ -187,4 +189,6 @@ public static class GeneralExtensions
     }
 
     public static void Indent(this StringBuilder stringBuilder, int indent) => stringBuilder.Append(' ', indent * 2);
+
+    public static ImmutableArray<T> AsImmutableUnsafe<T>(this T[] array) => ImmutableCollectionsMarshal.AsImmutableArray(array);
 }

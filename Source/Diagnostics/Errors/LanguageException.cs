@@ -16,10 +16,6 @@ public class LanguageException : Exception
         : this(message, position, file, suberrors.ToImmutableArray())
     { }
 
-    public LanguageException(string message, Position position, Uri? file, IEnumerable<LanguageException> suberrors)
-        : this(message, position, file, suberrors.ToImmutableArray())
-    { }
-
     public LanguageException(string message, Position position, Uri? file, ImmutableArray<LanguageException> suberrors)
         : base(message, suberrors.Length switch
         {
@@ -167,8 +163,9 @@ public class LanguageException : Exception
         Message,
         Position,
         File,
+        true,
         InnerException is LanguageException innerLanguageException
-            ? Enumerable.Repeat(innerLanguageException.ToDiagnostic(), 1)
-            : Enumerable.Empty<Diagnostic>()
+            ? ImmutableArray.Create(innerLanguageException.ToDiagnostic())
+            : ImmutableArray<Diagnostic>.Empty
     );
 }

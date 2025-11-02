@@ -62,6 +62,9 @@ public struct SinglePosition :
         return false;
     }
 
+    public static SinglePosition Max(SinglePosition a, SinglePosition b) => a > b ? a : b;
+    public static SinglePosition Min(SinglePosition a, SinglePosition b) => a < b ? a : b;
+
     public override readonly string ToString() => $"({Line + 1}:{Character})";
     public readonly string ToStringMin() => $"{Line + 1}:{Character}";
     readonly string GetDebuggerDisplay()

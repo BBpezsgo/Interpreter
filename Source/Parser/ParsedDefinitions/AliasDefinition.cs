@@ -20,10 +20,10 @@ public class AliasDefinition :
     public Position Position => new(Keyword, Identifier, Value);
     public bool IsExported => Modifiers.Contains(ProtectionKeywords.Export);
 
-    public AliasDefinition(IEnumerable<AttributeUsage> attributes, IEnumerable<Token> modifiers, Token keyword, Token identifier, TypeInstance value, Uri file)
+    public AliasDefinition(ImmutableArray<AttributeUsage> attributes, ImmutableArray<Token> modifiers, Token keyword, Token identifier, TypeInstance value, Uri file)
     {
-        Attributes = attributes.ToImmutableArray();
-        Modifiers = modifiers.ToImmutableArray();
+        Attributes = attributes;
+        Modifiers = modifiers;
         Keyword = keyword;
         Identifier = identifier;
         Value = value;

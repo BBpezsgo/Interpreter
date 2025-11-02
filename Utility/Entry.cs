@@ -8,6 +8,7 @@ using LanguageCore.Brainfuck.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Native.Generator;
 using LanguageCore.Runtime;
+using LanguageCore.TUI;
 
 namespace LanguageCore;
 
@@ -62,10 +63,9 @@ public static class Entry
             return 0;
         }
 
-        string[] additionalImports = new string[]
-        {
+        ImmutableArray<string> additionalImports = ImmutableArray.Create<string>(
             "Primitives"
-        };
+        );
 
         switch (arguments.Format)
         {
@@ -733,6 +733,9 @@ public static class Entry
             }
             case "assembly":
             {
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                { throw new PlatformNotSupportedException($"This is only supported on Linux"); }
+
                 Output.LogDebug($"Executing \"{arguments.Source}\" ...");
 
                 List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);

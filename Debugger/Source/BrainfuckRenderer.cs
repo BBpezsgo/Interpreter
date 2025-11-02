@@ -486,7 +486,7 @@ public class BrainfuckRenderer
             {
                 t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
                 t.Write('(');
-                for (int j = 0; j < compiledFunction.Parameters.Count; j++)
+                for (int j = 0; j < compiledFunction.Parameters.Length; j++)
                 {
                     if (j > 0) t.Write(", ");
                     for (int k = 0; k < compiledFunction.Parameters[j].Modifiers.Length; k++)

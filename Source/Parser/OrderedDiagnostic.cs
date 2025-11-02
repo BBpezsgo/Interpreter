@@ -33,10 +33,19 @@ class OrderedDiagnosticCollection : IEnumerable<OrderedDiagnostic>
         diagnostic.Diagnostic.Position,
         diagnostic.Diagnostic.File,
         false,
-        diagnostic.SubDiagnostics.Select(Compile).ToArray()
+        diagnostic.SubDiagnostics.Select(Compile).ToImmutableArray()
     );
 
-    public IEnumerable<Diagnostic> Compile() => _diagnostics.Select(Compile);
+    public ImmutableArray<Diagnostic> Compile()
+    {
+        if (_diagnostics.Count == 0) return ImmutableArray<Diagnostic>.Empty;
+        ImmutableArray<Diagnostic>.Builder result = ImmutableArray.CreateBuilder<Diagnostic>(_diagnostics.Count);
+        for (int i = 0; i < _diagnostics.Count; i++)
+        {
+            result.Add(Compile(_diagnostics[i]));
+        }
+        return result.MoveToImmutable();
+    }
 
     public IEnumerator<OrderedDiagnostic> GetEnumerator() => _diagnostics.GetEnumerator();
     IEnumerator IEnumerable.GetEnumerator() => _diagnostics.GetEnumerator();

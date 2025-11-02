@@ -41,7 +41,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (TryEvaluate(allocator, ImmutableArray.Create(compiledSize), new EvaluationContext(), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+        if (TryEvaluate(allocator, ImmutableArray.Create(compiledSize), new EvaluationContext(), out CompiledValue? returnValue, out ImmutableArray<RuntimeStatement2> runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -89,7 +89,7 @@ public partial class StatementCompiler
 
         if (!TryGetBuiltinFunction(BuiltinFunctions.Free, parameterTypes, location.File, out FunctionQueryResult<CompiledFunctionDefinition>? result, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
-            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", location, notFoundError.ToError(location)));
+            Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Free}\")] not found", location).WithSuberrors(notFoundError.ToError(location)));
             return false;
         }
 
@@ -132,10 +132,8 @@ public partial class StatementCompiler
             {
                 if (deallocateablePointerType.To.Is<StructType>())
                 {
-                    Diagnostics.Add(Diagnostic.Warning(
-                        $"Destructor for type \"{deallocateableType}\" not found",
-                        location,
-                        error.ToWarning(location)));
+                    Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", location)
+                        .WithSuberrors(error.ToWarning(location)));
                 }
 
                 if (!CompileDeallocation(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
@@ -154,10 +152,7 @@ public partial class StatementCompiler
         {
             if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out result, out PossibleDiagnostic? error, AddCompilable))
             {
-                Diagnostics.Add(Diagnostic.Warning(
-                    $"Destructor for type \"{deallocateableType}\" not found",
-                    location,
-                    error.ToWarning(location)));
+                Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", location).WithSuberrors(error.ToWarning(location)));
                 return false;
             }
         }
@@ -547,7 +542,7 @@ public partial class StatementCompiler
                 {
                     InstructionLabel = l,
                     Location = keywordCall.Location,
-                    Type = new FunctionType(BuiltinType.Void, Enumerable.Empty<GeneralType>()),
+                    Type = new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty),
                     SaveValue = true,
                 },
                 Type = Frames.Last.CompiledGeneratorContext.State.StateField.Type,
@@ -734,9 +729,9 @@ public partial class StatementCompiler
             });
         }
 
-        int remaining = compiledFunction.Parameters.Count - arguments.Count - alreadyPassed;
+        int remaining = compiledFunction.Parameters.Length - arguments.Count - alreadyPassed;
 
-        Scope[] savedScopes = Frames.Last.Scopes.ToArray();
+        ImmutableArray<Scope> savedScopes = Frames.Last.Scopes.ToImmutableArray();
         Frames.Last.Scopes.Clear();
         try
         {
@@ -898,8 +893,8 @@ public partial class StatementCompiler
         {
             if (!CompileAllocation(new AnyCall(
                 new Identifier(Token.CreateAnonymous("sizeof"), caller.File),
-                new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), new StructType(GetGeneratorState(callee).Struct, caller.File), caller.File) },
-                Array.Empty<Token>(),
+                ImmutableArray.Create<StatementWithValue>(new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), new StructType(GetGeneratorState(callee).Struct, caller.File), caller.File)),
+                ImmutableArray<Token>.Empty,
                 TokenPair.CreateAnonymous(caller.Position, "(", ")"),
                 caller.File
             ), out CompiledStatementWithValue? allocation))
@@ -971,10 +966,7 @@ public partial class StatementCompiler
                         Token.CreateAnonymous(GeneratorStructDefinition.Struct.Identifier.Content),
                         caller.Location.File
                     ),
-                    new StatementWithValue[]
-                    {
-                        // ...
-                    },
+                    ImmutableArray<StatementWithValue>.Empty,
                     TokenPair.CreateAnonymous("(", ")"),
                     caller.File
                 ),
@@ -1074,7 +1066,7 @@ public partial class StatementCompiler
         CompileFunction(callee, typeArguments);
 
         if (AllowEvaluating &&
-            TryEvaluate(callee, compiledArguments, new EvaluationContext(), out CompiledValue? returnValue, out RuntimeStatement2[]? runtimeStatements) &&
+            TryEvaluate(callee, compiledArguments, new EvaluationContext(), out CompiledValue? returnValue, out ImmutableArray<RuntimeStatement2> runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
@@ -1345,7 +1337,7 @@ public partial class StatementCompiler
         if (anyCall.Arguments.Length != functionType.Parameters.Length)
         {
             if (notFound is not null) Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
-            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{functionType}\": required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().Or(anyCall.Brackets)), anyCall.File));
+            Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{functionType}\": required {functionType.Parameters.Length} passed {anyCall.Arguments.Length}", new Position(anyCall.Arguments.As<IPositioned>().DefaultIfEmpty(anyCall.Brackets)), anyCall.File));
             return false;
         }
 
@@ -1368,10 +1360,7 @@ public partial class StatementCompiler
         }))
         {
             if (notFound is not null) Diagnostics.Add(notFound.ToError(anyCall.PrevStatement));
-            Diagnostics.Add(Diagnostic.Critical(
-                $"Argument types of caller \"...({string.Join(", ", compiledArguments.Select(v => v.Type))})\" doesn't match with callee \"{functionType}\"",
-                anyCall,
-                argumentError?.ToError(anyCall)));
+            Diagnostics.Add(Diagnostic.Critical($"Argument types of caller \"...({string.Join(", ", compiledArguments.Select(v => v.Type))})\" doesn't match with callee \"{functionType}\"", anyCall).WithSuberrors(argumentError?.ToError(anyCall)));
             return false;
         }
 
@@ -1802,11 +1791,7 @@ public partial class StatementCompiler
         }
         else
         {
-            Diagnostics.Add(Diagnostic.Critical(
-                $"Unknown operator \"{@operator.Operator.Content}\"",
-                @operator.Operator,
-                @operator.File,
-                operatorNotFoundError.ToError(@operator)));
+            Diagnostics.Add(Diagnostic.Critical($"Unknown operator \"{@operator.Operator.Content}\"", @operator.Operator, @operator.File).WithSuberrors(operatorNotFoundError.ToError(@operator)));
             return false;
         }
     }
@@ -2530,14 +2515,14 @@ public partial class StatementCompiler
             return true;
         }
 
-        Diagnostics.Add(Diagnostic.Critical(
-            $"Symbol \"{variable.Content}\" not found",
-            variable,
+        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{variable.Content}\" not found", variable)
+            .WithSuberrors(
             constantNotFoundError.ToError(variable),
             parameterNotFoundError.ToError(variable),
             variableNotFoundError.ToError(variable),
             globalVariableNotFoundError.ToError(variable),
-            functionNotFoundError.ToError(variable)));
+                functionNotFoundError.ToError(variable)
+            ));
         return false;
     }
     bool CompileStatement(AddressGetter addressGetter, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
@@ -2760,8 +2745,8 @@ public partial class StatementCompiler
             {
                 if (!CompileAllocation(new AnyCall(
                     new Identifier(Token.CreateAnonymous("sizeof"), newInstance.File),
-                    new CompiledTypeStatement[] { new(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File) },
-                    Array.Empty<Token>(),
+                    ImmutableArray.Create<StatementWithValue>(new CompiledTypeStatement(Token.CreateAnonymous(StatementKeywords.Type), pointerType.To, newInstance.File)),
+                    ImmutableArray<Token>.Empty,
                     TokenPair.CreateAnonymous(newInstance.Position, "(", ")"),
                     newInstance.File
                 ), out compiledStatement))
@@ -3402,12 +3387,12 @@ public partial class StatementCompiler
             return true;
         }
 
-        Diagnostics.Add(Diagnostic.Critical(
-            $"Symbol \"{statementToSet.Content}\" not found",
-            statementToSet,
+        Diagnostics.Add(Diagnostic.Critical($"Symbol \"{statementToSet.Content}\" not found", statementToSet)
+            .WithSuberrors(
             parameterNotFoundError.ToError(statementToSet),
             variableNotFoundError.ToError(statementToSet),
-            globalVariableNotFoundError.ToError(statementToSet)));
+                globalVariableNotFoundError.ToError(statementToSet)
+            ));
         return false;
     }
     bool CompileSetter(Field statementToSet, StatementWithValue value, [NotNullWhen(true)] out CompiledStatement? compiledStatement)
@@ -3652,7 +3637,7 @@ public partial class StatementCompiler
         Uri? file = null)
     {
         GeneralType returnType = CompileType(type.FunctionReturnType, file);
-        IEnumerable<GeneralType> parameters = CompileTypes(type.FunctionParameterTypes, file);
+        ImmutableArray<GeneralType> parameters = CompileTypes(type.FunctionParameterTypes, file);
 
         FunctionType result = new(returnType, parameters);
         type.SetAnalyzedType(result);
@@ -3696,8 +3681,8 @@ public partial class StatementCompiler
         {
             if (type.TypeArguments.HasValue)
             {
-                IEnumerable<GeneralType> typeParameters = CompileTypes(type.TypeArguments.Value, file);
-                result = new StructType(resultStructType.Struct, type.File, typeParameters.ToImmutableList());
+                ImmutableArray<GeneralType> typeParameters = CompileTypes(type.TypeArguments.Value, file);
+                result = new StructType(resultStructType.Struct, type.File, typeParameters);
             }
             else
             {
@@ -3714,14 +3699,16 @@ public partial class StatementCompiler
         return result;
     }
 
-    public IEnumerable<GeneralType> CompileTypes(
-        IEnumerable<TypeInstance>? types,
+    public ImmutableArray<GeneralType> CompileTypes(
+        ImmutableArray<TypeInstance> types,
         Uri? file = null)
     {
-        if (types is null) yield break;
-
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (TypeInstance item in types)
-        { yield return CompileType(item, file); }
+        {
+            result.Add(CompileType(item, file));
+        }
+        return result.MoveToImmutable();
     }
 
     #endregion
@@ -3784,7 +3771,7 @@ public partial class StatementCompiler
                 paramIndex,
                 new PointerType(new StructType(generatorState.Struct, function.File)),
                 new ParameterDefinition(
-                    new Token[] { Token.CreateAnonymous(ModifierKeywords.This) },
+                    ImmutableArray.Create<Token>(Token.CreateAnonymous(ModifierKeywords.This)),
                     new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(GetGeneratorState(function).Struct.Identifier.Content), function.File), Token.CreateAnonymous("*"), function.File),
                     Token.CreateAnonymous("this"),
                     null
@@ -3895,22 +3882,24 @@ public partial class StatementCompiler
 
         try
         {
-
             Scope scope = frame.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty, localInstructionLabels.ToImmutable()));
 
-            if (!CompileStatement(function.Block, out CompiledStatement? _body)) return false;
+            if (!CompileStatement(function.Block, out CompiledStatement? body)) return false;
 
             if (prefixStatement is not null || suffixStatement is not null)
             {
-                IEnumerable<CompiledStatement> v = Enumerable.Empty<CompiledStatement>();
-                if (prefixStatement is not null) v = v.Append(prefixStatement);
-                v = v.Append(((CompiledBlock)_body).Statements);
-                if (suffixStatement is not null) v = v.Append(suffixStatement);
+                ImmutableArray<CompiledStatement> bodyStatements = ((CompiledBlock)body).Statements;
 
-                _body = new CompiledBlock()
+                ImmutableArray<CompiledStatement>.Builder v = ImmutableArray.CreateBuilder<CompiledStatement>(bodyStatements.Length + (prefixStatement is null ? 0 : 1) + (suffixStatement is null ? 0 : 1));
+                if (prefixStatement is not null) v.Add(prefixStatement);
+                v.AddRange(bodyStatements);
+                if (suffixStatement is not null) v.Add(suffixStatement);
+                bodyStatements = v.MoveToImmutable();
+
+                body = new CompiledBlock()
                 {
-                    Location = _body.Location,
-                    Statements = v.ToImmutableArray(),
+                    Location = body.Location,
+                    Statements = bodyStatements,
                 };
             }
 
@@ -3918,7 +3907,7 @@ public partial class StatementCompiler
 
             function.IsMsilCompatible = function.IsMsilCompatible && frame.IsMsilCompatible;
 
-            GeneratedFunctions.Add(new(function, (CompiledBlock)_body));
+            GeneratedFunctions.Add(new(function, (CompiledBlock)body));
 
             return true;
         }
@@ -3930,6 +3919,7 @@ public partial class StatementCompiler
     end:
         return false;
     }
+
     bool CompileFunctions<TFunction>(IEnumerable<TFunction> functions)
         where TFunction : FunctionThingDefinition, IHaveInstructionOffset, IReferenceable, ICompiledFunctionDefinition
     {

@@ -30,7 +30,7 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
 
     public GeneralFunctionDefinition(
         Token identifier,
-        IEnumerable<Token> modifiers,
+        ImmutableArray<Token> modifiers,
         ParameterDefinitionCollection parameters,
         Uri file)
         : base(modifiers, identifier, parameters, null, file)

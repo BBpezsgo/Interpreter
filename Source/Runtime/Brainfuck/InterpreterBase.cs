@@ -81,7 +81,7 @@ public abstract class InterpreterBase<TCode> : InterpreterBase
         return this;
     }
 
-    protected abstract TCode[] ParseCode(string code, bool showProgress, DebugInformation? debugInfo);
+    protected abstract ImmutableArray<TCode> ParseCode(string code, bool showProgress, DebugInformation? debugInfo);
 
     public override bool Step()
     {

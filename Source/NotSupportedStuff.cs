@@ -1,4 +1,4 @@
-#if false
+#if UNITY
 global using MemberNotNullWhenAttribute = System.Runtime.CompilerServices.MemberNotNullWhenAttribute_;
 
 [assembly: SuppressMessage("Design", "CS8604")]

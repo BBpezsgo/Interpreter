@@ -10,14 +10,14 @@ public class TemplateInfo : IPositioned
     public ImmutableArray<Token> Parameters { get; }
 
     public Position Position =>
-        new Position(Parameters.As<IPositioned>().Or(Brackets))
+        new Position(Parameters.As<IPositioned>().DefaultIfEmpty(Brackets))
         .Union(Keyword, Brackets);
 
-    public TemplateInfo(Token keyword, TokenPair brackets, IEnumerable<Token> typeParameters)
+    public TemplateInfo(Token keyword, TokenPair brackets, ImmutableArray<Token> typeParameters)
     {
         Keyword = keyword;
         Brackets = brackets;
-        Parameters = typeParameters.ToImmutableArray();
+        Parameters = typeParameters;
     }
 
     public override string ToString() => $"{Keyword} {Brackets.Start}{string.Join(", ", Parameters)}{Brackets.End}";

@@ -9,7 +9,7 @@ public static class RangeExtensions
         => range.Start > range.End;
 
     public static int Size(this MutableRange<int> range)
-        => General.Max(range.Start, range.End) - General.Min(range.Start, range.End);
+        => Math.Max(range.Start, range.End) - Math.Min(range.Start, range.End);
 
     public static bool Contains(this MutableRange<int> range, int value)
     {
@@ -37,29 +37,29 @@ public static class RangeExtensions
 
     public static Range<int> Fix(this Range<int> v)
     {
-        int start = General.Min(v.Start, v.End);
-        int end = General.Max(v.Start, v.End);
+        int start = Math.Min(v.Start, v.End);
+        int end = Math.Max(v.Start, v.End);
         return new Range<int>(start, end);
     }
 
     public static Range<SinglePosition> Fix(this Range<SinglePosition> v)
     {
-        SinglePosition start = General.Min(v.Start, v.End);
-        SinglePosition end = General.Max(v.Start, v.End);
+        SinglePosition start = SinglePosition.Min(v.Start, v.End);
+        SinglePosition end = SinglePosition.Max(v.Start, v.End);
         return new Range<SinglePosition>(start, end);
     }
 
     public static MutableRange<int> Fix(this MutableRange<int> v)
     {
-        int start = General.Min(v.Start, v.End);
-        int end = General.Max(v.Start, v.End);
+        int start = Math.Min(v.Start, v.End);
+        int end = Math.Max(v.Start, v.End);
         return new MutableRange<int>(start, end);
     }
 
     public static MutableRange<SinglePosition> Fix(this MutableRange<SinglePosition> v)
     {
-        SinglePosition start = General.Min(v.Start, v.End);
-        SinglePosition end = General.Max(v.Start, v.End);
+        SinglePosition start = SinglePosition.Min(v.Start, v.End);
+        SinglePosition end = SinglePosition.Max(v.Start, v.End);
         return new MutableRange<SinglePosition>(start, end);
     }
 
@@ -67,7 +67,7 @@ public static class RangeExtensions
         => new(v.Start + offset, v.End + offset);
 
     public static int Size(this Range<int> range)
-        => General.Max(range.Start, range.End) - General.Min(range.Start, range.End);
+        => Math.Max(range.Start, range.End) - Math.Min(range.Start, range.End);
 
     public static IEnumerable<int> ForEach(this Range<int> a)
     {

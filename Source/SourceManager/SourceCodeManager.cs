@@ -341,8 +341,16 @@ public class SourceCodeManager
         }
     }
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _marker = new("LanguageCore.SourceCodeManager.Collect");
+    static readonly Unity.Profiling.ProfilerMarker _markerWait = new("LanguageCore.SourceCodeManager.WaitForFiles");
+#endif
     SourceCodeManagerResult Entry(string? file, ImmutableArray<string> additionalImports)
     {
+#if UNITY
+        using Unity.Profiling.ProfilerMarker.AutoScope _1 = _marker.Auto();
+#endif
+
         Uri? resolvedEntry = null;
 
         ImportIndex rootIndex = new();
@@ -370,6 +378,9 @@ public class SourceCodeManager
             }
         }
 
+#if UNITY
+        using Unity.Profiling.ProfilerMarker.AutoScope _2 = _markerWait.Auto();
+#endif
         while (PendingFiles.Count > 0)
         {
 #if UNITY

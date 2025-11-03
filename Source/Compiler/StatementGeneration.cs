@@ -2517,10 +2517,10 @@ public partial class StatementCompiler
 
         Diagnostics.Add(Diagnostic.Critical($"Symbol \"{variable.Content}\" not found", variable)
             .WithSuberrors(
-            constantNotFoundError.ToError(variable),
-            parameterNotFoundError.ToError(variable),
-            variableNotFoundError.ToError(variable),
-            globalVariableNotFoundError.ToError(variable),
+                constantNotFoundError.ToError(variable),
+                parameterNotFoundError.ToError(variable),
+                variableNotFoundError.ToError(variable),
+                globalVariableNotFoundError.ToError(variable),
                 functionNotFoundError.ToError(variable)
             ));
         return false;
@@ -3389,8 +3389,8 @@ public partial class StatementCompiler
 
         Diagnostics.Add(Diagnostic.Critical($"Symbol \"{statementToSet.Content}\" not found", statementToSet)
             .WithSuberrors(
-            parameterNotFoundError.ToError(statementToSet),
-            variableNotFoundError.ToError(statementToSet),
+                parameterNotFoundError.ToError(statementToSet),
+                variableNotFoundError.ToError(statementToSet),
                 globalVariableNotFoundError.ToError(statementToSet)
             ));
         return false;
@@ -3717,10 +3717,17 @@ public partial class StatementCompiler
 
     HashSet<FunctionThingDefinition> _generatedFunctions = new();
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _m2 = new("LanguageCore.Compiler.Function");
+#endif
     bool CompileFunction<TFunction>(TFunction function, ImmutableDictionary<string, GeneralType>? typeArguments)
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition
     {
         if (!_generatedFunctions.Add(function)) return false;
+
+#if UNITY
+        using var _1 = _m2.Auto();
+#endif
 
         if (function.Identifier is not null &&
             LanguageConstants.KeywordList.Contains(function.Identifier.ToString()))
@@ -3962,8 +3969,15 @@ public partial class StatementCompiler
         return compiledAnything;
     }
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _m1 = new("LanguageCore.Compiler.TopLevelStatements");
+#endif
     bool CompileTopLevelStatements(ImmutableArray<Statement> statements, [NotNullWhen(true)] out ImmutableArray<CompiledStatement> compiledStatements)
     {
+#if UNITY
+        using var _1 = _m1.Auto();
+#endif
+
         CompiledFrame frame = Frames.Push(new CompiledFrame()
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,

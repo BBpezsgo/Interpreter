@@ -48,8 +48,14 @@ public partial class Tokenizer
         => new Tokenizer(text, settings ?? TokenizerSettings.Default, file, preprocessorVariables, diagnostics)
         .TokenizeInternal();
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _marker = new("LanguageCore.Parser");
+#endif
     TokenizerResult TokenizeInternal()
     {
+#if UNITY
+        using Unity.Profiling.ProfilerMarker.AutoScope _1 = _marker.Auto();
+#endif
         for (int offsetTotal = 0; offsetTotal < Text.Length; offsetTotal++)
         {
             ProcessCharacter(Text[offsetTotal], offsetTotal);

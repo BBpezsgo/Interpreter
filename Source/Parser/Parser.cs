@@ -146,8 +146,14 @@ public sealed class Parser
     public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
         => new Parser(tokens, file, diagnostics).ParseInternal();
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _marker = new("LanguageCore.Parser");
+#endif
     ParserResult ParseInternal()
     {
+#if UNITY
+        using Unity.Profiling.ProfilerMarker.AutoScope _1 = _marker.Auto();
+#endif
         CurrentTokenIndex = 0;
 
         ParseCodeHeader();

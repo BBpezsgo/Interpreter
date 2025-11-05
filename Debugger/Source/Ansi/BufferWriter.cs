@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace LanguageCore.TUI;
 
-struct BufferWriter
+public struct BufferWriter : IBufferWriter<BufferWriter>
 {
     readonly AnsiBufferSlice _buffer;
     int _x = 0;

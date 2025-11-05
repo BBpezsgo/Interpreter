@@ -1,6 +1,6 @@
 namespace LanguageCore.TUI;
 
-enum AnsiColor : byte
+public enum AnsiColor : byte
 {
     Black = 30,
     Red = 31,

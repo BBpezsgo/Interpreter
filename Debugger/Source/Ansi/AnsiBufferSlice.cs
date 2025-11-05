@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace LanguageCore.TUI;
 
-readonly struct AnsiBufferSlice
+public readonly struct AnsiBufferSlice
 {
     readonly AnsiBuffer Buffer;
     public readonly int Width;

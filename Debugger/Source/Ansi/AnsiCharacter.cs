@@ -2,7 +2,7 @@ using System.Diagnostics;
 
 namespace LanguageCore.TUI;
 
-readonly struct AnsiCharacter
+public readonly struct AnsiCharacter
 {
     public readonly char Char;
     public readonly AnsiColor Foreground;

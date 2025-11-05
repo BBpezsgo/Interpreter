@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
+using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.TUI;
@@ -189,7 +190,7 @@ public class InterpreterRenderer
         return (memLoad, memStore, regLoad, regStore);
     }
 
-    static void WriteType(ref BufferWriter t, GeneralType type)
+    public static void WriteType<TWriter>(ref TWriter t, GeneralType type) where TWriter : IBufferWriter<TWriter>
     {
         switch (type)
         {
@@ -251,6 +252,50 @@ public class InterpreterRenderer
                 break;
             default:
                 throw new UnreachableException();
+        }
+    }
+
+    public static void WriteFunction<TWriter>(ref TWriter t, FunctionThingDefinition? function, ImmutableDictionary<string, GeneralType>? typeArguments) where TWriter : IBufferWriter<TWriter>
+    {
+        if (function is ICompiledFunctionDefinition compiledFunction)
+        {
+            t.Write(function.Identifier.Content, AnsiColor.Yellow);
+            t.Write('(');
+            for (int j = 0; j < compiledFunction.Parameters.Length; j++)
+            {
+                if (j > 0) t.Write(", ");
+                for (int k = 0; k < compiledFunction.Parameters[j].Modifiers.Length; k++)
+                {
+                    t.Write(compiledFunction.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
+                    t.Write(' ');
+                }
+                WriteType(ref t, GeneralType.InsertTypeParameters(compiledFunction.ParameterTypes[j], typeArguments) ?? compiledFunction.ParameterTypes[j]);
+                t.Write(' ');
+                t.Write(compiledFunction.Parameters[j].Identifier.Content);
+            }
+            t.Write(')');
+        }
+        else if (function is not null)
+        {
+            t.Write(function.Identifier.Content, AnsiColor.Yellow);
+            t.Write('(');
+            for (int j = 0; j < function.Parameters.Count; j++)
+            {
+                if (j > 0) t.Write(", ");
+                for (int k = 0; k < function.Parameters[j].Modifiers.Length; k++)
+                {
+                    t.Write(function.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
+                    t.Write(' ');
+                }
+                t.Write(function.Parameters[j].Type.ToString(typeArguments), AnsiColor.Green);
+                t.Write(' ');
+                t.Write(function.Parameters[j].Identifier.Content);
+            }
+            t.Write(')');
+        }
+        else
+        {
+            t.Write(function?.GetType().Name ?? "?");
         }
     }
 
@@ -1072,46 +1117,7 @@ public class InterpreterRenderer
                 continue;
             }
 
-            if (function.Function is ICompiledFunctionDefinition compiledFunction)
-            {
-                t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
-                t.Write('(');
-                for (int j = 0; j < compiledFunction.Parameters.Length; j++)
-                {
-                    if (j > 0) t.Write(", ");
-                    for (int k = 0; k < compiledFunction.Parameters[j].Modifiers.Length; k++)
-                    {
-                        t.Write(compiledFunction.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
-                        t.Write(' ');
-                    }
-                    WriteType(ref t, GeneralType.InsertTypeParameters(compiledFunction.ParameterTypes[j], function.TypeArguments) ?? compiledFunction.ParameterTypes[j]);
-                    t.Write(' ');
-                    t.Write(compiledFunction.Parameters[j].Identifier.Content);
-                }
-                t.Write(')');
-            }
-            else if (function.Function is not null)
-            {
-                t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
-                t.Write('(');
-                for (int j = 0; j < function.Function.Parameters.Count; j++)
-                {
-                    if (j > 0) t.Write(", ");
-                    for (int k = 0; k < function.Function.Parameters[j].Modifiers.Length; k++)
-                    {
-                        t.Write(function.Function.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
-                        t.Write(' ');
-                    }
-                    t.Write(function.Function.Parameters[j].Type.ToString(function.TypeArguments), AnsiColor.Green);
-                    t.Write(' ');
-                    t.Write(function.Function.Parameters[j].Identifier.Content);
-                }
-                t.Write(')');
-            }
-            else
-            {
-                t.Write(function.Function?.GetType().Name ?? "?");
-            }
+            WriteFunction(ref t, function.Function, function.TypeArguments);
         }
     }, ElementSize.Auto());
 
@@ -1145,7 +1151,7 @@ public class InterpreterRenderer
             e.Cancel = true;
         };
 
-        int tick = int.MaxValue;
+        int tick = 0;
         int freq = 100;
 
         try

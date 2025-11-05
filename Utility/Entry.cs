@@ -151,7 +151,42 @@ public static class Entry
                 {
                     for (int i = 0; i < generatedCode.Code.Length; i++)
                     {
+                        int indent = 0;
+                        if (generatedCode.DebugInfo is not null)
+                        {
+                            foreach (var item in generatedCode.DebugInfo.FunctionInformation)
+                            {
+                                if (item.Instructions.Contains(i))
+                                {
+                                    indent++;
+                                }
+
+                                if (item.Instructions.Start == i)
+                                {
+                                    ConsoleWriter t = default;
+                                    InterpreterRenderer.WriteFunction(ref t, item.Function, item.TypeArguments);
+                                    Console.WriteLine();
+                                    break;
+                                }
+                            }
+
+                            if (generatedCode.DebugInfo.CodeComments.TryGetValue(i, out List<string>? comments))
+                            {
+                                Console.ForegroundColor = ConsoleColor.DarkGray;
+                                foreach (string comment in comments)
+                                {
+                                    Console.Write(new string(' ', indent * 2));
+                                    Console.WriteLine(comment);
+                                }
+                            }
+                        }
+
                         Instruction instruction = generatedCode.Code[i];
+
+                        Console.Write(new string(' ', indent * 2));
+
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.Write($"{i,4}: ");
 
                         Console.ForegroundColor = ConsoleColor.DarkYellow;
                         Console.Write(instruction.Opcode);

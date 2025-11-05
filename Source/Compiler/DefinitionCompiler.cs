@@ -541,7 +541,7 @@ public partial class StatementCompiler
                 new PointerType(BuiltinType.Any),
                 @struct,
                 new FieldDefinition(
-                    Token.CreateAnonymous("_state"),
+                    Token.CreateAnonymous("_genstate"),
                     null,
                     ImmutableArray<Token>.Empty,
                     ImmutableArray<AttributeUsage>.Empty
@@ -645,7 +645,7 @@ public partial class StatementCompiler
                         Token.CreateAnonymous("="),
                         new Field(
                             new Identifier(Token.CreateAnonymous("this"), @struct.File),
-                            new Identifier(Token.CreateAnonymous("_state"), @struct.File),
+                            new Identifier(Token.CreateAnonymous("_genstate"), @struct.File),
                             @struct.File
                         ),
                         new Identifier(Token.CreateAnonymous("state"), @struct.File),

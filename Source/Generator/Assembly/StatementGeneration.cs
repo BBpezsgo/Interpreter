@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
@@ -444,109 +445,17 @@ public partial class CodeGeneratorForNative : CodeGenerator
 
     void EmitExpression(CompiledEvaluatedValue statement)
     {
-        AllocatedRegister reg;
-        switch (statement.Value.Type)
+        if (TryAllocateRegister(statement.Value.BitWidth, out AllocatedRegister reg))
         {
-            case RuntimeType.I8:
-                if (TryAllocateRegister(BitWidth._8, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.I8.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.I8.ToString());
-                }
-                break;
-            case RuntimeType.U8:
-                if (TryAllocateRegister(BitWidth._8, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.U8.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.U8.ToString());
-                }
-                break;
-            case RuntimeType.I16:
-                if (TryAllocateRegister(BitWidth._16, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.I16.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.I16.ToString());
-                }
-                break;
-            case RuntimeType.U16:
-                if (TryAllocateRegister(BitWidth._16, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.U16.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.U16.ToString());
-                }
-                break;
-            case RuntimeType.I32:
-                if (TryAllocateRegister(BitWidth._32, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.I32.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.I32.ToString());
-                }
-                break;
-            case RuntimeType.U32:
-                if (TryAllocateRegister(BitWidth._32, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.U32.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.U32.ToString());
-                }
-                break;
-            case RuntimeType.F32:
-                if (TryAllocateRegister(BitWidth._32, out reg))
-                {
-                    using (reg)
-                    {
-                        Code.AppendInstruction("mov", reg.ToString(), statement.Value.F32.ToString());
-                        SaveExpression(statement, reg);
-                    }
-                }
-                else
-                {
-                    Code.AppendInstruction("push", statement.Value.F32.ToString());
-                }
-                break;
-            case RuntimeType.Null:
-                throw new NotImplementedException("Bruh");
+            using (reg)
+            {
+                Code.AppendInstruction("mov", reg.ToString(), statement.Value.ToStringValue()!);
+                SaveExpression(statement, reg);
+            }
+        }
+        else
+        {
+            Code.AppendInstruction("push", statement.Value.ToStringValue()!);
         }
     }
 
@@ -584,11 +493,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
 
     void EmitStatement(CompiledReturn statement)
     {
-        if (statement.Value is null)
-        {
-            Code.AppendInstruction("mov", Register.EAX.ToString(), "0");
-        }
-        else
+        if (statement.Value is not null)
         {
             EmitExpression(statement.Value);
             PutExpressionIntoRegister(statement.Value, Register.EAX);
@@ -635,6 +540,9 @@ public partial class CodeGeneratorForNative : CodeGenerator
         }
     }
 
+#if NET
+    [SupportedOSPlatform("linux")]
+#endif
     NativeFunction GenerateImpl(DiagnosticsCollection diagnostics)
     {
         Frames.Push(new());
@@ -672,6 +580,9 @@ public partial class CodeGeneratorForNative : CodeGenerator
         return func;
     }
 
+#if NET
+    [SupportedOSPlatform("linux")]
+#endif
     public static NativeFunction Generate(CompilerResult compilerResult, DiagnosticsCollection diagnostics)
         => new CodeGeneratorForNative(compilerResult, diagnostics)
         .GenerateImpl(diagnostics);

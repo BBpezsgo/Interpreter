@@ -217,7 +217,7 @@ public static class Entry
                 if (arguments.Output is not null)
                 {
                     Console.WriteLine($"Writing to \"{arguments.Output}\" ...");
-                    File.WriteAllText(arguments.Output, null);
+                    File.WriteAllBytes(arguments.Output, ReadOnlySpan<byte>.Empty);
                     using FileStream stream = File.OpenWrite(arguments.Output);
                     using StreamWriter writer = new(stream);
                     foreach (Instruction instruction in generatedCode.Code)
@@ -800,7 +800,6 @@ public static class Entry
                     using NativeFunction f = CodeGeneratorForNative.Generate(compiled, diagnostics);
                     diagnostics.Print();
                     if (diagnostics.HasErrors) return 1;
-                    return 0;
                     return f.AsDelegate<CodeGeneratorForNative.JitFn>()();
                 }
                 catch (LanguageException ex)

@@ -270,6 +270,9 @@ public abstract class GeneralType :
 
     public static bool TryGetTypeParameters(GeneralType defined, GeneralType passed, Dictionary<string, GeneralType> typeParameters)
     {
+        defined = defined.FinalValue;
+        passed = passed.FinalValue;
+
         if (passed.Is(out GenericType? passedGenericType))
         {
             if (typeParameters.ContainsKey(passedGenericType.Identifier))
@@ -305,6 +308,17 @@ public abstract class GeneralType :
             }
 
             return TryGetTypeParameters(definedPointerType.To, passedPointerType.To, typeParameters);
+        }
+
+        if (defined.Is(out FunctionType? definedFunctionType) && passed.Is(out FunctionType? passedFunctionType))
+        {
+            if (definedFunctionType.Parameters.Length != passedFunctionType.Parameters.Length) return false;
+            for (int i = 0; i < definedFunctionType.Parameters.Length; i++)
+            {
+                if (!TryGetTypeParameters(definedFunctionType.Parameters[i], passedFunctionType.Parameters[i], typeParameters)) return false;
+            }
+            if (!TryGetTypeParameters(definedFunctionType.ReturnType, passedFunctionType.ReturnType, typeParameters)) return false;
+            return true;
         }
 
         if (defined.Is(out StructType? definedStructType) && passed.Is(out StructType? passedStructType))

@@ -137,6 +137,25 @@ class ControlFlowFrame
     public bool IsSkipping { get; set; }
 }
 
+readonly struct BytecodeLabel : IEquatable<BytecodeLabel>
+{
+    public static readonly BytecodeLabel Invalid = new(-1);
+
+    public readonly int Index;
+
+    public BytecodeLabel(int index)
+    {
+        Index = index;
+    }
+
+    public override bool Equals(object? obj) => obj is BytecodeLabel other && Index == other.Index;
+    public bool Equals(BytecodeLabel other) => Index == other.Index;
+    public override int GetHashCode() => Index;
+
+    public static bool operator ==(BytecodeLabel left, BytecodeLabel right) => left.Index == right.Index;
+    public static bool operator !=(BytecodeLabel left, BytecodeLabel right) => left.Index != right.Index;
+}
+
 public partial class CodeGeneratorForMain : CodeGenerator
 {
     public static readonly CompilerSettings DefaultCompilerSettings = new()
@@ -163,6 +182,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly Dictionary<CompiledInstructionLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
     readonly Dictionary<CompiledVariableDeclaration, GeneratedVariable> GeneratedVariables = new();
     readonly HashSet<ICompiledFunctionDefinition> GeneratedFunctions = new();
+    readonly List<BytecodeLabel> AwaitingLabels = new();
 
     readonly Stack<CompiledScope> CleanupStack2;
     IDefinition? CurrentContext;

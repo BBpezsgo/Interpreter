@@ -115,7 +115,7 @@ public ref partial struct ProcessorState
         HotFunctions.Cycle++;
         switch (CurrentInstruction.Opcode)
         {
-            case Opcode.NOP: break;
+            case Opcode.NOP: Registers.CodePointer++; break;
 
             case Opcode.Push: PUSH_VALUE(); break;
             case Opcode.Pop8: POP_VALUE(BitWidth._8); break;

@@ -85,6 +85,7 @@ public readonly struct InstructionOperand
     public readonly int Value;
     public readonly InstructionOperandType Type;
 
+    public Register Reg => (Register)Value;
     public int Int => Value.I32();
     public int Char => Value.U16();
     public int Byte => Value.U8();

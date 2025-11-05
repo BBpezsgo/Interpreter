@@ -13,55 +13,240 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region AddInstruction()
 
-    void AddInstruction(PreparationInstruction instruction)
+    bool OptimizeCode()
     {
-        if (AllowInstructionLevelOptimizations)
-        {
-            if ((instruction.Opcode is
-                Opcode.Jump or
-                Opcode.JumpIfEqual or
-                Opcode.JumpIfGreater or
-                Opcode.JumpIfGreaterOrEqual or
-                Opcode.JumpIfLess or
-                Opcode.JumpIfLessOrEqual or
-                Opcode.JumpIfNotEqual) &&
-                instruction.Operand1 == 1)
-            {
-                _statistics.InstructionLevelOptimizations++;
-                return;
-            }
+        if (!AllowInstructionLevelOptimizations) return false;
+        if (GeneratedCode.Count == 0) return false;
 
-            if ((instruction.Opcode is
-                Opcode.MathAdd or
-                Opcode.MathSub) &&
-                instruction.Operand2 == 0)
-            {
-                _statistics.InstructionLevelOptimizations++;
-                return;
-            }
+        PreparationInstruction instruction = GeneratedCode[^1];
+        if (IsBytecodeLabeled(GeneratedCode.Count - 1)) return false;
+
+        //if ((instruction.Opcode is
+        //    Opcode.Jump or
+        //    Opcode.JumpIfEqual or
+        //    Opcode.JumpIfGreater or
+        //    Opcode.JumpIfGreaterOrEqual or
+        //    Opcode.JumpIfLess or
+        //    Opcode.JumpIfLessOrEqual or
+        //    Opcode.JumpIfNotEqual) &&
+        //    instruction.Operand1 == 1)
+        //{
+        //    GeneratedCode.Pop();
+        //    return true;
+        //}
+
+        if ((instruction.Opcode is
+            Opcode.MathAdd or
+            Opcode.MathSub) &&
+            instruction.Operand2 == 0)
+        {
+            GeneratedCode.Pop();
+            return true;
         }
 
-        // if (GeneratedCode.Count > 0)
-        // {
-        //     PreparationInstruction last = GeneratedCode[^1];
-        //     if (last.Opcode == Opcode.Move &&
-        //         instruction.Opcode == Opcode.Push)
-        //     {
-        //         if (instruction.Operand1.Type == InstructionOperandType.PointerEAX32 &&
-        //             last.Operand1 == Register.EAX &&
-        //             last.Operand2 == Register.BasePointer)
-        //         {
-        //             GeneratedCode[^1] = new(
-        //                 instruction.Opcode,
-        //                 new(instruction.Operand1.Value, InstructionOperandType.PointerBP32)
-        //             );
-        //             return;
-        //         }
-        //         // Debugger.Break();
-        //     }
-        // }
+        if (GeneratedCode.Count < 2) return false;
 
+        PreparationInstruction prev1 = GeneratedCode[^2];
+        if (IsBytecodeLabeled(GeneratedCode.Count - 2)) return false;
+
+        if (instruction.Opcode == Opcode.MathAdd
+            && instruction.Operand2.Type == InstructionOperandType.Immediate32
+            && prev1.Opcode == Opcode.MathAdd
+            && prev1.Operand1 == instruction.Operand1
+            && prev1.Operand2.Type == InstructionOperandType.Immediate32)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.MathAdd,
+                instruction.Operand1,
+                prev1.Operand2.Value + instruction.Operand2.Value
+            );
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._64
+            && instruction.Opcode == Opcode.PopTo64)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.Move,
+                instruction.Operand1,
+                prev1.Operand1
+            );
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._32
+            && instruction.Opcode == Opcode.PopTo32)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.Move,
+                instruction.Operand1,
+                prev1.Operand1
+            );
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._16
+            && instruction.Opcode == Opcode.PopTo16)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.Move,
+                instruction.Operand1,
+                prev1.Operand1
+            );
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._8
+            && instruction.Opcode == Opcode.PopTo8)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.Move,
+                instruction.Operand1,
+                prev1.Operand1
+            );
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._64
+            && instruction.Opcode == Opcode.Pop64)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(Opcode.NOP);
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._32
+            && instruction.Opcode == Opcode.Pop32)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(Opcode.NOP);
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._16
+            && instruction.Opcode == Opcode.Pop16)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(Opcode.NOP);
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.BitWidth == BitWidth._8
+            && instruction.Opcode == Opcode.Pop8)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(Opcode.NOP);
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.Move
+            && prev1.Operand1.Type == InstructionOperandType.Register && ((Register)prev1.Operand1.Value).IsGeneralPurpose()
+            && prev1.Operand2.Type == InstructionOperandType.Register
+
+            && instruction.Opcode == Opcode.Move
+            && instruction.Operand1.Type == InstructionOperandType.Register
+            && instruction.Operand2.Type == ((Register)prev1.Operand1.Value).ToPtr(((Register)instruction.Operand1.Value).BitWidth()))
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(Opcode.Move, instruction.Operand1, ((Register)prev1.Operand2.Value).ToPtr(instruction.Operand2.Value, ((Register)instruction.Operand1.Value).BitWidth()));
+            return true;
+        }
+
+        if (prev1.Opcode is Opcode.Pop64 or Opcode.Pop32 or Opcode.Pop16 or Opcode.Pop8
+            && instruction.Opcode is Opcode.Pop64 or Opcode.Pop32 or Opcode.Pop16 or Opcode.Pop8)
+        {
+            int a = prev1.Opcode switch
+            {
+                Opcode.Pop64 => 8,
+                Opcode.Pop32 => 4,
+                Opcode.Pop16 => 2,
+                Opcode.Pop8 => 1,
+                _ => throw new UnreachableException(),
+            };
+            int b = instruction.Opcode switch
+            {
+                Opcode.Pop64 => 8,
+                Opcode.Pop32 => 4,
+                Opcode.Pop16 => 2,
+                Opcode.Pop8 => 1,
+                _ => throw new UnreachableException(),
+            };
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.MathAdd,
+                Register.StackPointer,
+                a + b
+            );
+            return true;
+        }
+
+        if (prev1.Opcode == Opcode.MathAdd
+            && prev1.Operand1 == Register.StackPointer
+            && prev1.Operand2.Type == InstructionOperandType.Immediate32
+            && instruction.Opcode is Opcode.Pop64 or Opcode.Pop32 or Opcode.Pop16 or Opcode.Pop8)
+        {
+            int a = instruction.Opcode switch
+            {
+                Opcode.Pop64 => 8,
+                Opcode.Pop32 => 4,
+                Opcode.Pop16 => 2,
+                Opcode.Pop8 => 1,
+                _ => throw new UnreachableException(),
+            };
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.MathAdd,
+                Register.StackPointer,
+                a + prev1.Operand2.Value
+            );
+            return true;
+        }
+
+        if (prev1.Opcode is Opcode.Pop64 or Opcode.Pop32 or Opcode.Pop16 or Opcode.Pop8
+            && instruction.Opcode == Opcode.MathAdd
+            && instruction.Operand1 == Register.StackPointer
+            && instruction.Operand2.Type == InstructionOperandType.Immediate32)
+        {
+            int a = prev1.Opcode switch
+            {
+                Opcode.Pop64 => 8,
+                Opcode.Pop32 => 4,
+                Opcode.Pop16 => 2,
+                Opcode.Pop8 => 1,
+                _ => throw new UnreachableException(),
+            };
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.MathAdd,
+                Register.StackPointer,
+                a + instruction.Operand2.Value
+            );
+            return true;
+        }
+
+        return false;
+    }
+
+    void AddInstruction(PreparationInstruction instruction)
+    {
         GeneratedCode.Add(instruction);
+        while (OptimizeCode())
+        {
+            _statistics.InstructionLevelOptimizations++;
+        }
     }
 
     void AddInstruction(
@@ -387,7 +572,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        if (CanReturn)
+        if (CanReturn && CleanupStack2.Count > 0)
         {
             AddComment("Cleanup function scopes {");
             for (int i = CleanupStack2.Count - 1; i >= 0; i--)
@@ -458,8 +643,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             PopTo(reg.Get(PointerBitWidth));
             AddInstruction(Opcode.MathSub, reg.Get(PointerBitWidth), GeneratedCode.Count + 1);
-
-            int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.Jump, reg.Get(PointerBitWidth));
         }
     }
@@ -501,6 +684,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForParameterCleanup(Stack<CompiledCleanup> parameterCleanup)
     {
+        if (parameterCleanup.Count == 0) return;
+
         AddComment(" Clear Params:");
         while (parameterCleanup.Count > 0)
         {
@@ -525,12 +710,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         AddInstruction(Opcode.CallMSIL, caller.Function.Id);
-        int conditionalJumpInstruction;
+        BytecodeLabel conditionalJumpInstruction;
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Register8L);
             AddInstruction(Opcode.Compare, reg.Register8L, 0);
-            conditionalJumpInstruction = GeneratedCode.Count;
+            conditionalJumpInstruction = MarkLabel();
             AddInstruction(Opcode.JumpIfNotEqual, 0);
         }
 
@@ -542,7 +727,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         AddInstruction(Opcode.HotFuncEnd, caller.Function.Id);
 
-        GeneratedCode[conditionalJumpInstruction].Operand1 = GeneratedCode.Count - conditionalJumpInstruction;
+        ApplyLabelRelative(conditionalJumpInstruction);
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -761,7 +946,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
         BitWidth bitWidth = StatementCompiler.MaxBitWidth(leftBitWidth, rightBitWidth);
 
-        int jumpInstruction = InvalidFunctionAddress;
+        BytecodeLabel jumpInstruction = BytecodeLabel.Invalid;
 
         GenerateCodeForStatement(@operator.Left);
 
@@ -773,7 +958,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 PopTo(regLeft.Get(leftBitWidth));
                 AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
-                jumpInstruction = GeneratedCode.Count;
+                jumpInstruction = MarkLabel();
                 AddInstruction(Opcode.JumpIfEqual, 0);
             }
         }
@@ -786,7 +971,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 PopTo(regLeft.Get(leftBitWidth));
                 AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
 
-                jumpInstruction = GeneratedCode.Count;
+                jumpInstruction = MarkLabel();
                 AddInstruction(Opcode.JumpIfNotEqual, 0);
             }
         }
@@ -905,8 +1090,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        if (jumpInstruction != InvalidFunctionAddress)
-        { GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction; }
+        ApplyLabelRelative(jumpInstruction);
     }
     void GenerateCodeForStatement(CompiledUnaryOperatorCall @operator)
     {
@@ -1129,7 +1313,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Condition");
         int conditionOffset = GeneratedCode.Count;
 
-        List<int> conditionFalseAddresses = new();
+        List<BytecodeLabel> conditionFalseAddresses = new();
         GenerateCodeForCondition(whileLoop.Condition, conditionFalseAddresses);
 
         BreakInstructions.Push(new ControlFlowFrame());
@@ -1143,8 +1327,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         FinishJumpInstructions(BreakInstructions.Last.Offsets);
 
-        foreach (int v in conditionFalseAddresses)
-        { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
+        foreach (BytecodeLabel v in conditionFalseAddresses)
+        { ApplyLabelRelative(v); }
 
         OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
 
@@ -1167,7 +1351,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("For-loop condition");
         int conditionOffsetFor = GeneratedCode.Count;
 
-        List<int> conditionFalseAddresses = new();
+        List<BytecodeLabel> conditionFalseAddresses = new();
         GenerateCodeForCondition(forLoop.Condition, conditionFalseAddresses);
 
         BreakInstructions.Push(new ControlFlowFrame());
@@ -1182,8 +1366,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         ReturnInstructions.Last.IsSkipping = false;
 
-        foreach (int v in conditionFalseAddresses)
-        { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
+        foreach (var v in conditionFalseAddresses)
+        { ApplyLabelRelative(v); }
 
         FinishJumpInstructions(BreakInstructions.Pop().Offsets);
 
@@ -1193,7 +1377,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledIf @if)
     {
-        List<int> jumpOutInstructions = new();
+        List<BytecodeLabel> jumpOutInstructions = new();
 
         CompiledBranch? ifSegment = @if;
 
@@ -1205,13 +1389,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("If condition");
 
-                List<int> falseJumpAddresses = new();
+                List<BytecodeLabel> falseJumpAddresses = new();
                 GenerateCodeForCondition(partIf.Condition, falseJumpAddresses);
 
                 GenerateCodeForStatement(partIf.Body);
 
                 AddComment("If jump-to-end");
-                jumpOutInstructions.Add(GeneratedCode.Count);
+                jumpOutInstructions.Add(MarkLabel());
                 AddInstruction(Opcode.Jump, 0);
 
                 ReturnInstructions.Last.IsSkipping = false;
@@ -1219,8 +1403,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("}");
 
-                foreach (int falseJumpAddress in falseJumpAddresses)
-                { GeneratedCode[falseJumpAddress].Operand1 = GeneratedCode.Count - falseJumpAddress; }
+                foreach (BytecodeLabel v in falseJumpAddresses)
+                { ApplyLabelRelative(v); }
 
                 ifSegment = partIf.Next;
             }
@@ -1243,10 +1427,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        foreach (int item in jumpOutInstructions)
-        {
-            GeneratedCode[item].Operand1 = GeneratedCode.Count - item;
-        }
+        foreach (BytecodeLabel v in jumpOutInstructions)
+        { ApplyLabelRelative(v); }
     }
     void GenerateCodeForStatement(CompiledStackAllocation newInstance)
     {
@@ -1585,6 +1767,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledBlock block, bool ignoreScope = false)
     {
+        if (block.Statements.Length == 0) return;
+
         CompiledScope scope = ignoreScope ? default : OnScopeEnter(block, false);
 
         AddComment("Statements {");
@@ -1666,7 +1850,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForCondition(CompiledStatementWithValue statement, List<int> falseJumpAddresses)
+    void GenerateCodeForCondition(CompiledStatementWithValue statement, List<BytecodeLabel> falseJumpAddresses)
     {
         switch (statement)
         {
@@ -1687,25 +1871,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 PopTo(reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)));
                 AddInstruction(Opcode.Compare, reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)), 0);
-                falseJumpAddresses.Add(GeneratedCode.Count);
+                falseJumpAddresses.Add(MarkLabel());
                 AddInstruction(Opcode.JumpIfEqual, 0);
             }
         }
     }
-    void GenerateCodeForCondition(CompiledUnaryOperatorCall @operator, List<int> falseJumpAddresses)
+    void GenerateCodeForCondition(CompiledUnaryOperatorCall @operator, List<BytecodeLabel> falseJumpAddresses)
     {
         switch (@operator.Operator)
         {
             case CompiledUnaryOperatorCall.LogicalNOT:
             {
-                List<int> subFalseJumpAddresses = new();
+                List<BytecodeLabel> subFalseJumpAddresses = new();
                 GenerateCodeForCondition(@operator.Left, subFalseJumpAddresses);
 
-                falseJumpAddresses.Add(GeneratedCode.Count);
+                falseJumpAddresses.Add(MarkLabel());
                 AddInstruction(Opcode.Jump, 0);
 
-                foreach (int v in subFalseJumpAddresses)
-                { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
+                foreach (BytecodeLabel v in subFalseJumpAddresses)
+                { ApplyLabelRelative(v); }
 
                 return;
             }
@@ -1731,7 +1915,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
     }
-    void GenerateCodeForCondition(CompiledBinaryOperatorCall @operator, List<int> falseJumpAddresses)
+    void GenerateCodeForCondition(CompiledBinaryOperatorCall @operator, List<BytecodeLabel> falseJumpAddresses)
     {
         BitWidth leftBitWidth = @operator.Left.Type.GetBitWidth(this, Diagnostics, @operator.Left);
         BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
@@ -1744,18 +1928,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
         {
-            List<int> subFalseJumpAddresses = new();
+            List<BytecodeLabel> subFalseJumpAddresses = new();
             GenerateCodeForCondition(@operator.Left, subFalseJumpAddresses);
 
-            int trueAddress = GeneratedCode.Count;
+            BytecodeLabel trueAddress = MarkLabel();
             AddInstruction(Opcode.Jump, 0);
 
-            foreach (int v in subFalseJumpAddresses)
-            { GeneratedCode[v].Operand1 = GeneratedCode.Count - v; }
+            foreach (BytecodeLabel v in subFalseJumpAddresses)
+            { ApplyLabelRelative(v); }
 
             GenerateCodeForCondition(@operator.Right, falseJumpAddresses);
 
-            GeneratedCode[trueAddress].Operand1 = GeneratedCode.Count - trueAddress;
+            ApplyLabelRelative(trueAddress);
         }
         else
         {
@@ -1823,37 +2007,37 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                     case CompiledBinaryOperatorCall.CompEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        falseJumpAddresses.Add(MarkLabel());
                         AddInstruction(Opcode.JumpIfNotEqual, 0);
                         break;
 
                     case CompiledBinaryOperatorCall.CompNEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        falseJumpAddresses.Add(MarkLabel());
                         AddInstruction(Opcode.JumpIfEqual, 0);
                         break;
 
                     case CompiledBinaryOperatorCall.CompGT:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        falseJumpAddresses.Add(MarkLabel());
                         AddInstruction(Opcode.JumpIfLessOrEqual, 0);
                         break;
 
                     case CompiledBinaryOperatorCall.CompGEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        falseJumpAddresses.Add(MarkLabel());
                         AddInstruction(Opcode.JumpIfLess, 0);
                         break;
 
                     case CompiledBinaryOperatorCall.CompLT:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        falseJumpAddresses.Add(MarkLabel());
                         AddInstruction(Opcode.JumpIfGreaterOrEqual, 0);
                         break;
 
                     case CompiledBinaryOperatorCall.CompLEQ:
                         AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(GeneratedCode.Count);
+                        falseJumpAddresses.Add(MarkLabel());
                         AddInstruction(Opcode.JumpIfGreater, 0);
                         break;
 
@@ -2288,9 +2472,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         ReturnInstructions.Push(new ControlFlowFrame());
 
-        AddComment("Statements {");
         GenerateCodeForStatement(body, true);
-        AddComment("}");
 
         CurrentReturnType = null;
 
@@ -2368,10 +2550,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = ExitCodeType;
 
-        AddComment("Statements {");
-        foreach (CompiledStatement statement in statements)
-        { GenerateCodeForStatement(statement); }
-        AddComment("}");
+        if (statements.Length > 0)
+        {
+            AddComment("Statements {");
+            foreach (CompiledStatement statement in statements)
+            { GenerateCodeForStatement(statement); }
+            AddComment("}");
+        }
 
         FinishJumpInstructions(ReturnInstructions.Pop().Offsets);
 
@@ -2446,9 +2631,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             globalVariablesCleanup.Insert(0, variableDeclaration.Cleanup);
         }
 
-        AddComment("Allocate global variables {");
-        StackAlloc(GlobalVariablesSize, false);
-        AddComment("}");
+        if (GlobalVariablesSize > 0)
+        {
+            AddComment("Allocate global variables {");
+            StackAlloc(GlobalVariablesSize, false);
+            AddComment("}");
+        }
 
         {
             // Absolute global offset
@@ -2478,7 +2666,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Pop abs global address");
         Pop(AbsGlobalAddressType.GetSize(this)); // Pop abs global offset
 
-        if (Settings.CleanupGlobalVaraibles)
+        if (Settings.CleanupGlobalVaraibles && globalVariablesCleanup.Count > 0)
         {
             AddComment("Cleanup global variables {");
             CleanupVariables(globalVariablesCleanup.ToImmutableArray(), default, true);
@@ -2558,6 +2746,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             { argumentsSize += p.GetSize(this, Diagnostics, ((FunctionDefinition)f).Type); }
 
             exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize);
+        }
+
+        if (AwaitingLabels.Count > 0)
+        {
+            throw new InternalExceptionWithoutContext($"Some bytecode labels are not set");
         }
 
         return new BBLangGeneratorResult()

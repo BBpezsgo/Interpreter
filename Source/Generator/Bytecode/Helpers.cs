@@ -17,7 +17,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        int returnToValueInstruction = GeneratedCode.Count;
+        var returnToValueInstruction = MarkLabel();
         Push(0);
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, address));
@@ -29,19 +29,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             PopTo(reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
             AddInstruction(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)), GeneratedCode.Count + 2);
-
             AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
-
-            int jumpInstruction = GeneratedCode.Count;
             AddInstruction(Opcode.Jump, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
 
-            GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
+            ApplyLabelAbsolute(returnToValueInstruction);
         }
     }
 
     int Call(int absoluteAddress, ILocated callerLocation)
     {
-        int returnToValueInstruction = GeneratedCode.Count;
+        var returnToValueInstruction = MarkLabel();
         AddInstruction(Opcode.Push, 0);
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
@@ -52,7 +49,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         int jumpInstruction = GeneratedCode.Count;
         AddInstruction(Opcode.Jump, absoluteAddress - GeneratedCode.Count);
 
-        GeneratedCode[returnToValueInstruction].Operand1 = GeneratedCode.Count;
+        ApplyLabelAbsolute(returnToValueInstruction);
 
         return jumpInstruction;
     }
@@ -524,14 +521,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddInstruction(Opcode.Compare, reg.Get(PointerBitWidth), 0);
         }
 
-        int jumpInstruction = GeneratedCode.Count;
+        var jumpInstruction = MarkLabel();
         AddInstruction(Opcode.JumpIfNotEqual, 0);
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             AddInstruction(Opcode.Crash, 0);
         }
-        GeneratedCode[jumpInstruction].Operand1 = GeneratedCode.Count - jumpInstruction;
+        ApplyLabelRelative(jumpInstruction);
 
         AddComment($"}}");
     }
@@ -775,6 +772,67 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         return sum;
+    }
+
+    #endregion
+
+    #region Bytecode Labels
+
+    bool IsBytecodeLabeled(int index)
+    {
+        foreach (BytecodeLabel v in AwaitingLabels)
+        {
+            if (v.Index == index) return true;
+        }
+        foreach (UndefinedOffset v in UndefinedFunctionOffsets)
+        {
+            if (v.InstructionIndex == index) return true;
+        }
+        foreach (UndefinedOffset v in UndefinedInstructionLabels)
+        {
+            if (v.InstructionIndex == index) return true;
+        }
+        return false;
+    }
+
+    BytecodeLabel MarkLabel()
+    {
+        BytecodeLabel label = new(GeneratedCode.Count);
+        AwaitingLabels.Add(label);
+        return label;
+    }
+
+    void ApplyLabel(BytecodeLabel label, int address)
+    {
+        for (int i = 0; i < AwaitingLabels.Count; i++)
+        {
+            if (AwaitingLabels[i].Index != label.Index) continue;
+            AwaitingLabels.RemoveAt(i--);
+        }
+        if (label == BytecodeLabel.Invalid) return;
+        GeneratedCode[label.Index].Operand1 = address;
+    }
+
+    void ApplyLabelAbsolute(BytecodeLabel label)
+    {
+        for (int i = 0; i < AwaitingLabels.Count; i++)
+        {
+            if (AwaitingLabels[i].Index != label.Index) continue;
+            AwaitingLabels.RemoveAt(i--);
+        }
+        if (label == BytecodeLabel.Invalid) return;
+        GeneratedCode[label.Index].Operand1 = GeneratedCode.Count;
+    }
+
+    void ApplyLabelRelative(BytecodeLabel label)
+    {
+        for (int i = 0; i < AwaitingLabels.Count; i++)
+        {
+            if (AwaitingLabels[i].Index != label.Index) continue;
+            AwaitingLabels.RemoveAt(i--);
+        }
+        if (label == BytecodeLabel.Invalid) return;
+        GeneratedCode[label.Index].Operand1 = GeneratedCode.Count - label.Index;
     }
 
     #endregion

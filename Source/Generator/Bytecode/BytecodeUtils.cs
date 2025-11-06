@@ -15,6 +15,7 @@ public partial class CodeGeneratorForMain
         PreparationInstruction instruction = GeneratedCode[^1];
         if (IsBytecodeLabeled(GeneratedCode.Count - 1)) return false;
 
+        // WHYYYYY
         //if ((instruction.Opcode is
         //    Opcode.Jump or
         //    Opcode.JumpIfEqual or
@@ -29,6 +30,13 @@ public partial class CodeGeneratorForMain
         //    return true;
         //}
 
+        if (instruction.Opcode == Opcode.Move
+            && instruction.Operand1 == instruction.Operand2)
+        {
+            GeneratedCode.Pop();
+            return true;
+        }
+
         if ((instruction.Opcode is Opcode.MathAdd or Opcode.MathSub)
             && instruction.Operand2 == 0)
         {
@@ -40,6 +48,60 @@ public partial class CodeGeneratorForMain
 
         PreparationInstruction prev1 = GeneratedCode[^2];
         if (IsBytecodeLabeled(GeneratedCode.Count - 2)) return false;
+
+        //if (prev1.Opcode == Opcode.MathAdd
+        //    && prev1.Operand1.Type == InstructionOperandType.Register && prev1.Operand1.Reg.IsGeneralPurpose()
+        //    && prev1.Operand2.Type == InstructionOperandType.Immediate32
+        //    && instruction.Opcode == Opcode.Move
+        //    && instruction.Operand2.Type == prev1.Operand1.Reg.ToPtr(instruction.Operand1.BitWidth))
+        //{
+        //    GeneratedCode.Pop();
+        //    GeneratedCode[^1] = new(
+        //        Opcode.Move,
+        //        instruction.Operand1,
+        //        prev1.Operand1.Reg.ToPtr(prev1.Operand2.Value, instruction.Operand1.BitWidth)
+        //    );
+        //}
+
+        //if (prev1.Opcode == Opcode.MathAdd
+        //    && prev1.Operand1.Type == InstructionOperandType.Register && prev1.Operand1.Reg.IsGeneralPurpose()
+        //    && prev1.Operand2.Type == InstructionOperandType.Immediate32
+        //    && instruction.Opcode == Opcode.PopTo32
+        //    && instruction.Operand1.Type == prev1.Operand1.Reg.ToPtr(BitWidth._32))
+        //{
+        //    GeneratedCode.Pop();
+        //    GeneratedCode[^1] = new(
+        //        Opcode.PopTo32,
+        //        prev1.Operand1.Reg.ToPtr(prev1.Operand2.Value, BitWidth._32)
+        //    );
+        //}
+
+        if (prev1.Opcode == Opcode.Push
+            && prev1.Operand1.Type == InstructionOperandType.Immediate16
+            && instruction.Opcode == Opcode.Push
+            && instruction.Operand1.Type == InstructionOperandType.Immediate16)
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = new PreparationInstruction(
+                Opcode.Push,
+                new InstructionOperand((instruction.Operand1.Value) | (prev1.Operand1.Value << 16), InstructionOperandType.Immediate32)
+            );
+            return true;
+        }
+
+        // FIXME: the two moves can overlap
+        if (prev1.Opcode == Opcode.Move
+            && instruction.Opcode == Opcode.Move
+            && instruction.Operand1 == prev1.Operand1
+            && !(
+                prev1.Operand1.Type == InstructionOperandType.Register
+                && instruction.Operand2.Type == prev1.Operand1.Reg.ToPtr(instruction.Operand1.BitWidth)
+            ))
+        {
+            GeneratedCode.Pop();
+            GeneratedCode[^1] = instruction;
+            return true;
+        }
 
         if (instruction.Opcode == Opcode.MathAdd
             && instruction.Operand2.Type == InstructionOperandType.Immediate32

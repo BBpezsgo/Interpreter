@@ -802,17 +802,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return label;
     }
 
-    void ApplyLabel(BytecodeLabel label, int address)
-    {
-        for (int i = 0; i < AwaitingLabels.Count; i++)
-        {
-            if (AwaitingLabels[i].Index != label.Index) continue;
-            AwaitingLabels.RemoveAt(i--);
-        }
-        if (label == BytecodeLabel.Invalid) return;
-        GeneratedCode[label.Index].Operand1 = address;
-    }
-
     void ApplyLabelAbsolute(BytecodeLabel label)
     {
         for (int i = 0; i < AwaitingLabels.Count; i++)
@@ -822,6 +811,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         if (label == BytecodeLabel.Invalid) return;
         GeneratedCode[label.Index].Operand1 = GeneratedCode.Count;
+        OptimizeCode();
     }
 
     void ApplyLabelRelative(BytecodeLabel label)
@@ -833,6 +823,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         if (label == BytecodeLabel.Invalid) return;
         GeneratedCode[label.Index].Operand1 = GeneratedCode.Count - label.Index;
+        OptimizeCode();
     }
 
     #endregion

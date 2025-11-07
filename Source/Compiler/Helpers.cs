@@ -3893,12 +3893,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool TryCompute(FunctionAddressGetter functionAddressGetter, EvaluationContext context, out CompiledValue value)
     {
-        if (functionAddressGetter.Function.InstructionOffset != InvalidFunctionAddress)
-        {
-            value = functionAddressGetter.Function.InstructionOffset;
-            return true;
-        }
-
         value = CompiledValue.Null;
         return false;
     }

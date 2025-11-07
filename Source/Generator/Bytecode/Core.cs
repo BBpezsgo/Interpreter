@@ -4,6 +4,33 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
 
+public struct InstructionLabel : IEquatable<InstructionLabel>
+{
+    public static readonly InstructionLabel Invalid = new(-2, default);
+
+    public int Index;
+    readonly int Id;
+
+    public InstructionLabel(int index, int id)
+    {
+        Index = index;
+        Id = id;
+    }
+
+    public override readonly bool Equals(object? obj) => obj is InstructionLabel other && Id == other.Id;
+    public readonly bool Equals(InstructionLabel other) => Id == other.Id;
+
+    public static bool operator ==(InstructionLabel left, InstructionLabel right) => left.Id == right.Id;
+    public static bool operator !=(InstructionLabel left, InstructionLabel right) => left.Id != right.Id;
+
+    public override readonly int GetHashCode() => Id;
+
+    public readonly PreparationInstructionOperand Relative(int additionalOffset = 0) => new(this, false, additionalOffset);
+    public readonly PreparationInstructionOperand Absolute(int additionalOffset = 0) => new(this, true, additionalOffset);
+
+    public override string ToString() => Id.ToString();
+}
+
 class RegisterUsage
 {
     public readonly struct Auto : IDisposable, IEquatable<Auto>
@@ -131,33 +158,40 @@ class GeneratedVariable
     public bool IsInitialized { get; set; }
 }
 
-class ControlFlowFrame
-{
-    public List<int> Offsets { get; } = new();
-    public bool IsSkipping { get; set; }
-}
-
-readonly struct BytecodeLabel : IEquatable<BytecodeLabel>
-{
-    public static readonly BytecodeLabel Invalid = new(-1);
-
-    public readonly int Index;
-
-    public BytecodeLabel(int index)
-    {
-        Index = index;
-    }
-
-    public override bool Equals(object? obj) => obj is BytecodeLabel other && Index == other.Index;
-    public bool Equals(BytecodeLabel other) => Index == other.Index;
-    public override int GetHashCode() => Index;
-
-    public static bool operator ==(BytecodeLabel left, BytecodeLabel right) => left.Index == right.Index;
-    public static bool operator !=(BytecodeLabel left, BytecodeLabel right) => left.Index != right.Index;
-}
-
 public partial class CodeGeneratorForMain : CodeGenerator
 {
+    readonly struct UndefinedOffset
+    {
+        public InstructionLabel Label { get; }
+        public Location CallerLocation { get; }
+        public IHaveInstructionOffset Called { get; }
+
+        public UndefinedOffset(InstructionLabel label, ILocated caller, IHaveInstructionOffset called)
+        {
+            Label = label;
+            CallerLocation = caller.Location;
+            Called = called;
+        }
+
+        public UndefinedOffset(InstructionLabel label, Location callerLocation, IHaveInstructionOffset called)
+        {
+            Label = label;
+            CallerLocation = callerLocation;
+            Called = called;
+        }
+    }
+
+    class ControlFlowFrame
+    {
+        public InstructionLabel Label;
+        public bool IsSkipping;
+
+        public ControlFlowFrame(InstructionLabel label)
+        {
+            Label = label;
+        }
+    }
+
     public static readonly CompilerSettings DefaultCompilerSettings = new()
     {
         PointerSize = 4,
@@ -182,7 +216,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly Dictionary<CompiledInstructionLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
     readonly Dictionary<CompiledVariableDeclaration, GeneratedVariable> GeneratedVariables = new();
     readonly HashSet<ICompiledFunctionDefinition> GeneratedFunctions = new();
-    readonly List<BytecodeLabel> AwaitingLabels = new();
 
     readonly Stack<CompiledScope> CleanupStack2;
     IDefinition? CurrentContext;
@@ -190,7 +223,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly Stack<ControlFlowFrame> ReturnInstructions;
     readonly Stack<ControlFlowFrame> BreakInstructions;
 
-    readonly List<PreparationInstruction> GeneratedCode;
+    readonly BytecodeEmitter Code;
 
     readonly List<UndefinedOffset> UndefinedFunctionOffsets;
     readonly List<UndefinedOffset> UndefinedInstructionLabels;
@@ -243,7 +276,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ILGenerator = settings.ILGeneratorSettings.HasValue ? new CodeGeneratorForIL(compilerResult, new DiagnosticsCollection(), settings.ILGeneratorSettings.Value, null) : null;
         ExternalFunctions = compilerResult.ExternalFunctions;
-        GeneratedCode = new();
+        Code = new BytecodeEmitter()
+        {
+            EnableOptimizations = !settings.DontOptimize,
+        };
         CleanupStack2 = new();
         ReturnInstructions = new();
         BreakInstructions = new();
@@ -290,7 +326,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 continue;
             }
 
-            item.Apply(GeneratedCode);
+            Code.MarkLabel(item.Label);
         }
     }
 

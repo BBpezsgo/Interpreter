@@ -8,6 +8,13 @@ namespace LanguageCore.BBLang.Generator;
 public partial class CodeGeneratorForMain : CodeGenerator
 {
     GeneratorStatistics _statistics;
+    readonly Dictionary<IHaveInstructionOffset, InstructionLabel> DefinitionLabels = new();
+
+    InstructionLabel LabelForDefinition(IHaveInstructionOffset definition)
+    {
+        if (DefinitionLabels.TryGetValue(definition, out InstructionLabel label)) return label;
+        return DefinitionLabels[definition] = Code.DefineLabel();
+    }
 
     void GenerateDeallocator(CompiledCleanup cleanup)
     {
@@ -36,10 +43,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(deallocator.InstructionOffset, cleanup.Location);
+        InstructionLabel label = LabelForDefinition(deallocator);
+        Call(label, cleanup.Location);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset(jumpInstruction, false, cleanup.Location, deallocator)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, deallocator)); }
 
         if (deallocator.ReturnSomething)
         {
@@ -79,10 +87,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(cleanup.Destructor.InstructionOffset, cleanup.Location);
+        var label = LabelForDefinition(cleanup.Destructor);
+        Call(label, cleanup.Location);
 
         if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset(jumpInstruction, false, cleanup.Location, cleanup.Destructor)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, cleanup.Destructor)); }
 
         if (deallocateableType.Is<PointerType>())
         {
@@ -127,7 +136,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool GenerateSize(PointerType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
-        AddInstruction(Opcode.MathAdd, result, PointerSize);
+        Code.Emit(Opcode.MathAdd, result, PointerSize);
         return true;
     }
     bool GenerateSize(ArrayType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -136,7 +145,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (FindSize(type, out int size, out _))
         {
-            AddInstruction(Opcode.MathAdd, result, size);
+            Code.Emit(Opcode.MathAdd, result, size);
             return true;
         }
 
@@ -168,22 +177,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto lengthRegister = Registers.GetFree())
         {
             PopTo(lengthRegister.Get(lengthType.GetBitWidth(this)));
-            AddInstruction(Opcode.MathMult, lengthRegister.Get(lengthType.GetBitWidth(this)), elementSize);
-            AddInstruction(Opcode.MathAdd, result, lengthRegister.Get(lengthType.GetBitWidth(this)));
+            Code.Emit(Opcode.MathMult, lengthRegister.Get(lengthType.GetBitWidth(this)), elementSize);
+            Code.Emit(Opcode.MathAdd, result, lengthRegister.Get(lengthType.GetBitWidth(this)));
         }
         return true;
     }
     bool GenerateSize(FunctionType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
-        AddInstruction(Opcode.MathAdd, result, PointerSize);
+        Code.Emit(Opcode.MathAdd, result, PointerSize);
         return true;
     }
     bool GenerateSize(StructType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         if (!FindSize(type, out int size, out error))
         { return false; }
-        AddInstruction(Opcode.MathAdd, result, size);
+        Code.Emit(Opcode.MathAdd, result, size);
         return true;
     }
     bool GenerateSize(GenericType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
@@ -191,7 +200,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (!FindSize(type, out int size, out error))
         { return false; }
-        AddInstruction(Opcode.MathAdd, result, size);
+        Code.Emit(Opcode.MathAdd, result, size);
         return true;
     }
     bool GenerateSize(AliasType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GenerateSize(type.Value, result, out error);
@@ -265,10 +274,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             generatedInstructionLabel = GeneratedInstructionLabels[instructionLabel] = new()
             {
-                InstructionOffset = GeneratedCode.Count,
+                InstructionOffset = Code.Offset,
             };
         }
-        generatedInstructionLabel.InstructionOffset = GeneratedCode.Count;
+        generatedInstructionLabel.InstructionOffset = Code.Offset;
+        Code.MarkLabel(LabelForDefinition(generatedInstructionLabel));
     }
     void GenerateCodeForStatement(CompiledReturn keywordCall)
     {
@@ -314,9 +324,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
         }
 
-        ReturnInstructions.Last.Offsets.Add(GeneratedCode.Count);
         ReturnInstructions.Last.IsSkipping = true;
-        AddInstruction(Opcode.Jump, 0);
+        Code.Emit(Opcode.Jump, ReturnInstructions.Last.Label.Relative());
 
         AddComment("}");
     }
@@ -336,7 +345,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     InstructionOperandType.Immediate16
                 ));
             }
-            AddInstruction(Opcode.Crash, Register.StackPointer);
+            Code.Emit(Opcode.Crash, Register.StackPointer);
         }
         else
         {
@@ -344,7 +353,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
                 PopTo(reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
-                AddInstruction(Opcode.Crash, reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
+                Code.Emit(Opcode.Crash, reg.Get(throwType.GetBitWidth(this, Diagnostics, throwValue)));
             }
         }
     }
@@ -356,9 +365,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        BreakInstructions.Last.Offsets.Add(GeneratedCode.Count);
         ReturnInstructions.Last.IsSkipping = true;
-        AddInstruction(Opcode.Jump, 0);
+        Code.Emit(Opcode.Jump, BreakInstructions.Last.Label.Relative());
     }
     void GenerateCodeForStatement(CompiledDelete compiledDelete)
     {
@@ -373,8 +381,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
-            AddInstruction(Opcode.MathSub, reg.Get(PointerBitWidth), GeneratedCode.Count + 1);
-            AddInstruction(Opcode.Jump, reg.Get(PointerBitWidth));
+            InstructionLabel offsetLabel = Code.DefineLabel();
+            Code.Emit(Opcode.MathSub, reg.Get(PointerBitWidth), offsetLabel.Absolute());
+            Code.MarkLabel(offsetLabel);
+            Code.Emit(Opcode.Jump, reg.Get(PointerBitWidth));
         }
     }
     Stack<CompiledCleanup> GenerateCodeForArguments(IReadOnlyList<CompiledPassedArgument> arguments, ICompiledFunctionDefinition compiledFunction, int alreadyPassed = 0)
@@ -440,25 +450,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        AddInstruction(Opcode.CallMSIL, caller.Function.Id);
-        BytecodeLabel conditionalJumpInstruction;
+        Code.Emit(Opcode.CallMSIL, caller.Function.Id);
+        InstructionLabel skipLabel = Code.DefineLabel();
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Register8L);
-            AddInstruction(Opcode.Compare, reg.Register8L, 0);
-            conditionalJumpInstruction = MarkLabel();
-            AddInstruction(Opcode.JumpIfNotEqual, 0);
+            Code.Emit(Opcode.Compare, reg.Register8L, 0);
+            Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
         }
 
-        int jumpInstruction = Call(caller.Declaration.InstructionOffset, caller);
+        InstructionLabel label = LabelForDefinition(caller.Declaration);
+        Call(label, caller);
 
         if (caller.Declaration.InstructionOffset == InvalidFunctionAddress)
         {
-            UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, caller.Declaration));
+            UndefinedFunctionOffsets.Add(new(label, caller, caller.Declaration));
         }
-        AddInstruction(Opcode.HotFuncEnd, caller.Function.Id);
+        Code.Emit(Opcode.HotFuncEnd, caller.Function.Id);
 
-        ApplyLabelRelative(conditionalJumpInstruction);
+        Code.MarkLabel(skipLabel);
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -484,7 +494,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(caller.Arguments, caller.Declaration);
 
         AddComment(" .:");
-        AddInstruction(Opcode.CallExternal, caller.Function.Id);
+        Code.Emit(Opcode.CallExternal, caller.Function.Id);
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -577,11 +587,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(caller.Function.InstructionOffset, caller);
+        var label = LabelForDefinition(caller.Function);
+        Call(label, caller);
 
         if (caller.Function.InstructionOffset == InvalidFunctionAddress)
         {
-            UndefinedFunctionOffsets.Add(new(jumpInstruction, false, caller, caller.Function));
+            UndefinedFunctionOffsets.Add(new(label, caller, caller.Function));
         }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
@@ -605,7 +616,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         {
             using RegisterUsage.Auto reg = Registers.GetFree();
-            AddInstruction(Opcode.Move, reg.Get(BuiltinType.I32.GetBitWidth(this)), 0);
+            Code.Emit(Opcode.Move, reg.Get(BuiltinType.I32.GetBitWidth(this)), 0);
             if (!GenerateSize(paramType, reg.Get(BuiltinType.I32.GetBitWidth(this)), out PossibleDiagnostic? generateSizeError))
             { Diagnostics.Add(generateSizeError.ToError(anyCall)); }
             Push(reg.Get(BuiltinType.I32.GetBitWidth(this)));
@@ -677,7 +688,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
         BitWidth bitWidth = StatementCompiler.MaxBitWidth(leftBitWidth, rightBitWidth);
 
-        BytecodeLabel jumpInstruction = BytecodeLabel.Invalid;
+        InstructionLabel endLabel = Code.DefineLabel();
 
         GenerateCodeForStatement(@operator.Left);
 
@@ -688,9 +699,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             {
                 PopTo(regLeft.Get(leftBitWidth));
-                AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
-                jumpInstruction = MarkLabel();
-                AddInstruction(Opcode.JumpIfEqual, 0);
+                Code.Emit(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
+                Code.Emit(Opcode.JumpIfEqual, endLabel.Relative());
             }
         }
         else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
@@ -700,10 +710,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto regLeft = Registers.GetFree())
             {
                 PopTo(regLeft.Get(leftBitWidth));
-                AddInstruction(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
-
-                jumpInstruction = MarkLabel();
-                AddInstruction(Opcode.JumpIfNotEqual, 0);
+                Code.Emit(Opcode.Compare, regLeft.Get(leftBitWidth), 0);
+                Code.Emit(Opcode.JumpIfNotEqual, endLabel.Relative());
             }
         }
 
@@ -720,99 +728,99 @@ public partial class CodeGeneratorForMain : CodeGenerator
             switch (@operator.Operator)
             {
                 case CompiledBinaryOperatorCall.Addition:
-                    AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.Subtraction:
-                    AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.Multiplication:
-                    AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.Division:
-                    AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.Modulo:
-                    AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.LogicalAND:
-                    AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.LogicalOR:
-                    AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.BitwiseAND:
-                    AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.BitwiseOR:
-                    AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.BitwiseXOR:
-                    AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.BitshiftLeft:
-                    AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
                 case CompiledBinaryOperatorCall.BitshiftRight:
-                    AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                     Push(regLeft.Get(bitWidth));
                     break;
 
                 case CompiledBinaryOperatorCall.CompEQ:
-                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                    AddInstruction(Opcode.JumpIfEqual, 3);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.JumpIfEqual, 3);
                     Push(false);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(true);
                     break;
 
                 case CompiledBinaryOperatorCall.CompNEQ:
-                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                    AddInstruction(Opcode.JumpIfNotEqual, 3);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.JumpIfNotEqual, 3);
                     Push(false);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(true);
                     break;
 
                 case CompiledBinaryOperatorCall.CompGT:
-                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                    AddInstruction(Opcode.JumpIfLessOrEqual, 3);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.JumpIfLessOrEqual, 3);
                     Push(true);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(false);
                     break;
 
                 case CompiledBinaryOperatorCall.CompGEQ:
-                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                    AddInstruction(Opcode.JumpIfLess, 3);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.JumpIfLess, 3);
                     Push(true);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(false);
                     break;
 
                 case CompiledBinaryOperatorCall.CompLT:
-                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                    AddInstruction(Opcode.JumpIfLess, 3);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.JumpIfLess, 3);
                     Push(false);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(true);
                     break;
 
                 case CompiledBinaryOperatorCall.CompLEQ:
-                    AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                    AddInstruction(Opcode.JumpIfLessOrEqual, 3);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                    Code.Emit(Opcode.JumpIfLessOrEqual, 3);
                     Push(false);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(true);
                     break;
 
@@ -821,7 +829,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        ApplyLabelRelative(jumpInstruction);
+        Code.MarkLabel(endLabel);
     }
     void GenerateCodeForStatement(CompiledUnaryOperatorCall @operator)
     {
@@ -837,10 +845,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     PopTo(reg.Get(bitWidth));
-                    AddInstruction(Opcode.Compare, reg.Get(bitWidth), 0);
-                    AddInstruction(Opcode.JumpIfEqual, 3);
+                    Code.Emit(Opcode.Compare, reg.Get(bitWidth), 0);
+                    Code.Emit(Opcode.JumpIfEqual, 3);
                     Push(false);
-                    AddInstruction(Opcode.Jump, 2);
+                    Code.Emit(Opcode.Jump, 2);
                     Push(true);
                 }
 
@@ -853,7 +861,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     PopTo(reg.Get(bitWidth));
-                    AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                    Code.Emit(Opcode.BitsNOT, reg.Get(bitWidth));
                     Push(reg.Get(bitWidth));
                 }
 
@@ -869,9 +877,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto right = Registers.GetFree())
                 {
                     PopTo(right.Get(bitWidth));
-                    AddInstruction(Opcode.Move, left.Get(bitWidth), new InstructionOperand(isFloat ? new CompiledValue(0f) : new CompiledValue(0)));
+                    Code.Emit(Opcode.Move, left.Get(bitWidth), new InstructionOperand(isFloat ? new CompiledValue(0f) : new CompiledValue(0)));
 
-                    AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, left.Get(bitWidth), right.Get(bitWidth));
+                    Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, left.Get(bitWidth), right.Get(bitWidth));
 
                     Push(left.Get(bitWidth));
                 }
@@ -911,25 +919,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             // Save pointer
-            AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), (InstructionOperand)StackTop);
+            Code.Emit(Opcode.Move, reg.Get(PointerBitWidth), (InstructionOperand)StackTop);
 
             if (stringInstance.IsASCII)
             {
                 for (int i = 0; i < stringInstance.Value.Length; i++)
                 {
-                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), (byte)stringInstance.Value[i]);
+                    Code.Emit(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), (byte)stringInstance.Value[i]);
                 }
 
-                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), (byte)'\0');
+                Code.Emit(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), (byte)'\0');
             }
             else
             {
                 for (int i = 0; i < stringInstance.Value.Length; i++)
                 {
-                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), stringInstance.Value[i]);
+                    Code.Emit(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), stringInstance.Value[i]);
                 }
 
-                AddInstruction(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), '\0');
+                Code.Emit(Opcode.Move, reg.Get(PointerBitWidth).ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), '\0');
             }
         }
 
@@ -952,10 +960,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledLambda compiledLambda)
     {
-        if (compiledLambda.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset(GeneratedCode.Count, true, compiledLambda, compiledLambda)); }
+        var label = LabelForDefinition(compiledLambda);
 
-        Push(compiledLambda.InstructionOffset);
+        if (compiledLambda.InstructionOffset == InvalidFunctionAddress)
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, compiledLambda, compiledLambda)); }
+
+        Push(label.Absolute());
     }
     void GenerateCodeForStatement(CompilerVariableGetter compilerVariableGetter)
     {
@@ -963,7 +973,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(RegisterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        AddInstruction(Opcode.Push, variable.Register);
+        Code.Emit(Opcode.Push, variable.Register);
     }
     void GenerateCodeForStatement(CompiledParameterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
@@ -988,24 +998,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         IHaveInstructionOffset compiledFunction = variable.Function;
+        var label = LabelForDefinition(compiledFunction);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset(GeneratedCode.Count, true, variable, compiledFunction)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, variable, compiledFunction)); }
 
-        Push(compiledFunction.InstructionOffset);
+        Push(label.Absolute());
     }
     void GenerateCodeForStatement(InstructionLabelAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
+        InstructionLabel label;
+
         if (!GeneratedInstructionLabels.TryGetValue(variable.InstructionLabel, out GeneratedInstructionLabel? instructionLabel))
         {
             instructionLabel = GeneratedInstructionLabels[variable.InstructionLabel] = new()
             {
                 InstructionOffset = InvalidFunctionAddress,
             };
-            UndefinedInstructionLabels.Add(new UndefinedOffset(GeneratedCode.Count, true, variable, instructionLabel));
+            label = LabelForDefinition(instructionLabel);
+            UndefinedInstructionLabels.Add(new UndefinedOffset(label, variable, instructionLabel));
+        }
+        else
+        {
+            label = LabelForDefinition(instructionLabel);
         }
 
-        Push(instructionLabel.InstructionOffset);
+        Push(label.Absolute());
     }
     void GenerateCodeForStatement(CompiledAddressGetter addressGetter)
     {
@@ -1042,24 +1060,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledScope scope = OnScopeEnter(block, false);
 
         AddComment("Condition");
-        int conditionOffset = GeneratedCode.Count;
+        InstructionLabel conditionOffset = Code.MarkLabel();
 
-        List<BytecodeLabel> conditionFalseAddresses = new();
-        GenerateCodeForCondition(whileLoop.Condition, conditionFalseAddresses);
+        InstructionLabel endLabel = Code.DefineLabel();
+        GenerateCodeForCondition(whileLoop.Condition, endLabel);
 
-        BreakInstructions.Push(new ControlFlowFrame());
+        BreakInstructions.Push(new ControlFlowFrame(endLabel));
 
         GenerateCodeForStatement(block, true);
 
         AddComment("Jump Back");
-        AddInstruction(Opcode.Jump, conditionOffset - GeneratedCode.Count);
+        Code.Emit(Opcode.Jump, conditionOffset.Relative());
 
         ReturnInstructions.Last.IsSkipping = false;
 
-        FinishJumpInstructions(BreakInstructions.Last.Offsets);
-
-        foreach (BytecodeLabel v in conditionFalseAddresses)
-        { ApplyLabelRelative(v); }
+        Code.MarkLabel(endLabel);
 
         OnScopeExit(block.Location.Position.After(), block.Location.File, scope);
 
@@ -1080,27 +1095,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         AddComment("For-loop condition");
-        int conditionOffsetFor = GeneratedCode.Count;
+        InstructionLabel conditionOffsetFor = Code.MarkLabel();
 
-        List<BytecodeLabel> conditionFalseAddresses = new();
-        GenerateCodeForCondition(forLoop.Condition, conditionFalseAddresses);
+        InstructionLabel endLabel = Code.DefineLabel();
 
-        BreakInstructions.Push(new ControlFlowFrame());
+        GenerateCodeForCondition(forLoop.Condition, endLabel);
 
+        BreakInstructions.Push(new ControlFlowFrame(endLabel));
         GenerateCodeForStatement(forLoop.Body);
 
         AddComment("For-loop expression");
         GenerateCodeForStatement(forLoop.Expression);
 
         AddComment("Jump back");
-        AddInstruction(Opcode.Jump, conditionOffsetFor - GeneratedCode.Count);
+        Code.Emit(Opcode.Jump, conditionOffsetFor.Relative());
 
         ReturnInstructions.Last.IsSkipping = false;
 
-        foreach (var v in conditionFalseAddresses)
-        { ApplyLabelRelative(v); }
-
-        FinishJumpInstructions(BreakInstructions.Pop().Offsets);
+        Code.MarkLabel(endLabel);
 
         OnScopeExit(forLoop.Location.Position.After(), forLoop.Location.File, scope);
 
@@ -1108,7 +1120,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledIf @if)
     {
-        List<BytecodeLabel> jumpOutInstructions = new();
+        InstructionLabel endLabel = Code.DefineLabel();
 
         CompiledBranch? ifSegment = @if;
 
@@ -1120,22 +1132,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
                 AddComment("If condition");
 
-                List<BytecodeLabel> falseJumpAddresses = new();
-                GenerateCodeForCondition(partIf.Condition, falseJumpAddresses);
+                InstructionLabel falseLabel = Code.DefineLabel();
+                GenerateCodeForCondition(partIf.Condition, falseLabel);
 
                 GenerateCodeForStatement(partIf.Body);
 
                 AddComment("If jump-to-end");
-                jumpOutInstructions.Add(MarkLabel());
-                AddInstruction(Opcode.Jump, 0);
+                Code.Emit(Opcode.Jump, endLabel.Relative());
 
                 ReturnInstructions.Last.IsSkipping = false;
                 if (BreakInstructions.Count > 0) BreakInstructions.Last.IsSkipping = false;
 
                 AddComment("}");
 
-                foreach (BytecodeLabel v in falseJumpAddresses)
-                { ApplyLabelRelative(v); }
+                Code.MarkLabel(falseLabel);
 
                 ifSegment = partIf.Next;
             }
@@ -1158,8 +1168,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        foreach (BytecodeLabel v in jumpOutInstructions)
-        { ApplyLabelRelative(v); }
+        Code.MarkLabel(endLabel);
     }
     void GenerateCodeForStatement(CompiledStackAllocation newInstance)
     {
@@ -1194,7 +1203,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 return;
             }
 
-            AddInstruction(Opcode.Push, Register.StackPointer);
+            Code.Emit(Opcode.Push, Register.StackPointer);
 
             parameterCleanup.Add(new CompiledCleanup()
             {
@@ -1216,10 +1225,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        int jumpInstruction = Call(compiledFunction.InstructionOffset, constructorCall);
+        InstructionLabel label = LabelForDefinition(compiledFunction);
+        Call(label, constructorCall);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
-        { UndefinedFunctionOffsets.Add(new UndefinedOffset(jumpInstruction, false, constructorCall, compiledFunction)); }
+        { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, constructorCall, compiledFunction)); }
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -1325,8 +1335,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto regIndex = Registers.GetFree())
                 {
                     PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
-                    AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)), arrayType.Of.GetSize(this, Diagnostics, index.Base));
-                    AddInstruction(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
+                    Code.Emit(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)), arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                    Code.Emit(Opcode.MathAdd, regPtr.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, index.Index)));
                 }
 
                 PushFrom(new AddressRegisterPointer(regPtr.Get(PointerBitWidth)), arrayType.Of.GetSize(this, Diagnostics, index.Base));
@@ -1368,7 +1378,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     PopTo(reg.Get(PointerBitWidth));
-                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), addressOffset.Offset);
+                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), addressOffset.Offset);
                     Push(reg.Get(PointerBitWidth));
                 }
                 break;
@@ -1396,11 +1406,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto regIndex = Registers.GetFree())
                 {
                     PopTo(regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)));
-                    AddInstruction(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)), runtimeIndex.ElementSize);
+                    Code.Emit(Opcode.MathMult, regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)), runtimeIndex.ElementSize);
                     using (RegisterUsage.Auto regBase = Registers.GetFree())
                     {
                         PopTo(regBase.Get(PointerBitWidth));
-                        AddInstruction(Opcode.MathAdd, regBase.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)));
+                        Code.Emit(Opcode.MathAdd, regBase.Get(PointerBitWidth), regIndex.Get(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)));
                         Push(regBase.Get(PointerBitWidth));
                     }
                 }
@@ -1424,7 +1434,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             targetType.SameAs(BuiltinType.I32))
         {
             GenerateCodeForStatement(typeCast.Value);
-            AddInstruction(Opcode.FFrom, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
+            Code.Emit(Opcode.FFrom, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
             return;
         }
 
@@ -1433,7 +1443,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             targetType.SameAs(BuiltinType.F32))
         {
             GenerateCodeForStatement(typeCast.Value);
-            AddInstruction(Opcode.FTo, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
+            Code.Emit(Opcode.FTo, (InstructionOperand)StackTop, (InstructionOperand)StackTop);
             return;
         }
 
@@ -1521,7 +1531,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledStatement statement, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        int startInstruction = GeneratedCode.Count;
+        int startInstruction = Code.Offset;
 
         switch (statement)
         {
@@ -1571,57 +1581,60 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
-        if (startInstruction != GeneratedCode.Count)
+        if (startInstruction != Code.Offset)
         {
             DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
             {
-                Instructions = (startInstruction, GeneratedCode.Count - 1),
+                Instructions = (startInstruction, Code.Offset - 1),
                 Location = statement.Location,
             });
         }
     }
 
-    void GenerateCodeForCondition(CompiledStatementWithValue statement, List<BytecodeLabel> falseJumpAddresses)
+    void GenerateCodeForCondition(CompiledStatementWithValue statement, InstructionLabel falseLabel)
+    {
+        bool v = false;
+        GenerateCodeForCondition(statement, falseLabel, ref v);
+    }
+    void GenerateCodeForCondition(CompiledStatementWithValue statement, InstructionLabel falseLabel, ref bool didJump)
     {
         switch (statement)
         {
             case CompiledBinaryOperatorCall v:
-                GenerateCodeForCondition(v, falseJumpAddresses);
+                GenerateCodeForCondition(v, falseLabel, ref didJump);
                 break;
             case CompiledUnaryOperatorCall v:
-                GenerateCodeForCondition(v, falseJumpAddresses);
+                GenerateCodeForCondition(v, falseLabel, ref didJump);
                 break;
             default:
                 GenerateCodeForStatement(statement);
                 break;
         }
 
-        if (falseJumpAddresses.Count == 0)
+        if (!didJump)
         {
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
                 PopTo(reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)));
-                AddInstruction(Opcode.Compare, reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)), 0);
-                falseJumpAddresses.Add(MarkLabel());
-                AddInstruction(Opcode.JumpIfEqual, 0);
+                Code.Emit(Opcode.Compare, reg.Get(statement.Type.GetBitWidth(this, Diagnostics, statement)), 0);
+                Code.Emit(Opcode.JumpIfEqual, falseLabel.Relative());
+                didJump = true;
             }
         }
     }
-    void GenerateCodeForCondition(CompiledUnaryOperatorCall @operator, List<BytecodeLabel> falseJumpAddresses)
+    void GenerateCodeForCondition(CompiledUnaryOperatorCall @operator, InstructionLabel falseLabel, ref bool didJump)
     {
         switch (@operator.Operator)
         {
             case CompiledUnaryOperatorCall.LogicalNOT:
             {
-                List<BytecodeLabel> subFalseJumpAddresses = new();
-                GenerateCodeForCondition(@operator.Left, subFalseJumpAddresses);
+                InstructionLabel subFalseLabel = Code.DefineLabel();
+                GenerateCodeForCondition(@operator.Left, subFalseLabel);
 
-                falseJumpAddresses.Add(MarkLabel());
-                AddInstruction(Opcode.Jump, 0);
+                Code.Emit(Opcode.Jump, falseLabel.Relative());
+                didJump = true;
 
-                foreach (BytecodeLabel v in subFalseJumpAddresses)
-                { ApplyLabelRelative(v); }
-
+                Code.MarkLabel(subFalseLabel);
                 return;
             }
             case CompiledUnaryOperatorCall.BinaryNOT:
@@ -1633,7 +1646,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     PopTo(reg.Get(bitWidth));
-                    AddInstruction(Opcode.BitsNOT, reg.Get(bitWidth));
+                    Code.Emit(Opcode.BitsNOT, reg.Get(bitWidth));
                     Push(reg.Get(bitWidth));
                 }
 
@@ -1646,7 +1659,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
     }
-    void GenerateCodeForCondition(CompiledBinaryOperatorCall @operator, List<BytecodeLabel> falseJumpAddresses)
+    void GenerateCodeForCondition(CompiledBinaryOperatorCall @operator, InstructionLabel falseLabel, ref bool didJump)
     {
         BitWidth leftBitWidth = @operator.Left.Type.GetBitWidth(this, Diagnostics, @operator.Left);
         BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
@@ -1654,23 +1667,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (@operator.Operator == CompiledBinaryOperatorCall.LogicalAND)
         {
-            GenerateCodeForCondition(@operator.Left, falseJumpAddresses);
-            GenerateCodeForCondition(@operator.Right, falseJumpAddresses);
+            GenerateCodeForCondition(@operator.Left, falseLabel, ref didJump);
+            GenerateCodeForCondition(@operator.Right, falseLabel, ref didJump);
         }
         else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
         {
-            List<BytecodeLabel> subFalseJumpAddresses = new();
-            GenerateCodeForCondition(@operator.Left, subFalseJumpAddresses);
+            InstructionLabel subFalseLabel = Code.DefineLabel();
+            GenerateCodeForCondition(@operator.Left, subFalseLabel);
 
-            BytecodeLabel trueAddress = MarkLabel();
-            AddInstruction(Opcode.Jump, 0);
+            InstructionLabel trueLabel = Code.DefineLabel();
+            Code.Emit(Opcode.Jump, trueLabel.Relative());
 
-            foreach (BytecodeLabel v in subFalseJumpAddresses)
-            { ApplyLabelRelative(v); }
+            Code.MarkLabel(subFalseLabel);
 
-            GenerateCodeForCondition(@operator.Right, falseJumpAddresses);
+            GenerateCodeForCondition(@operator.Right, falseLabel, ref didJump);
 
-            ApplyLabelRelative(trueAddress);
+            Code.MarkLabel(trueLabel);
         }
         else
         {
@@ -1688,88 +1700,88 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 switch (@operator.Operator)
                 {
                     case CompiledBinaryOperatorCall.Addition:
-                        AddInstruction(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.Subtraction:
-                        AddInstruction(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.Multiplication:
-                        AddInstruction(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.Division:
-                        AddInstruction(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.Modulo:
-                        AddInstruction(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.LogicalAND:
-                        AddInstruction(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.LogicAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.LogicalOR:
-                        AddInstruction(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.LogicOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.BitwiseAND:
-                        AddInstruction(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.BitsAND, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.BitwiseOR:
-                        AddInstruction(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.BitsOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.BitwiseXOR:
-                        AddInstruction(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.BitsXOR, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.BitshiftLeft:
-                        AddInstruction(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.BitsShiftLeft, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
                     case CompiledBinaryOperatorCall.BitshiftRight:
-                        AddInstruction(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.BitsShiftRight, regLeft.Get(bitWidth), regRight.Get(bitWidth));
                         Push(regLeft.Get(bitWidth));
                         break;
 
                     case CompiledBinaryOperatorCall.CompEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(MarkLabel());
-                        AddInstruction(Opcode.JumpIfNotEqual, 0);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.JumpIfNotEqual, falseLabel.Relative());
+                        didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompNEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(MarkLabel());
-                        AddInstruction(Opcode.JumpIfEqual, 0);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.JumpIfEqual, falseLabel.Relative());
+                        didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompGT:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(MarkLabel());
-                        AddInstruction(Opcode.JumpIfLessOrEqual, 0);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.JumpIfLessOrEqual, falseLabel.Relative());
+                        didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompGEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(MarkLabel());
-                        AddInstruction(Opcode.JumpIfLess, 0);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.JumpIfLess, falseLabel.Relative());
+                        didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompLT:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(MarkLabel());
-                        AddInstruction(Opcode.JumpIfGreaterOrEqual, 0);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.JumpIfGreaterOrEqual, falseLabel.Relative());
+                        didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompLEQ:
-                        AddInstruction(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
-                        falseJumpAddresses.Add(MarkLabel());
-                        AddInstruction(Opcode.JumpIfGreater, 0);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Get(bitWidth), regRight.Get(bitWidth));
+                        Code.Emit(Opcode.JumpIfGreater, falseLabel.Relative());
+                        didJump = true;
                         break;
 
                     default:
@@ -1959,7 +1971,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Location = new SourceCodeLocation()
             {
-                Instructions = (GeneratedCode.Count, GeneratedCode.Count),
+                Instructions = (Code.Offset, Code.Offset),
                 Location = new Location(position, file),
             },
             Stack = new List<StackElementInformation>(),
@@ -1984,7 +1996,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CleanupVariables(scope.Variables, new Location(position, file), false);
 
         ScopeInformation scopeDebug = CurrentScopeDebug.Pop();
-        scopeDebug.Location.Instructions.End = GeneratedCode.Count - 1;
+        scopeDebug.Location.Instructions.End = Code.Offset - 1;
         DebugInfo?.ScopeInformation.Add(scopeDebug);
     }
 
@@ -2093,26 +2105,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void FinishJumpInstructions(IEnumerable<int> jumpInstructions)
-        => FinishJumpInstructions(jumpInstructions, GeneratedCode.Count);
-    void FinishJumpInstructions(IEnumerable<int> jumpInstructions, int jumpTo)
-    {
-        foreach (int jumpInstruction in jumpInstructions)
-        {
-            GeneratedCode[jumpInstruction].Operand1 = jumpTo - jumpInstruction;
-        }
-    }
-
     void GenerateCodeForFunction(ICompiledFunctionDefinition function, CompiledBlock body)
     {
         if (!GeneratedFunctions.Add(function)) return;
+        Code.MarkLabel(LabelForDefinition(function));
 
-        function.InstructionOffset = GeneratedCode.Count;
+        function.InstructionOffset = Code.Offset;
         for (int i = UndefinedFunctionOffsets.Count - 1; i >= 0; i--)
         {
             UndefinedOffset item = UndefinedFunctionOffsets[i];
             if (item.Called != function) continue;
-            item.Apply(GeneratedCode);
+            Code.MarkLabel(item.Label);
             UndefinedFunctionOffsets.RemoveAt(i);
         }
 
@@ -2127,7 +2130,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CompiledParameters.AddRange(function.Parameters.Select((v, i) => new CompiledParameter(i, function.ParameterTypes[i], v)));
 
-        int instructionStart = GeneratedCode.Count;
+        int instructionStart = Code.Offset;
 
         if (function is IHaveCompiledType functionWithType)
         { CurrentReturnType = functionWithType.Type; }
@@ -2201,7 +2204,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CurrentScopeDebug.Last.Stack.Add(debugInfo);
         }
 
-        ReturnInstructions.Push(new ControlFlowFrame());
+        InstructionLabel returnLabel = Code.DefineLabel();
+        ReturnInstructions.Push(new ControlFlowFrame(returnLabel));
 
         GenerateCodeForStatement(body, true);
 
@@ -2209,7 +2213,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         OnScopeExit(body.Location.Position.After(), body.Location.File, scope);
 
-        FinishJumpInstructions(ReturnInstructions.Last.Offsets);
+        Code.MarkLabel(returnLabel);
         ReturnInstructions.Pop();
 
         AddComment("Return");
@@ -2224,7 +2228,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 IsValid = true,
                 Function = functionDefinition,
                 TypeArguments = TypeArguments.ToImmutableDictionary(),
-                Instructions = (instructionStart, GeneratedCode.Count),
+                Instructions = (instructionStart, Code.Offset),
             });
         }
 
@@ -2252,7 +2256,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Location = new SourceCodeLocation()
             {
-                Instructions = (GeneratedCode.Count, GeneratedCode.Count),
+                Instructions = (Code.Offset, Code.Offset),
                 Location = statements.Select(v => v.Location).Aggregate((a, b) => a.Union(b)),
             },
             Stack = new List<StackElementInformation>(),
@@ -2264,7 +2268,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("Create stack frame");
         Push(Register.BasePointer);
-        AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
+        Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
@@ -2277,7 +2281,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         });
 
         CurrentContext = null;
-        ReturnInstructions.Push(new ControlFlowFrame());
+        InstructionLabel returnLabel = Code.DefineLabel();
+        ReturnInstructions.Push(new ControlFlowFrame(returnLabel));
 
         CurrentReturnType = ExitCodeType;
 
@@ -2289,7 +2294,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
         }
 
-        FinishJumpInstructions(ReturnInstructions.Pop().Offsets);
+        Code.MarkLabel(returnLabel);
 
         CurrentReturnType = null;
 
@@ -2300,7 +2305,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("}");
 
         ScopeInformation scope = CurrentScopeDebug.Pop();
-        scope.Location.Instructions.End = GeneratedCode.Count - 1;
+        scope.Location.Instructions.End = Code.Offset - 1;
         DebugInfo?.ScopeInformation.Add(scope);
     }
 
@@ -2314,7 +2319,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Location = new SourceCodeLocation()
             {
-                Instructions = (GeneratedCode.Count, GeneratedCode.Count),
+                Instructions = (Code.Offset, Code.Offset),
                 Location = new Location(Position.UnknownPosition, compilerResult.File),
             },
             Stack = new List<StackElementInformation>(),
@@ -2376,8 +2381,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             using (RegisterUsage.Auto reg = Registers.GetFree())
             {
-                // AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), Register.StackPointer);
-                // AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), GlobalVariablesSize);
+                // Code.AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), Register.StackPointer);
+                // Code.AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), GlobalVariablesSize);
                 Push(Register.StackPointer);
             }
 
@@ -2404,7 +2409,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("}");
         }
 
-        AddInstruction(Opcode.Exit);
+        Code.Emit(Opcode.Exit);
 
         // 4 -> exit code
         if (ScopeSizes.Pop() != 4) { } // throw new InternalException("Bruh");
@@ -2457,7 +2462,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         // {
         //     ScopeInformation scope = CurrentScopeDebug.Pop();
-        //     scope.Location.Instructions.End = GeneratedCode.Count - 1;
+        //     scope.Location.Instructions.End = Code.Offset - 1;
         //     DebugInfo?.ScopeInformation.Add(scope);
         // }
 
@@ -2479,14 +2484,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize);
         }
 
-        if (AwaitingLabels.Count > 0)
-        {
-            throw new InternalExceptionWithoutContext($"Some bytecode labels are not set");
-        }
-
         return new BBLangGeneratorResult()
         {
-            Code = GeneratedCode.Select(v => new Instruction(v)).ToImmutableArray(),
+            Code = Code.Compile(),
+            CodeEmitter = Code,
             DebugInfo = DebugInfo,
             CompiledFunctions = compilerResult.FunctionDefinitions,
             CompiledOperators = compilerResult.OperatorDefinitions,

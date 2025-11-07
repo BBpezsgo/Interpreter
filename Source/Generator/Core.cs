@@ -2,34 +2,6 @@
 
 namespace LanguageCore.Compiler;
 
-readonly struct UndefinedOffset
-{
-    public int InstructionIndex { get; }
-    public bool IsAbsoluteAddress { get; }
-
-    public Location CallerLocation { get; }
-    public IHaveInstructionOffset Called { get; }
-
-    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, ILocated caller, IHaveInstructionOffset called)
-        : this(callInstructionIndex, isAbsoluteAddress, caller.Location, called)
-    { }
-
-    public UndefinedOffset(int callInstructionIndex, bool isAbsoluteAddress, Location callerLocation, IHaveInstructionOffset called)
-    {
-        InstructionIndex = callInstructionIndex;
-        IsAbsoluteAddress = isAbsoluteAddress;
-
-        CallerLocation = callerLocation;
-        Called = called;
-    }
-
-    public void Apply(List<Runtime.PreparationInstruction> code)
-    {
-        int offset = IsAbsoluteAddress ? Called.InstructionOffset : Called.InstructionOffset - InstructionIndex;
-        code[InstructionIndex].Operand1 = offset;
-    }
-}
-
 public static class ReferenceExtensions
 {
     public static void AddReference<TSource>(this List<Reference<TSource>> references, TSource source, Uri sourceFile)

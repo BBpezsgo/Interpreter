@@ -15,6 +15,7 @@ public struct GeneratorStatistics
 public struct BBLangGeneratorResult
 {
     public ImmutableArray<Instruction> Code;
+    public BytecodeEmitter CodeEmitter;
     public DebugInformation? DebugInfo;
     public GeneratorStatistics Statistics;
     public ImmutableArray<CompiledFunctionDefinition> CompiledFunctions;

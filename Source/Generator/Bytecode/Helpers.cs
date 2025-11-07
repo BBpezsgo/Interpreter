@@ -5,6 +5,15 @@ namespace LanguageCore.BBLang.Generator;
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
+    void AddComment(string comment)
+    {
+        if (DebugInfo is null) return;
+        if (DebugInfo.CodeComments.TryGetValue(Code.Offset, out List<string>? comments))
+        { comments.Add(comment); }
+        else
+        { DebugInfo.CodeComments.Add(Code.Offset, new List<string>() { comment }); }
+    }
+
     #region Helper Functions
 
     void CallRuntime(CompiledStatementWithValue address)
@@ -17,8 +26,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        var returnToValueInstruction = MarkLabel();
-        Push(0);
+        InstructionLabel returnLabel = Code.DefineLabel();
+        Push(returnLabel.Absolute());
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, address));
         Push(Register.BasePointer);
@@ -28,37 +37,36 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
-            AddInstruction(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)), GeneratedCode.Count + 2);
-            AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
-            AddInstruction(Opcode.Jump, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
-
-            ApplyLabelAbsolute(returnToValueInstruction);
+            InstructionLabel offsetLabel = Code.DefineLabel();
+            Code.Emit(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)), offsetLabel.Absolute());
+            Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
+            Code.MarkLabel(offsetLabel);
+            Code.Emit(Opcode.Jump, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
         }
+
+        Code.MarkLabel(returnLabel);
     }
 
-    int Call(int absoluteAddress, ILocated callerLocation)
+    void Call(InstructionLabel label, ILocated callerLocation)
     {
-        var returnToValueInstruction = MarkLabel();
-        AddInstruction(Opcode.Push, 0);
+        InstructionLabel returnLabel = Code.DefineLabel();
+        Code.Emit(Opcode.Push, returnLabel.Absolute());
 
         PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
         Push(Register.BasePointer);
 
-        AddInstruction(Opcode.Move, Register.BasePointer, Register.StackPointer);
+        Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
 
-        int jumpInstruction = GeneratedCode.Count;
-        AddInstruction(Opcode.Jump, absoluteAddress - GeneratedCode.Count);
+        Code.Emit(Opcode.Jump, label.Relative());
 
-        ApplyLabelAbsolute(returnToValueInstruction);
-
-        return jumpInstruction;
+        Code.MarkLabel(returnLabel);
     }
 
     void Return(ILocated location)
     {
         PopTo(Register.BasePointer);
         Pop(AbsGlobalAddressType.GetSize(this, Diagnostics, location)); // Pop AbsoluteGlobalOffset
-        AddInstruction(Opcode.Return);
+        Code.Emit(Opcode.Return);
         ScopeSizes.LastRef -= PointerSize;
     }
 
@@ -136,7 +144,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             size %= 8;
             for (int i = 0; i < qwordCount; i++)
             {
-                AddInstruction(Opcode.Pop64);
+                Code.Emit(Opcode.Pop64);
                 ScopeSizes.LastRef -= 8;
             }
         }
@@ -147,7 +155,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             size %= 4;
             for (int i = 0; i < dwordCount; i++)
             {
-                AddInstruction(Opcode.Pop32);
+                Code.Emit(Opcode.Pop32);
                 ScopeSizes.LastRef -= 4;
             }
         }
@@ -156,13 +164,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         size %= 2;
         for (int i = 0; i < wordCount; i++)
         {
-            AddInstruction(Opcode.Pop16);
+            Code.Emit(Opcode.Pop16);
             ScopeSizes.LastRef -= 2;
         }
 
         for (int i = 0; i < size; i++)
         {
-            AddInstruction(Opcode.Pop8);
+            Code.Emit(Opcode.Pop8);
             ScopeSizes.LastRef -= 1;
         }
     }
@@ -171,7 +179,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (!initializeZero)
         {
-            AddInstruction(Opcode.MathSub, Register.StackPointer, size);
+            Code.Emit(Opcode.MathSub, Register.StackPointer, size);
             ScopeSizes.LastRef += size;
             if (ScopeSizes.Last >= Settings.StackSize)
             { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
@@ -214,7 +222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             size is BitWidth._8 or BitWidth._32)
         { throw new NotImplementedException(); }
 
-        AddInstruction(size switch
+        Code.Emit(size switch
         {
             0 => default,
             BitWidth._8 => Opcode.PopTo8,
@@ -228,7 +236,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void PopTo(Register destination)
     {
-        AddInstruction(destination.BitWidth() switch
+        Code.Emit(destination.BitWidth() switch
         {
             0 => default,
             BitWidth._8 => Opcode.PopTo8,
@@ -250,7 +258,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     PopTo(reg.Get(PointerBitWidth));
-                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
                     PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
@@ -261,8 +269,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
-                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    Code.Emit(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
+                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
                     PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
@@ -367,7 +375,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
                     PopTo(reg.Get(PointerBitWidth));
-                    AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
                     PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
@@ -378,7 +386,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 using (RegisterUsage.Auto reg = Registers.GetFree())
                 {
-                    AddInstruction(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
+                    Code.Emit(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
 
                     int currentOffset = size - 1;
 
@@ -402,7 +410,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         }
                     }
 
-                    // AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
+                    // Code.AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
                     // PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
                 }
 
@@ -496,8 +504,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void Push(Register value) => Push((InstructionOperand)value);
     void Push(InstructionOperand value)
     {
-        AddInstruction(Opcode.Push, value);
+        Code.Emit(Opcode.Push, value);
         ScopeSizes.LastRef += (int)value.BitWidth;
+        if (ScopeSizes.Last >= Settings.StackSize)
+        { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
+    }
+    void Push(PreparationInstructionOperand value)
+    {
+        Code.Emit(Opcode.Push, value);
+
+        if (value.IsLabelAddress) ScopeSizes.LastRef += (int)BitWidth._32;
+        else ScopeSizes.LastRef += (int)value.Value.BitWidth;
+
         if (ScopeSizes.Last >= Settings.StackSize)
         { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
     }
@@ -518,17 +536,18 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
             PopTo(reg.Get(PointerBitWidth));
-            AddInstruction(Opcode.Compare, reg.Get(PointerBitWidth), 0);
+            Code.Emit(Opcode.Compare, reg.Get(PointerBitWidth), 0);
         }
 
-        var jumpInstruction = MarkLabel();
-        AddInstruction(Opcode.JumpIfNotEqual, 0);
+        InstructionLabel skipLabel = Code.DefineLabel();
+        Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
 
         using (RegisterUsage.Auto reg = Registers.GetFree())
         {
-            AddInstruction(Opcode.Crash, 0);
+            Code.Emit(Opcode.Crash, 0);
         }
-        ApplyLabelRelative(jumpInstruction);
+
+        Code.MarkLabel(skipLabel);
 
         AddComment($"}}");
     }
@@ -772,58 +791,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         return sum;
-    }
-
-    #endregion
-
-    #region Bytecode Labels
-
-    bool IsBytecodeLabeled(int index)
-    {
-        foreach (BytecodeLabel v in AwaitingLabels)
-        {
-            if (v.Index == index) return true;
-        }
-        foreach (UndefinedOffset v in UndefinedFunctionOffsets)
-        {
-            if (v.InstructionIndex == index) return true;
-        }
-        foreach (UndefinedOffset v in UndefinedInstructionLabels)
-        {
-            if (v.InstructionIndex == index) return true;
-        }
-        return false;
-    }
-
-    BytecodeLabel MarkLabel()
-    {
-        BytecodeLabel label = new(GeneratedCode.Count);
-        AwaitingLabels.Add(label);
-        return label;
-    }
-
-    void ApplyLabelAbsolute(BytecodeLabel label)
-    {
-        for (int i = 0; i < AwaitingLabels.Count; i++)
-        {
-            if (AwaitingLabels[i].Index != label.Index) continue;
-            AwaitingLabels.RemoveAt(i--);
-        }
-        if (label == BytecodeLabel.Invalid) return;
-        GeneratedCode[label.Index].Operand1 = GeneratedCode.Count;
-        OptimizeCode();
-    }
-
-    void ApplyLabelRelative(BytecodeLabel label)
-    {
-        for (int i = 0; i < AwaitingLabels.Count; i++)
-        {
-            if (AwaitingLabels[i].Index != label.Index) continue;
-            AwaitingLabels.RemoveAt(i--);
-        }
-        if (label == BytecodeLabel.Invalid) return;
-        GeneratedCode[label.Index].Operand1 = GeneratedCode.Count - label.Index;
-        OptimizeCode();
     }
 
     #endregion

@@ -303,11 +303,11 @@ public readonly struct Instruction
         }
     }
 
-    public Instruction(PreparationInstruction other)
+    public Instruction(Opcode opcode, InstructionOperand operand1, InstructionOperand operand2)
     {
-        Opcode = other.Opcode;
-        Operand1 = other.Operand1;
-        Operand2 = other.Operand2;
+        Opcode = opcode;
+        Operand1 = operand1;
+        Operand2 = operand2;
     }
 
     [ExcludeFromCodeCoverage]

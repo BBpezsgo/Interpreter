@@ -3,6 +3,150 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
 
+enum RegisterIdentifier : byte
+{
+    AX,
+    BX,
+    CX,
+    DX,
+}
+
+enum RegisterSlice : byte
+{
+    R,
+    D,
+    W,
+    H,
+    L,
+}
+
+readonly struct GeneralPurposeRegister : IEquatable<GeneralPurposeRegister>
+{
+    public static readonly GeneralPurposeRegister EAX = new(RegisterIdentifier.AX, RegisterSlice.D);
+    public static readonly GeneralPurposeRegister EBX = new(RegisterIdentifier.BX, RegisterSlice.D);
+    public static readonly GeneralPurposeRegister ECX = new(RegisterIdentifier.CX, RegisterSlice.D);
+    public static readonly GeneralPurposeRegister EDX = new(RegisterIdentifier.DX, RegisterSlice.D);
+
+    public readonly RegisterIdentifier Identifier;
+    public readonly RegisterSlice Slice;
+
+    public GeneralPurposeRegister(RegisterIdentifier identifier, RegisterSlice slice)
+    {
+        Identifier = identifier;
+        Slice = slice;
+    }
+
+    public override bool Equals(object? obj) => obj is GeneralPurposeRegister other && Equals(other);
+    public bool Equals(GeneralPurposeRegister other) => Identifier == other.Identifier && Slice == other.Slice;
+    public override int GetHashCode() => HashCode.Combine(Identifier, Slice);
+
+    public static bool operator ==(GeneralPurposeRegister left, GeneralPurposeRegister right) => left.Equals(right);
+    public static bool operator !=(GeneralPurposeRegister left, GeneralPurposeRegister right) => !left.Equals(right);
+
+    public static implicit operator Register(GeneralPurposeRegister reg) => reg.Identifier switch
+    {
+        RegisterIdentifier.AX => reg.Slice switch
+        {
+            RegisterSlice.R => Register.RAX,
+            RegisterSlice.D => Register.EAX,
+            RegisterSlice.W => Register.AX,
+            RegisterSlice.H => Register.AH,
+            RegisterSlice.L => Register.AL,
+            _ => throw new UnreachableException(),
+        },
+        RegisterIdentifier.BX => reg.Slice switch
+        {
+            RegisterSlice.R => Register.RBX,
+            RegisterSlice.D => Register.EBX,
+            RegisterSlice.W => Register.BX,
+            RegisterSlice.H => Register.BH,
+            RegisterSlice.L => Register.BL,
+            _ => throw new UnreachableException(),
+        },
+        RegisterIdentifier.CX => reg.Slice switch
+        {
+            RegisterSlice.R => Register.RCX,
+            RegisterSlice.D => Register.ECX,
+            RegisterSlice.W => Register.CX,
+            RegisterSlice.H => Register.CH,
+            RegisterSlice.L => Register.CL,
+            _ => throw new UnreachableException(),
+        },
+        RegisterIdentifier.DX => reg.Slice switch
+        {
+            RegisterSlice.R => Register.RDX,
+            RegisterSlice.D => Register.EDX,
+            RegisterSlice.W => Register.DX,
+            RegisterSlice.H => Register.DH,
+            RegisterSlice.L => Register.DL,
+            _ => throw new UnreachableException(),
+        },
+        _ => throw new UnreachableException(),
+    };
+
+    public override string ToString()
+    {
+        return Identifier switch
+        {
+            RegisterIdentifier.AX => Slice switch
+            {
+                RegisterSlice.R => "RAX",
+                RegisterSlice.D => "EAX",
+                RegisterSlice.W => "AX",
+                RegisterSlice.H => "AH",
+                RegisterSlice.L => "AL",
+                _ => throw new UnreachableException(),
+            },
+            RegisterIdentifier.BX => Slice switch
+            {
+                RegisterSlice.R => "RBX",
+                RegisterSlice.D => "EBX",
+                RegisterSlice.W => "BX",
+                RegisterSlice.H => "BH",
+                RegisterSlice.L => "BL",
+                _ => throw new UnreachableException(),
+            },
+            RegisterIdentifier.CX => Slice switch
+            {
+                RegisterSlice.R => "RCX",
+                RegisterSlice.D => "ECX",
+                RegisterSlice.W => "CX",
+                RegisterSlice.H => "CH",
+                RegisterSlice.L => "CL",
+                _ => throw new UnreachableException(),
+            },
+            RegisterIdentifier.DX => Slice switch
+            {
+                RegisterSlice.R => "RDX",
+                RegisterSlice.D => "EDX",
+                RegisterSlice.W => "DX",
+                RegisterSlice.H => "DH",
+                RegisterSlice.L => "DL",
+                _ => throw new UnreachableException(),
+            },
+            _ => throw new UnreachableException(),
+        };
+    }
+
+    public bool Overlaps(GeneralPurposeRegister other)
+    {
+        if (Identifier != other.Identifier)
+        {
+            return false;
+        }
+
+        return Slice switch
+        {
+            RegisterSlice.R => true,
+            RegisterSlice.D => true,
+            RegisterSlice.W => true,
+            RegisterSlice.H => other.Slice is not RegisterSlice.L,
+            RegisterSlice.L => other.Slice is not RegisterSlice.H,
+            _ => throw new UnreachableException(),
+        };
+    }
+}
+
 public partial class CodeGeneratorForMain : CodeGenerator
 {
     void AddComment(string comment)
@@ -34,14 +178,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForStatement(address);
 
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(addressType.GetBitWidth(this, Diagnostics, address)))
         {
-            PopTo(reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
+            PopTo(reg.Register);
             InstructionLabel offsetLabel = Code.DefineLabel();
-            Code.Emit(Opcode.MathSub, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)), offsetLabel.Absolute());
+            Code.Emit(Opcode.MathSub, reg.Register, offsetLabel.Absolute());
             Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
             Code.MarkLabel(offsetLabel);
-            Code.Emit(Opcode.Jump, reg.Get(addressType.GetBitWidth(this, Diagnostics, address)));
+            Code.Emit(Opcode.Jump, reg.Register);
         }
 
         Code.MarkLabel(returnLabel);
@@ -102,9 +246,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
         { throw new LanguageException($"Variable {variable} was not compiled", variable.Location.Position, variable.Location.File); }
 
         return new(
-                Register.BasePointer,
-                generatedVariable.MemoryAddress
-            );
+            Register.BasePointer,
+            generatedVariable.MemoryAddress
+        );
     }
 
     [SuppressMessage("Style", "IDE0060:Remove unused parameter")]
@@ -255,11 +399,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressPointer addressPointer:
             {
                 PushFrom(addressPointer.PointerAddress, PointerSize);
-                using (RegisterUsage.Auto reg = Registers.GetFree())
+                using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
                 {
-                    PopTo(reg.Get(PointerBitWidth));
-                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
-                    PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+                    PopTo(reg.Register);
+                    Code.Emit(Opcode.MathAdd, reg.Register, address.Offset);
+                    PopTo(new AddressRegisterPointer(reg.Register), size);
                 }
 
                 break;
@@ -267,12 +411,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             case AddressRegisterPointer registerPointer:
             {
-                using (RegisterUsage.Auto reg = Registers.GetFree())
-                {
-                    Code.Emit(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
-                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
-                    PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
-                }
+                PopTo(new AddressRegisterPointer(registerPointer.Register), size, address.Offset);
 
                 break;
             }
@@ -280,10 +419,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default:
             {
                 GenerateAddressResolver(address);
-                using (RegisterUsage.Auto reg = Registers.GetFree())
+                using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
                 {
-                    PopTo(reg.Get(PointerBitWidth));
-                    PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+                    PopTo(reg.Register);
+                    PopTo(new AddressRegisterPointer(reg.Register), size);
                 }
                 break;
             }
@@ -293,14 +432,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void PopTo(AddressPointer address, int size)
     {
         PushFrom(address.PointerAddress, PointerSize);
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PopTo(new AddressRegisterPointer(reg.Register), size);
         }
     }
 
-    void PopTo(AddressRegisterPointer address, int size)
+    void PopTo(AddressRegisterPointer address, int size, int offset = 0)
     {
         int currentOffset = 0;
         while (currentOffset < size)
@@ -321,7 +460,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (size - currentOffset < checkSize) continue;
                 if (PointerSize < checkSize) continue;
 
-                PopTo(address.Register.ToPtr(currentOffset, checkBitWidth), checkBitWidth);
+                PopTo(address.Register.ToPtr(currentOffset + offset, checkBitWidth), checkBitWidth);
                 currentOffset += checkSize;
                 break;
             }
@@ -331,24 +470,20 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void PopTo(AddressRuntimePointer address, int size)
     {
         GenerateAddressResolver(address);
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PopTo(new AddressRegisterPointer(reg.Register), size);
         }
     }
 
     void PopTo(AddressRuntimeIndex address, int size)
     {
-        AddComment($"Resolver address {{");
         GenerateAddressResolver(address);
-        AddComment($"}}");
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            AddComment($"Pop address:");
-            PopTo(reg.Get(PointerBitWidth));
-            AddComment($"Pop value:");
-            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PopTo(new AddressRegisterPointer(reg.Register), size);
         }
     }
 
@@ -372,11 +507,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressPointer addressPointer:
             {
                 PushFrom(addressPointer.PointerAddress, PointerSize);
-                using (RegisterUsage.Auto reg = Registers.GetFree())
+                using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
                 {
-                    PopTo(reg.Get(PointerBitWidth));
-                    Code.Emit(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
-                    PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+                    PopTo(reg.Register);
+                    PushFrom(reg.Register, address.Offset, size);
                 }
 
                 break;
@@ -384,48 +518,52 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             case AddressRegisterPointer registerPointer:
             {
-                using (RegisterUsage.Auto reg = Registers.GetFree())
-                {
-                    Code.Emit(Opcode.Move, reg.Get(PointerBitWidth), registerPointer.Register);
-
-                    int currentOffset = size - 1;
-
-                    while (currentOffset >= 0)
-                    {
-                        foreach (BitWidth checkBitWidth in
-#if NET_STANDARD
-                            CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
-#else
-                            Enum.GetValues<BitWidth>().Reverse()
-#endif
-                        )
-                        {
-                            int checkSize = (int)checkBitWidth;
-                            if (currentOffset < checkSize - 1) continue;
-                            if (PointerSize < checkSize) continue;
-
-                            Push(reg.Get(PointerBitWidth).ToPtr(currentOffset + address.Offset - (checkSize - 1), checkBitWidth));
-                            currentOffset -= checkSize;
-                            break;
-                        }
-                    }
-
-                    // Code.AddInstruction(Opcode.MathAdd, reg.Get(PointerBitWidth), address.Offset);
-                    // PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
-                }
-
+                PushFrom(registerPointer.Register, address.Offset, size);
                 break;
             }
 
             default:
             {
                 GenerateAddressResolver(address);
-                using (RegisterUsage.Auto reg = Registers.GetFree())
+                using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
                 {
-                    PopTo(reg.Get(PointerBitWidth));
-                    PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+                    PopTo(reg.Register);
+                    PushFrom(reg.Register, 0, size);
                 }
                 break;
+            }
+        }
+    }
+
+    void PushFrom(Register register, int offset, int size)
+    {
+        int currentOffset = size;
+
+        while (currentOffset > 0)
+        {
+            if (currentOffset >= 8 && PointerSize >= 8)
+            {
+                Push(register.ToPtr(currentOffset - 8 + offset, BitWidth._64));
+                currentOffset -= 8;
+            }
+            else if (currentOffset >= 4)
+            {
+                Push(register.ToPtr(currentOffset - 4 + offset, BitWidth._32));
+                currentOffset -= 4;
+            }
+            else if (currentOffset >= 2)
+            {
+                Push(register.ToPtr(currentOffset - 2 + offset, BitWidth._16));
+                currentOffset -= 2;
+            }
+            else if (currentOffset >= 1)
+            {
+                Push(register.ToPtr(currentOffset - 1 + offset, BitWidth._8));
+                currentOffset -= 1;
+            }
+            else
+            {
+                throw new UnreachableException();
             }
         }
     }
@@ -433,69 +571,35 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void PushFrom(AddressPointer address, int size)
     {
         PushFrom(address.PointerAddress, PointerSize);
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PushFrom(reg.Register, 0, size);
         }
     }
 
     void PushFrom(AddressRegisterPointer address, int size)
     {
-        int currentOffset = size - 1;
-
-        while (currentOffset >= 0)
-        {
-            // foreach (BitWidth checkBitWidth in Enum.GetValues<BitWidth>().Reverse())
-            // {
-            //     int checkSize = (int)checkBitWidth;
-            //     if (currentOffset < checkSize) continue;
-            //     if (PointerSize < checkSize) continue;
-            // 
-            //     Push(address.Register.ToPtr(currentOffset - (checkSize - 1), checkBitWidth));
-            //     currentOffset -= checkSize;
-            //     break;
-            // }
-            if (currentOffset >= 8 && PointerSize >= 8)
-            {
-                Push(address.Register.ToPtr(currentOffset - 7, BitWidth._64));
-                currentOffset -= 8;
-            }
-            else if (currentOffset >= 4)
-            {
-                Push(address.Register.ToPtr(currentOffset - 3, BitWidth._32));
-                currentOffset -= 4;
-            }
-            else if (currentOffset >= 2)
-            {
-                Push(address.Register.ToPtr(currentOffset - 1, BitWidth._16));
-                currentOffset -= 2;
-            }
-            else
-            {
-                Push(address.Register.ToPtr(currentOffset, BitWidth._8));
-                currentOffset -= 1;
-            }
-        }
+        PushFrom(address.Register, 0, size);
     }
 
     void PushFrom(AddressRuntimePointer address, int size)
     {
         GenerateAddressResolver(address);
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PushFrom(reg.Register, 0, size);
         }
     }
 
     void PushFrom(AddressRuntimeIndex address, int size)
     {
         GenerateAddressResolver(address);
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            PushFrom(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PushFrom(reg.Register, 0, size);
         }
     }
 
@@ -533,19 +637,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (preservePointer)
         { PushFrom(StackTop, PointerSize); }
 
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            Code.Emit(Opcode.Compare, reg.Get(PointerBitWidth), 0);
+            PopTo(reg.Register);
+            Code.Emit(Opcode.Compare, reg.Register, 0);
         }
 
         InstructionLabel skipLabel = Code.DefineLabel();
         Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
 
-        using (RegisterUsage.Auto reg = Registers.GetFree())
-        {
+        //using (RegisterUsage.Auto reg = Registers.GetFree())
+        //{
             Code.Emit(Opcode.Crash, 0);
-        }
+        //}
 
         Code.MarkLabel(skipLabel);
 
@@ -557,11 +661,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateAddressResolver(address);
         CheckPointerNull();
 
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
+            PopTo(reg.Register);
             for (int i = size - 1; i >= 0; i--)
-            { Push(reg.Get(PointerBitWidth).ToPtr(i, BitWidth._8)); }
+            { Push(reg.Register.ToPtr(i, BitWidth._8)); }
         }
     }
 
@@ -570,10 +674,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateAddressResolver(address);
         CheckPointerNull();
 
-        using (RegisterUsage.Auto reg = Registers.GetFree())
+        using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
-            PopTo(reg.Get(PointerBitWidth));
-            PopTo(new AddressRegisterPointer(reg.Get(PointerBitWidth)), size);
+            PopTo(reg.Register);
+            PopTo(new AddressRegisterPointer(reg.Register), size);
         }
     }
 

@@ -191,4 +191,10 @@ public static class GeneralExtensions
     public static void Indent(this StringBuilder stringBuilder, int indent) => stringBuilder.Append(' ', indent * 2);
 
     public static ImmutableArray<T> AsImmutableUnsafe<T>(this T[] array) => ImmutableCollectionsMarshal.AsImmutableArray(array);
+
+    public static void RemoveSwapBack<T>(this List<T> list, int index)
+    {
+        list[index] = list[^1];
+        list.RemoveAt(list.Count - 1);
+    }
 }

@@ -36,73 +36,28 @@ class RegisterUsage
     public readonly struct Auto : IDisposable, IEquatable<Auto>
     {
         readonly RegisterUsage _registers;
-        readonly Register _register;
+        readonly GeneralPurposeRegister _register;
 
-        public Register Register32 => _register switch
+        public Register Register => _register;
+
+        public Register Register8L => _register.Identifier switch
         {
-            0 => default,
-            Register.EAX => Register.EAX,
-            Register.EBX => Register.EBX,
-            Register.ECX => Register.ECX,
-            Register.EDX => Register.EDX,
-            _ => throw new UnreachableException(),
-        };
-        public Register Register64 => _register switch
-        {
-            0 => default,
-            Register.EAX => Register.RAX,
-            Register.EBX => Register.RBX,
-            Register.ECX => Register.RCX,
-            Register.EDX => Register.RDX,
-            _ => throw new UnreachableException(),
-        };
-        public Register Register16 => _register switch
-        {
-            0 => default,
-            Register.EAX => Register.AX,
-            Register.EBX => Register.BX,
-            Register.ECX => Register.CX,
-            Register.EDX => Register.DX,
-            _ => throw new UnreachableException(),
-        };
-        public Register Register8H => _register switch
-        {
-            0 => default,
-            Register.EAX => Register.AH,
-            Register.EBX => Register.BH,
-            Register.ECX => Register.CH,
-            Register.EDX => Register.DH,
-            _ => throw new UnreachableException(),
-        };
-        public Register Register8L => _register switch
-        {
-            0 => default,
-            Register.EAX => Register.AL,
-            Register.EBX => Register.BL,
-            Register.ECX => Register.CL,
-            Register.EDX => Register.DL,
+            RegisterIdentifier.AX => Register.AL,
+            RegisterIdentifier.BX => Register.BL,
+            RegisterIdentifier.CX => Register.CL,
+            RegisterIdentifier.DX => Register.DL,
             _ => throw new UnreachableException(),
         };
 
-        public Auto(RegisterUsage registers, Register register)
+        public Auto(RegisterUsage registers, GeneralPurposeRegister register)
         {
             _registers = registers;
             _register = register;
 
-            _registers._isUsed[_register] = true;
+            _registers.UsedRegisters.Add(_register);
         }
 
-        public Register Get(BitWidth bitWidth) => bitWidth switch
-        {
-            0 => default,
-            BitWidth._8 => Register8L,
-            BitWidth._16 => Register16,
-            BitWidth._32 => Register32,
-            BitWidth._64 => Register64,
-            _ => throw new UnreachableException(),
-        };
-
-        public void Dispose() => _registers._isUsed[_register] = false;
+        public void Dispose() => _registers.UsedRegisters.Remove(_register);
 
         public override string ToString() => _register.ToString();
 
@@ -113,35 +68,45 @@ class RegisterUsage
         public static bool operator !=(Auto left, Auto right) => left._register != right._register;
     }
 
-    readonly Dictionary<Register, bool> _isUsed;
+    readonly HashSet<GeneralPurposeRegister> UsedRegisters = new();
 
-    static readonly ImmutableArray<Register> GeneralRegisters32 = ImmutableArray.Create(
-        Register.EAX,
-        Register.EBX,
-        Register.ECX,
-        Register.EDX
-    );
-
-    public RegisterUsage()
+    public bool IsFree(GeneralPurposeRegister register)
     {
-        _isUsed = new Dictionary<Register, bool>();
-    }
-
-    public bool IsFree(Register register)
-    {
-        if (!_isUsed.TryGetValue(register, out bool isUsed))
-        { return true; }
-        return !isUsed;
-    }
-
-    public Auto GetFree()
-    {
-        foreach (Register reg in GeneralRegisters32)
+        foreach (GeneralPurposeRegister item in UsedRegisters)
         {
-            if (IsFree(reg))
-            { return new Auto(this, reg); }
+            if (item.Identifier != register.Identifier) continue;
+            if (item.Slice is RegisterSlice.R or RegisterSlice.D or RegisterSlice.W) return false;
+            if (register.Slice is RegisterSlice.R or RegisterSlice.D or RegisterSlice.W) return false;
+            if (register.Slice == item.Slice) return false;
+            return true;
         }
-        throw new NotImplementedException();
+        return true;
+    }
+
+    public Auto GetFree(BitWidth bitWidth)
+    {
+        ReadOnlySpan<RegisterSlice> registerSlices = bitWidth switch
+        {
+            BitWidth._8 => stackalloc[] { RegisterSlice.L, RegisterSlice.H },
+            BitWidth._16 => stackalloc[] { RegisterSlice.W },
+            BitWidth._32 => stackalloc[] { RegisterSlice.D },
+            BitWidth._64 => stackalloc[] { RegisterSlice.R },
+            _ => throw new UnreachableException(),
+        };
+
+        foreach (RegisterIdentifier identifier in Enum.GetValues(typeof(RegisterIdentifier)))
+        {
+            foreach (RegisterSlice slice in registerSlices)
+            {
+                GeneralPurposeRegister reg = new(identifier, slice);
+                if (IsFree(reg))
+                {
+                    return new Auto(this, reg);
+                }
+            }
+        }
+
+        throw new InternalExceptionWithoutContext("No registers avaliable");
     }
 }
 
@@ -276,10 +241,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ILGenerator = settings.ILGeneratorSettings.HasValue ? new CodeGeneratorForIL(compilerResult, new DiagnosticsCollection(), settings.ILGeneratorSettings.Value, null) : null;
         ExternalFunctions = compilerResult.ExternalFunctions;
-        Code = new BytecodeEmitter()
-        {
-            EnableOptimizations = !settings.DontOptimize,
-        };
         CleanupStack2 = new();
         ReturnInstructions = new();
         BreakInstructions = new();
@@ -295,6 +256,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 SavedBasePointer = SavedBasePointerOffset,
                 SavedCodePointer = SavedCodePointerOffset,
             }
+        };
+        Code = new BytecodeEmitter()
+        {
+            EnableOptimizations = !settings.DontOptimize,
+            DebugInfo = DebugInfo,
         };
     }
 

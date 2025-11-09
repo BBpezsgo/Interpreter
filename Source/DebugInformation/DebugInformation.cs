@@ -24,12 +24,12 @@ public class DebugInformation : IDuplicatable<DebugInformation>
     {
         {
             Dictionary<int, List<string>> newCodeComments = new();
-            foreach (KeyValuePair<int, List<string>> item in CodeComments)
+            foreach ((int key, List<string> comments) in CodeComments)
             {
-                if (item.Key > from)
-                { newCodeComments.Add(item.Key + offset, item.Value); }
-                else
-                { newCodeComments.Add(item.Key, item.Value); }
+                int offsetted = key;
+                if (key >= from) offsetted += offset;
+                if (newCodeComments.TryGetValue(offsetted, out List<string>? existing)) existing.AddRange(comments);
+                else newCodeComments.Add(offsetted, comments);
             }
             CodeComments.Clear();
             CodeComments.AddRange(newCodeComments);

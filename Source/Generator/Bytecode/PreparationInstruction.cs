@@ -37,7 +37,7 @@ public readonly struct LabelInstructionOperand : IEquatable<LabelInstructionOper
             result.Append('+');
             result.Append(AdditionalLabelOffset);
         }
-        else
+        else if (AdditionalLabelOffset < 0)
         {
             result.Append(AdditionalLabelOffset);
         }

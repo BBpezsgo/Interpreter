@@ -24,24 +24,74 @@ public class BytecodeEmitter
         public static bool operator !=(BytecodeJump left, BytecodeJump right) => left.Index != right.Index;
     }
 
-    public bool EnableOptimizations { get; set; }
+    public bool EnableOptimizations { get; init; }
+    public required DebugInformation DebugInfo { get; init; }
 
     readonly List<PreparationInstruction> Code = new();
     readonly List<InstructionLabel> Labels = new();
 
     public int Offset => Code.Count;
 
-    public void WriteTo(StreamWriter writer)
+    public void WriteTo(StreamWriter writer, bool comments)
     {
+        if (!comments)
+        {
+            for (int i = 0; i < Code.Count; i++)
+            {
+                foreach (InstructionLabel label in Labels)
+                {
+                    if (label.Index != i) continue;
+                    writer.WriteLine($"{label}:");
+                }
+                writer.Write("  ");
+                writer.WriteLine(Code[i].ToString());
+            }
+
+            return;
+        }
+
         for (int i = 0; i < Code.Count; i++)
         {
+            FunctionInformation f = DebugInfo.FunctionInformation.FirstOrDefault(v => v.Instructions.Contains(i));
+
+            int indent = 0;
+
+            if (f.IsValid)
+            {
+                indent += 2;
+                if (f.Instructions.Start == i)
+                {
+                    writer.WriteLine(f.Function?.ToReadable() ?? f.ReadableIdentifier);
+                    writer.WriteLine('{');
+                }
+            }
+
+            if (DebugInfo.CodeComments.TryGetValue(i, out List<string>? _comments))
+            {
+                foreach (string comment in _comments)
+                {
+                    writer.Write(new string(' ', indent));
+                    writer.WriteLine(comment);
+                }
+            }
+
             foreach (InstructionLabel label in Labels)
             {
                 if (label.Index != i) continue;
+                writer.Write(new string(' ', indent));
                 writer.WriteLine($"{label}:");
             }
+            writer.Write(new string(' ', indent));
             writer.Write("  ");
             writer.WriteLine(Code[i].ToString());
+
+            if (f.IsValid)
+            {
+                if (f.Instructions.End == i)
+                {
+                    writer.WriteLine('}');
+                }
+            }
         }
     }
 
@@ -57,6 +107,41 @@ public class BytecodeEmitter
                 Labels[i] = v;
             }
         }
+        DebugInfo.OffsetCodeFrom(index, -1);
+    }
+
+    static bool DoesOverlap(InstructionOperand a, InstructionOperand b)
+    {
+        if (a.Type.IsImmediate()) return false;
+        if (b.Type.IsImmediate()) return false;
+
+        if (a.Type is InstructionOperandType.Register) return false;
+        if (b.Type is InstructionOperandType.Register) return false;
+
+        if (a.Type.IsRegisterPointer() && b.Type.IsRegisterPointer())
+        {
+            if (a.Type.RegisterOfPointer() == b.Type.RegisterOfPointer())
+            {
+                return RangeUtils.Overlaps(
+                    new Range<int>(a.Value, a.Value + (int)a.Type.BitwidthOfPointer()),
+                    new Range<int>(b.Value, b.Value + (int)b.Type.BitwidthOfPointer())
+                );
+            }
+            else
+            {
+                return true;
+            }
+        }
+
+        if (a.Type.IsPointer() && b.Type.IsPointer())
+        {
+            return RangeUtils.Overlaps(
+                new Range<int>(a.Value, a.Value + (int)a.Type.BitwidthOfPointer()),
+                new Range<int>(b.Value, b.Value + (int)b.Type.BitwidthOfPointer())
+            );
+        }
+
+        return true;
     }
 
     bool OptimizeCodeAt(int i)
@@ -64,6 +149,23 @@ public class BytecodeEmitter
         if (!EnableOptimizations) return false;
 
         PreparationInstruction prev0 = Code[i];
+
+        if (prev0.Opcode
+            is Opcode.Jump
+            or Opcode.JumpIfEqual
+            or Opcode.JumpIfGreater
+            or Opcode.JumpIfGreaterOrEqual
+            or Opcode.JumpIfLess
+            or Opcode.JumpIfLessOrEqual
+            or Opcode.JumpIfNotEqual
+            && prev0.Operand1.IsLabelAddress
+            && prev0.Operand1.LabelValue.AdditionalLabelOffset == 0
+            && prev0.Operand1.LabelValue.IsAbsoluteLabelAddress == false
+            && GetLabelIndex(prev0.Operand1.LabelValue.Label) == i + 1)
+        {
+            RemoveAt(i);
+            return true;
+        }
 
         if (prev0.Operand1.IsLabelAddress || prev0.Operand2.IsLabelAddress) return false;
 
@@ -127,6 +229,25 @@ public class BytecodeEmitter
 
         PreparationInstruction prev1 = Code[i - 1];
         if (prev1.Operand1.IsLabelAddress || prev1.Operand2.IsLabelAddress) return false;
+
+        if (prev1.Opcode == Opcode.Move
+            && prev1.Operand1.Value.Type == InstructionOperandType.Register
+            && prev1.Operand2.Value.Type == InstructionOperandType.Register
+
+            && prev0.Opcode == Opcode.Move
+            && prev0.Operand1.Value == prev1.Operand1.Value
+            && prev0.Operand2.Value.Type == prev1.Operand1.Value.Reg.ToPtr(prev0.Operand1.Value.BitWidth)
+
+            && !DoesOverlap(prev0.Operand1.Value, prev1.Operand2.Value.Reg.ToPtr(prev0.Operand2.Value.Value, prev0.Operand1.Value.BitWidth)))
+        {
+            RemoveAt(i--);
+            Code[i] = new PreparationInstruction(
+                Opcode.Move,
+                prev0.Operand1.Value,
+                prev1.Operand2.Value.Reg.ToPtr(prev0.Operand2.Value.Value, prev0.Operand1.Value.BitWidth)
+            );
+            return true;
+        }
 
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.Type == InstructionOperandType.Immediate16
@@ -213,7 +334,9 @@ public class BytecodeEmitter
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._64
 
-            && prev0.Opcode == Opcode.PopTo64)
+            && prev0.Opcode == Opcode.PopTo64
+
+            && !DoesOverlap(prev0.Operand1.Value, prev1.Operand1.Value))
         {
             RemoveAt(i--);
             Code[i] = new PreparationInstruction(
@@ -227,7 +350,9 @@ public class BytecodeEmitter
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._32
 
-            && prev0.Opcode == Opcode.PopTo32)
+            && prev0.Opcode == Opcode.PopTo32
+
+            && !DoesOverlap(prev0.Operand1.Value, prev1.Operand1.Value))
         {
             RemoveAt(i--);
             Code[i] = new PreparationInstruction(
@@ -241,7 +366,9 @@ public class BytecodeEmitter
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._16
 
-            && prev0.Opcode == Opcode.PopTo16)
+            && prev0.Opcode == Opcode.PopTo16
+
+            && !DoesOverlap(prev0.Operand1.Value, prev1.Operand1.Value))
         {
             RemoveAt(i--);
             Code[i] = new PreparationInstruction(
@@ -255,7 +382,9 @@ public class BytecodeEmitter
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._8
 
-            && prev0.Opcode == Opcode.PopTo8)
+            && prev0.Opcode == Opcode.PopTo8
+
+            && !DoesOverlap(prev0.Operand1.Value, prev1.Operand1.Value))
         {
             RemoveAt(i--);
             Code[i] = new PreparationInstruction(
@@ -268,7 +397,10 @@ public class BytecodeEmitter
 
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._64
-            && prev0.Opcode == Opcode.Pop64)
+
+            && prev0.Opcode == Opcode.MathAdd
+            && prev0.Operand1 == Register.StackPointer
+            && prev0.Operand2 == 8)
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -277,7 +409,10 @@ public class BytecodeEmitter
 
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._32
-            && prev0.Opcode == Opcode.Pop32)
+
+            && prev0.Opcode == Opcode.MathAdd
+            && prev0.Operand1 == Register.StackPointer
+            && prev0.Operand2 == 4)
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -286,7 +421,10 @@ public class BytecodeEmitter
 
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._16
-            && prev0.Opcode == Opcode.Pop16)
+
+            && prev0.Opcode == Opcode.MathAdd
+            && prev0.Operand1 == Register.StackPointer
+            && prev0.Operand2 == 2)
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -295,7 +433,10 @@ public class BytecodeEmitter
 
         if (prev1.Opcode == Opcode.Push
             && prev1.Operand1.Value.BitWidth == BitWidth._8
-            && prev0.Opcode == Opcode.Pop8)
+
+            && prev0.Opcode == Opcode.MathAdd
+            && prev0.Operand1 == Register.StackPointer
+            && prev0.Operand2 == 1)
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -353,30 +494,30 @@ public class BytecodeEmitter
         }
     }
 
+    int GetLabelIndex(InstructionLabel label)
+    {
+        foreach (InstructionLabel _label in Labels)
+        {
+            if (_label != label) continue;
+            return _label.Index;
+        }
+        throw new KeyNotFoundException($"Label {label} not found");
+    }
+
     InstructionOperand Compile(PreparationInstructionOperand v, int i)
     {
         if (!v.IsLabelAddress) return v.Value;
-        InstructionLabel label;
-        foreach (InstructionLabel _label in Labels)
-        {
-            if (_label == v.LabelValue.Label)
-            {
-                label = _label;
-                goto ok;
-            }
-        }
-        throw new UnreachableException();
-    ok:
-        if (label.Index == -1) throw new InternalExceptionWithoutContext($"Label is not marked");
-        if (label.Index == -2) throw new InternalExceptionWithoutContext($"Label is invalid");
-        if (label.Index < -2) throw new UnreachableException();
+        int label = GetLabelIndex(v.LabelValue.Label);
+        if (label == -1) throw new InternalExceptionWithoutContext($"Label is not marked");
+        if (label == -2) throw new InternalExceptionWithoutContext($"Label is invalid");
+        if (label < -2) throw new UnreachableException();
         if (v.LabelValue.IsAbsoluteLabelAddress)
         {
-            return new InstructionOperand(label.Index + v.LabelValue.AdditionalLabelOffset, InstructionOperandType.Immediate32);
+            return new InstructionOperand(label + v.LabelValue.AdditionalLabelOffset, InstructionOperandType.Immediate32);
         }
         else
         {
-            return new InstructionOperand(label.Index - i + v.LabelValue.AdditionalLabelOffset, InstructionOperandType.Immediate32);
+            return new InstructionOperand(label - i + v.LabelValue.AdditionalLabelOffset, InstructionOperandType.Immediate32);
         }
     }
 
@@ -385,15 +526,28 @@ public class BytecodeEmitter
         return new Instruction(v.Opcode, Compile(v.Operand1, i), Compile(v.Operand2, i));
     }
 
+    void PurgeLabels()
+    {
+        for (int i = Labels.Count - 1; i >= 0; i--)
+        {
+            InstructionLabel label = Labels[i];
+            if (Code.Any(v => (v.Operand1.IsLabelAddress && v.Operand1.LabelValue.Label == label) || (v.Operand2.IsLabelAddress && v.Operand2.LabelValue.Label == label)))
+            { continue; }
+            Labels.RemoveSwapBack(i);
+        }
+    }
+
     public ImmutableArray<Instruction> Compile()
     {
-        bool notDone = false;
+        bool notDone;
         do
         {
+            notDone = false;
             for (int i = Code.Count - 1; i >= 0; i--)
             {
                 if (OptimizeCodeAt(i))
                 {
+                    PurgeLabels();
                     notDone = true;
                     break;
                 }

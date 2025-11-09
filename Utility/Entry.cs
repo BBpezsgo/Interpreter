@@ -152,13 +152,15 @@ public static class Entry
                     for (int i = 0; i < generatedCode.Code.Length; i++)
                     {
                         int indent = 0;
+                        FunctionInformation f = default;
                         if (generatedCode.DebugInfo is not null)
                         {
-                            foreach (var item in generatedCode.DebugInfo.FunctionInformation)
+                            foreach (FunctionInformation item in generatedCode.DebugInfo.FunctionInformation)
                             {
                                 if (item.Instructions.Contains(i))
                                 {
                                     indent++;
+                                    f = item;
                                 }
 
                                 if (item.Instructions.Start == i)
@@ -166,6 +168,7 @@ public static class Entry
                                     ConsoleWriter t = default;
                                     InterpreterRenderer.WriteFunction(ref t, item.Function, item.TypeArguments);
                                     Console.WriteLine();
+                                    Console.WriteLine('{');
                                     break;
                                 }
                             }
@@ -209,6 +212,11 @@ public static class Entry
                         }
 
                         Console.WriteLine();
+
+                        if (f.IsValid && i == f.Instructions.End - 1)
+                        {
+                            Console.WriteLine('}');
+                        }
                     }
                 }
 
@@ -220,10 +228,7 @@ public static class Entry
                     File.WriteAllBytes(arguments.Output, ReadOnlySpan<byte>.Empty);
                     using FileStream stream = File.OpenWrite(arguments.Output);
                     using StreamWriter writer = new(stream);
-                    foreach (Instruction instruction in generatedCode.Code)
-                    {
-                        writer.WriteLine(instruction.ToString());
-                    }
+                    generatedCode.CodeEmitter.WriteTo(writer, false);
                 }
 
                 void PrintStuff(BytecodeProcessor interpreter)

@@ -37,6 +37,8 @@ struct Window
 public class InterpreterRenderer
 {
     readonly BytecodeProcessor processor;
+    readonly ImmutableArray<(int Index, int Offset)> CodeCommentOffsets;
+    readonly ImmutableDictionary<int, int> CodeCommentOffsets2;
 
     DataMovement memLoad;
     DataMovement memStore;
@@ -44,9 +46,28 @@ public class InterpreterRenderer
     Register regLoad;
     Register regStore;
 
+    int CommentsBeforehand(int index)
+    {
+        for (int i = index; i >= 0; i--)
+        {
+            if (CodeCommentOffsets2.TryGetValue(i, out int result)) return result;
+        }
+        return 0;
+    }
+
     public InterpreterRenderer(BytecodeProcessor processor)
     {
         this.processor = processor;
+
+        ImmutableArray<(int, int)>.Builder codeCommentOffsets = ImmutableArray.CreateBuilder<(int, int)>(processor.DebugInformation.CodeComments.Count);
+        int offset = 0;
+        foreach (var item in processor.DebugInformation.CodeComments.OrderBy(v => v.Key))
+        {
+            offset += item.Value.Length;
+            codeCommentOffsets.Add((item.Key, offset));
+        }
+        CodeCommentOffsets = codeCommentOffsets.MoveToImmutable();
+        CodeCommentOffsets2 = CodeCommentOffsets.ToDictionary().ToImmutableDictionary();
     }
 
     enum DataMovementEdge
@@ -375,6 +396,24 @@ public class InterpreterRenderer
     {
         buffer.Clear();
 
+        static void _WriteRegisterPointerOperand(ref BufferWriter t, string type, string register, int offset)
+        {
+            t.Write(type, AnsiColor.BrightBlack);
+            t.Write(' ');
+            t.Write('[');
+            t.Write(register, AnsiColor.BrightBlue);
+            if (offset > 0)
+            {
+                t.Write('+');
+                t.Write(offset.ToString());
+            }
+            else if (offset < 0)
+            {
+                t.Write(offset.ToString());
+            }
+            t.Write(']');
+        }
+
         static void WriteOperand(ref BufferWriter writer, in InstructionOperand operand)
         {
             switch (operand.Type)
@@ -448,279 +487,45 @@ public class InterpreterRenderer
                         case Register.RDX: writer.Write("RDX", AnsiColor.BrightBlue); break;
                     }
                     break;
-                case InstructionOperandType.PointerBP8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("BP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerBP16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("BP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerBP32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("BP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerBP64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("BP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerSP8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("SP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerSP16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("SP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerSP32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("SP", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEAX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEAX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEAX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEAX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEBX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEBX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEBX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEBX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerECX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("ECX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerECX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("ECX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerECX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("ECX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerECX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("ECX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEDX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEDX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEDX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerEDX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("EDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRAX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRAX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRAX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRAX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RAX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRBX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRBX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRBX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRBX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RBX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRCX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RCX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRCX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RCX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRCX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RCX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRCX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RCX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRDX8:
-                    writer.Write("u8", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRDX16:
-                    writer.Write("u16", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRDX32:
-                    writer.Write("u32", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
-                case InstructionOperandType.PointerRDX64:
-                    writer.Write("u64", AnsiColor.BrightBlack);
-                    writer.Write(' ');
-                    writer.Write('[');
-                    writer.Write("RDX", AnsiColor.BrightBlue);
-                    writer.Write(']');
-                    break;
+                case InstructionOperandType.PointerBP8: _WriteRegisterPointerOperand(ref writer, "u8", "BP", operand.Int); break;
+                case InstructionOperandType.PointerBP16: _WriteRegisterPointerOperand(ref writer, "u16", "BP", operand.Int); break;
+                case InstructionOperandType.PointerBP32: _WriteRegisterPointerOperand(ref writer, "u32", "BP", operand.Int); break;
+                case InstructionOperandType.PointerBP64: _WriteRegisterPointerOperand(ref writer, "u64", "BP", operand.Int); break;
+                case InstructionOperandType.PointerSP8: _WriteRegisterPointerOperand(ref writer, "u8", "SP", operand.Int); break;
+                case InstructionOperandType.PointerSP16: _WriteRegisterPointerOperand(ref writer, "u16", "SP", operand.Int); break;
+                case InstructionOperandType.PointerSP32: _WriteRegisterPointerOperand(ref writer, "u32", "SP", operand.Int); break;
+                case InstructionOperandType.PointerEAX8: _WriteRegisterPointerOperand(ref writer, "u8", "EAX", operand.Int); break;
+                case InstructionOperandType.PointerEAX16: _WriteRegisterPointerOperand(ref writer, "u16", "EAX", operand.Int); break;
+                case InstructionOperandType.PointerEAX32: _WriteRegisterPointerOperand(ref writer, "u32", "EAX", operand.Int); break;
+                case InstructionOperandType.PointerEAX64: _WriteRegisterPointerOperand(ref writer, "u64", "EAX", operand.Int); break;
+                case InstructionOperandType.PointerEBX8: _WriteRegisterPointerOperand(ref writer, "u8", "EBX", operand.Int); break;
+                case InstructionOperandType.PointerEBX16: _WriteRegisterPointerOperand(ref writer, "u16", "EBX", operand.Int); break;
+                case InstructionOperandType.PointerEBX32: _WriteRegisterPointerOperand(ref writer, "u32", "EBX", operand.Int); break;
+                case InstructionOperandType.PointerEBX64: _WriteRegisterPointerOperand(ref writer, "u64", "EBX", operand.Int); break;
+                case InstructionOperandType.PointerECX8: _WriteRegisterPointerOperand(ref writer, "u8", "ECX", operand.Int); break;
+                case InstructionOperandType.PointerECX16: _WriteRegisterPointerOperand(ref writer, "u16", "ECX", operand.Int); break;
+                case InstructionOperandType.PointerECX32: _WriteRegisterPointerOperand(ref writer, "u32", "ECX", operand.Int); break;
+                case InstructionOperandType.PointerECX64: _WriteRegisterPointerOperand(ref writer, "u64", "ECX", operand.Int); break;
+                case InstructionOperandType.PointerEDX8: _WriteRegisterPointerOperand(ref writer, "u8", "EDX", operand.Int); break;
+                case InstructionOperandType.PointerEDX16: _WriteRegisterPointerOperand(ref writer, "u16", "EDX", operand.Int); break;
+                case InstructionOperandType.PointerEDX32: _WriteRegisterPointerOperand(ref writer, "u32", "EDX", operand.Int); break;
+                case InstructionOperandType.PointerEDX64: _WriteRegisterPointerOperand(ref writer, "u64", "EDX", operand.Int); break;
+                case InstructionOperandType.PointerRAX8: _WriteRegisterPointerOperand(ref writer, "u8", "RAX", operand.Int); break;
+                case InstructionOperandType.PointerRAX16: _WriteRegisterPointerOperand(ref writer, "u16", "RAX", operand.Int); break;
+                case InstructionOperandType.PointerRAX32: _WriteRegisterPointerOperand(ref writer, "u32", "RAX", operand.Int); break;
+                case InstructionOperandType.PointerRAX64: _WriteRegisterPointerOperand(ref writer, "u64", "RAX", operand.Int); break;
+                case InstructionOperandType.PointerRBX8: _WriteRegisterPointerOperand(ref writer, "u8", "RBX", operand.Int); break;
+                case InstructionOperandType.PointerRBX16: _WriteRegisterPointerOperand(ref writer, "u16", "RBX", operand.Int); break;
+                case InstructionOperandType.PointerRBX32: _WriteRegisterPointerOperand(ref writer, "u32", "RBX", operand.Int); break;
+                case InstructionOperandType.PointerRBX64: _WriteRegisterPointerOperand(ref writer, "u64", "RBX", operand.Int); break;
+                case InstructionOperandType.PointerRCX8: _WriteRegisterPointerOperand(ref writer, "u8", "RCX", operand.Int); break;
+                case InstructionOperandType.PointerRCX16: _WriteRegisterPointerOperand(ref writer, "u16", "RCX", operand.Int); break;
+                case InstructionOperandType.PointerRCX32: _WriteRegisterPointerOperand(ref writer, "u32", "RCX", operand.Int); break;
+                case InstructionOperandType.PointerRCX64: _WriteRegisterPointerOperand(ref writer, "u64", "RCX", operand.Int); break;
+                case InstructionOperandType.PointerRDX8: _WriteRegisterPointerOperand(ref writer, "u8", "RDX", operand.Int); break;
+                case InstructionOperandType.PointerRDX16: _WriteRegisterPointerOperand(ref writer, "u16", "RDX", operand.Int); break;
+                case InstructionOperandType.PointerRDX32: _WriteRegisterPointerOperand(ref writer, "u32", "RDX", operand.Int); break;
+                case InstructionOperandType.PointerRDX64: _WriteRegisterPointerOperand(ref writer, "u64", "RDX", operand.Int); break;
                 default:
                     writer.Write("?", AnsiColor.BrightBlack);
                     break;
@@ -728,11 +533,31 @@ public class InterpreterRenderer
         }
 
         int position = processor.Registers.CodePointer;
-        int begin = Math.Max(0, position - (buffer.Height / 2));
-        int end = Math.Min(processor.Code.Length, Math.Max(position + (buffer.Height / 2), begin + buffer.Height));
+
+        int begin = position - (buffer.Height / 2);
+        int end = Math.Max(position + (buffer.Height / 2), begin + buffer.Height);
+
+        int offset = 0;
+        offset -= (CommentsBeforehand(position) - CommentsBeforehand(begin));
+
+        begin = Math.Max(0, begin);
+        end = Math.Min(processor.Code.Length, end);
+
         for (int i = begin; i < end; i++)
         {
-            BufferWriter t = buffer.Text(0, i - begin);
+            BufferWriter t = buffer.Text(0, offset + i - begin);
+            if (processor.DebugInformation.CodeComments.TryGetValue(i, out ImmutableArray<string> comments))
+            {
+                foreach (string comment in comments)
+                {
+                    t.Write(' ', 5);
+                    t.Write(comment, AnsiColor.BrightBlack);
+                    offset++;
+                    if (offset + i - begin >= buffer.Height) break;
+                    t = buffer.Text(0, offset + i - begin);
+                }
+            }
+            if (offset + i - begin >= buffer.Height) break;
             t.Write(' ', Math.Max(0, 5 - i.ToString().Length));
             t.Write($" {i} ", background: i == position ? AnsiColor.Red : AnsiColor.Default);
             t.Write(processor.Code[i].Opcode.ToString(), foreground: AnsiColor.Yellow);
@@ -963,21 +788,89 @@ public class InterpreterRenderer
                                 }
                                 break;
                         }
-                        break;
+                        goto skipBruh;
                     }
                     else if (i > a && i < a + item.Size - 1)
                     {
                         t.PadTo(13);
                         t.Write('│');
-                        break;
+                        goto skipBruh;
                     }
                     else if (i > a && i == a + item.Size - 1)
+                    {
+                        t.PadTo(13);
+                        t.Write('└');
+                        goto skipBruh;
+                    }
+                }
+
+                foreach (StackElementInformation item in stackDebugInfo.Stack)
+                {
+                    if (item.Kind == StackElementKind.Internal) continue;
+                    if (!item.Type.Is(out PointerType? pointerType)) continue;
+                    int pointerAddress = item.AbsoluteAddress(processor.Registers.BasePointer, processor.StackStart);
+                    int valueAddress = processor.Memory.AsSpan().Get<int>(pointerAddress);
+                    if (valueAddress <= 0) continue;
+
+                    if (!pointerType.To.GetSize(new RuntimeInfoProvider()
+                    {
+                        PointerSize = CodeGeneratorForMain.DefaultCompilerSettings.PointerSize,
+                    }, out int valueSize, out _))
+                    {
+                        valueSize = 0;
+                    }
+
+                    if (valueAddress == i)
+                    {
+                        t.PadTo(13);
+                        if (valueSize <= 1) t.Write(' ');
+                        else t.Write('┌');
+                        WriteType(ref t, pointerType.To);
+                        t.Write(' ');
+                        if (item.Kind == StackElementKind.Internal)
+                        {
+                            t.Write('*');
+                            t.Write(item.Identifier, AnsiColor.BrightBlack);
+                        }
+                        else
+                        {
+                            t.Write('*');
+                            t.Write(item.Identifier);
+                        }
+                        switch (pointerType.To.FinalValue)
+                        {
+                            case BuiltinType v:
+                                switch (v.Type)
+                                {
+                                    case BasicType.U8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<byte>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I8: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<sbyte>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.U16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ushort>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I16: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<short>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.U32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<uint>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<int>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.U64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<ulong>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.I64: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<long>(i).ToString(), AnsiColor.BrightBlue); break;
+                                    case BasicType.F32: t.Write(" = "); t.Write(processor.Memory.AsSpan().Get<float>(i).ToString(), AnsiColor.BrightBlue); break;
+                                }
+                                break;
+                        }
+                        break;
+                    }
+                    else if (i > valueAddress && i < valueAddress + valueSize - 1)
+                    {
+                        t.PadTo(13);
+                        t.Write('│');
+                        break;
+                    }
+                    else if (i > valueAddress && i == valueAddress + valueSize - 1)
                     {
                         t.PadTo(13);
                         t.Write('└');
                         break;
                     }
                 }
+
+            skipBruh:;
             }
         }, ElementSize.Auto());
     }
@@ -1027,7 +920,8 @@ public class InterpreterRenderer
 
             foreach (StackElementInformation item in stackDebugInfo.Stack)
             {
-                if (item.Type is not PointerType pointerType) continue;
+                if (item.Kind == StackElementKind.Internal) continue;
+                if (!item.Type.Is(out PointerType? pointerType)) continue;
                 int pointerAddress = item.AbsoluteAddress(processor.Registers.BasePointer, processor.StackStart);
                 int valueAddress = processor.Memory.AsSpan().Get<int>(pointerAddress);
                 if (valueAddress <= 0) continue;
@@ -1049,10 +943,12 @@ public class InterpreterRenderer
                     t.Write(' ');
                     if (item.Kind == StackElementKind.Internal)
                     {
+                        t.Write('*');
                         t.Write(item.Identifier, AnsiColor.BrightBlack);
                     }
                     else
                     {
+                        t.Write('*');
                         t.Write(item.Identifier);
                     }
                     switch (pointerType.To.FinalValue)
@@ -1087,7 +983,6 @@ public class InterpreterRenderer
                     break;
                 }
             }
-
         }
     }, ElementSize.Auto());
 

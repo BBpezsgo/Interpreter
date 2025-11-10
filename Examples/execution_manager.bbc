@@ -1,21 +1,21 @@
 using System;
 
 [Expose("init")]
-void Init()
+void init()
 {
-    PrintLine("init");
+    printline("init");
 }
 
 [Expose("tick")]
-void Tick()
+void tick()
 {
-    PrintLine("tick");
+    printline("tick");
 }
 
 [Expose("end")]
-void End()
+void end()
 {
-    PrintLine("end");
+    printline("end");
 }
 
-PrintLine(".");
+printline(".");

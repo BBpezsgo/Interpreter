@@ -1,3 +1,3 @@
 using System.Console;
 
-PrintLine("Hello world!");
+printline("Hello world!");

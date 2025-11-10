@@ -3,10 +3,10 @@ int a = 4;
 int main()
 {
     int a = 8;
-    return A();
+    return fa();
 }
 
-int A(int v = a)
+int fa(int v = a)
 {
     return v;
 }

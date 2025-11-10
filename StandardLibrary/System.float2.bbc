@@ -14,7 +14,7 @@ export struct float2
     }
 }
 
-export void ToFloat2(byte2* a, float2* b)
+export void tofloat2(byte2* a, float2* b)
 {
     int _x = (int)a.x;
     int _y = (int)a.y;
@@ -24,67 +24,67 @@ export void ToFloat2(byte2* a, float2* b)
     b.y = (f32)_y;
 }
 
-export float Distance(float2 a, float2 b)
+export float distance(float2 a, float2 b)
 {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
-    return Sqrt((dx * dx) + (dy * dy));
+    return sqrt((dx * dx) + (dy * dy));
 }
 
-export float DistanceSqr(float2 a, float2 b)
+export float distancesqr(float2 a, float2 b)
 {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     return (dx * dx) + (dy * dy);
 }
 
-export inline float Dot(float2 a, float2 b)
+export inline float dot(float2 a, float2 b)
 {
     return (a.x * b.x) + (a.y * b.y);
 }
 
-export inline float Cross(float2 a, float2 b)
+export inline float cross(float2 a, float2 b)
 {
     return a.x * b.y - a.y * b.x;
 }
 
-export inline float Magnitude(this float2 v)
+export inline float length(this float2 v)
 {
-    return Sqrt((v.x * v.x) + (v.y * v.y));
+    return sqrt((v.x * v.x) + (v.y * v.y));
 }
 
-export inline float Magnitude(this float2* v)
+export inline float length(this float2* v)
 {
-    return Sqrt((v.x * v.x) + (v.y * v.y));
+    return sqrt((v.x * v.x) + (v.y * v.y));
 }
 
-export float2 Normalised(this float2 v)
+export float2 normalise(this float2 v)
 {
-    float d = v.Magnitude();
+    float d = v.length();
     v.x /= d;
     v.y /= d;
     return v;
 }
 
-export void Normalise(float2* v)
+export void normalise(float2* v)
 {
-    float d = v.Magnitude();
+    float d = v.length();
     v.x /= d;
     v.y /= d;
 }
 
-export void Rotate(float2* v, f32 angle)
+export void rotate(float2* v, f32 angle)
 {
     f32 tx = v.x;
-    v.x = v.x * Cos(angle) - v.y * Sin(angle);
-    v.y = tx * Sin(angle) + v.y * Cos(angle);
+    v.x = v.x * cos(angle) - v.y * sin(angle);
+    v.y = tx * sin(angle) + v.y * cos(angle);
 }
 
-export float2 Rotated(float2 v, f32 angle)
+export float2 rotate(float2 v, f32 angle)
 {
     return new float2(
-        v.x * Cos(angle) - v.y * Sin(angle),
-        v.x * Sin(angle) + v.y * Cos(angle)
+        v.x * cos(angle) - v.y * sin(angle),
+        v.x * sin(angle) + v.y * cos(angle)
     );
 }
 

@@ -7,8 +7,8 @@ b = -b;
 a = +a;
 b = +b;
 
-PrintLine(a.x);
-PrintLine(a.y);
+printline(a.x);
+printline(a.y);
 
-PrintLine(b.x);
-PrintLine(b.y);
+printline(b.x);
+printline(b.y);

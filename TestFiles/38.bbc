@@ -1,17 +1,17 @@
 using System;
 
 template<T>
-inline void PrintStackString(T text)
+inline void print_stack_string(T text)
 {
 	for (int i = 0; i < text.Length; i++)
 	{
-		Print(text[i]);
+		print(text[i]);
 	}
 }
 
 char[6] a = "asdasd";
-PrintStackString(a);
-PrintLine();
+print_stack_string(a);
+printline();
 
 char[] b = "asdasd";
-PrintLine(&b);
+printline(&b);

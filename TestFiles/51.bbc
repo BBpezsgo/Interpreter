@@ -7,15 +7,15 @@ struct Vector2
 	int y;
 }
 
-int Magnitude(this Vector2* vec)
+int length(this Vector2* vec)
 {
 	int a = vec.x * vec.x;
 	int b = vec.y * vec.y;
-	return Sqrt(a + b);
+	return sqrt(a + b);
 }
 
 temp Vector2* vec = new Vector2*;
 vec.x = 9;
 vec.y = 12;
 
-return vec.Magnitude();
+return vec.length();

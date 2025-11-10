@@ -1,6 +1,6 @@
 using System.Console;
 
-string input = ReadLine();
+string input = readline();
 
 int current = 0;
 for (int i = 0; input[i]; i++)
@@ -8,14 +8,14 @@ for (int i = 0; input[i]; i++)
     char c = input[i];
     while (c < current)
     {
-        Print('-');
+        print('-');
         current--;
     }
     while (c > current)
     {
-        Print('+');
+        print('+');
         current++;
     }
-    Print('.');
+    print('.');
 }
-PrintLine();
+printline();

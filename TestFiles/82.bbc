@@ -2,4 +2,4 @@ using System.Console;
 
 u32 a = (u32)55;
 u32 b = (u32)55;
-Print(a + b);
+print(a + b);

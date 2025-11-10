@@ -1,15 +1,15 @@
 using System.Console;
 
 [External("str")]
-void PassString(string text);
+void pass_string(string text);
 
 [Expose("str")]
-void ReceiveString(string text)
+void receive_string(string text)
 {
-    Print("Received string \"");
-    Print(text);
-    Print("\"");
-    PrintLine();
+    print("Received string \"");
+    print(text);
+    print("\"");
+    printline();
 
     delete text;
 }

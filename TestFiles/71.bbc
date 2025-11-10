@@ -1,6 +1,6 @@
 using System.Console;
 using System.Stringify;
 
-PrintLine(temp 0.ToString());
-PrintLine(temp 1.ToString());
-PrintLine(temp 255.ToString());
+printline(temp 0.tostring());
+printline(temp 1.tostring());
+printline(temp 255.tostring());

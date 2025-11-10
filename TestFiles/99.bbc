@@ -2,19 +2,19 @@ using System;
 
 int A()
 {
-    Print('A');
+    print('A');
     return 5;
 }
 
 int B()
 {
-    Print('B');
+    print('B');
     return 4;
 }
 
 int C()
 {
-    Print('C');
+    print('C');
     return 3;
 }
 

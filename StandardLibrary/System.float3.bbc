@@ -16,7 +16,7 @@ export struct float3
     }
 }
 
-export void ToFloat3(byte3* a, float3* b)
+export void tofloat3(byte3* a, float3* b)
 {
     int _x = (int)a.x;
     int _y = (int)a.y;
@@ -29,15 +29,15 @@ export void ToFloat3(byte3* a, float3* b)
     b.z = (f32)_z;
 }
 
-export float Distance(float3 a, float3 b)
+export float distance(float3 a, float3 b)
 {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
     float dz = a.z - b.z;
-    return Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+    return sqrt((dx * dx) + (dy * dy) + (dz * dz));
 }
 
-export float DistanceSqr(float3 a, float3 b)
+export float distancesqr(float3 a, float3 b)
 {
     float dx = a.x - b.x;
     float dy = a.y - b.y;
@@ -45,33 +45,33 @@ export float DistanceSqr(float3 a, float3 b)
     return (dx * dx) + (dy * dy) + (dz * dz);
 }
 
-export inline float Dot(float3 a, float3 b)
+export float dot(float3 a, float3 b)
 {
     return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
 }
 
-export inline float Magnitude(this float3 v)
+export float length(float3 v)
 {
-    return Sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
+    return sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
 }
 
-export inline float Magnitude(this float3* v)
+export float length(float3* v)
 {
-    return Sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
+    return sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
 }
 
-export float3 Normalised(this float3 v)
+export float3 normalise(float3 v)
 {
-    float d = v.Magnitude();
+    float d = length(v);
     v.x /= d;
     v.y /= d;
     v.z /= d;
     return v;
 }
 
-export void Normalise(float3* v)
+export void normalise(float3* v)
 {
-    float d = v.Magnitude();
+    float d = length(v);
     v.x /= d;
     v.y /= d;
     v.z /= d;

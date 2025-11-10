@@ -1,9 +1,9 @@
 using System;
 using "45b";
 
-void Bruh()
+void bruh()
 {
-  PrintLine("NOO");
+    printline("NOO");
 }
 
-A();
+a();

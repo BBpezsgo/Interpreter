@@ -1,8 +1,8 @@
 int a = 1;
 
-int Func() {
+int func() {
 	a++;
 	return a;
 }
 
-return a + Func();
+return a + func();

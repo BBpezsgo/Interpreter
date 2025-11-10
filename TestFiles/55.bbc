@@ -1,4 +1,4 @@
 [External("test")]
-void Test(int a, int b, int c, int d);
+void test(int a, int b, int c, int d);
 
-Test(1, 2, 3, 4);
+test(1, 2, 3, 4);

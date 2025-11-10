@@ -2,20 +2,20 @@ using System.Console;
 
 int yeah = 59;
 
-void Modify(int* ptr)
+void modify(int* ptr)
 {
     *ptr += 22;
 }
 
-void Bruh()
+void bruh()
 {
-    Modify(&yeah);
+    modify(&yeah);
 }
 
-PrintLine(yeah);
+printline(yeah);
 
-Modify(&yeah);
-PrintLine(yeah);
+modify(&yeah);
+printline(yeah);
 
-Bruh();
-PrintLine(yeah);
+bruh();
+printline(yeah);

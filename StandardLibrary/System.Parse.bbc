@@ -3,9 +3,9 @@ using System.String;
 using System.Memory;
 using System.Math;
 
-export int ParseInt(temp string v)
+export int parseint(temp string v)
 {
-    if (v.IsNullOrEmpty())
+    if (v.empty())
     { return 0; }
 
     byte isNegative = (v[0] == '-');
@@ -28,9 +28,9 @@ export int ParseInt(temp string v)
     return result;
 }
 
-export byte ParseByte(temp string v)
+export byte parsebyte(temp string v)
 {
-    if (v.IsNullOrEmpty())
+    if (v.empty())
     { return (byte)0; }
 
     byte result = (byte)0;

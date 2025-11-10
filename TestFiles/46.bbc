@@ -5,8 +5,8 @@ int yeah;
 
 yeah = 55;
 
-SetBruh();
+setbruh();
 
-yeah += GetBruh();
+yeah += getbruh();
 
 return yeah;

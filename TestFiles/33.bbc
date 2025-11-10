@@ -1,16 +1,16 @@
 using System.Memory;
 
-void Func(int* v)
+void func(int* v)
 {
 	*v += 7;
 }
 
-int* a = Alloc(4) as int*;
+int* a = alloc(4) as int*;
 *a = 3;
 
-Func(a);
+func(a);
 
 int result = *a;
-Dealloc(a);
+free(a);
 
 return result;

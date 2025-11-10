@@ -11,14 +11,14 @@ for (int y = 0; y < Height; y++)
         int sinvint = (sinv * (Height / 2)).ToInt() + (Height / 2);
         if (y == sinvint)
         {
-            Print('x');
+            print('x');
         }
         else
         {
-            Print(' ');
+            print(' ');
         }
     }
-    PrintLine();
+    printline();
 }
 
 for (int y = 0; y < Height; y++)
@@ -29,12 +29,12 @@ for (int y = 0; y < Height; y++)
         int sinvint = (sinv * (Height / 2)).ToInt() + (Height / 2);
         if (y == sinvint)
         {
-            Print('x');
+            print('x');
         }
         else
         {
-            Print(' ');
+            print(' ');
         }
     }
-    PrintLine();
+    printline();
 }

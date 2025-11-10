@@ -1,10 +1,10 @@
-void Func(int v)
+void func(int v)
 {
 	v += 7;
 }
 
 int a = 3;
 
-Func(a);
+func(a);
 
 return a;

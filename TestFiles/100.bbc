@@ -3,7 +3,7 @@ using System;
 int v = 69;
 
 [Expose("hey")]
-int Something(int a, int b)
+int something(int a, int b)
 {
     return a - b;
 }

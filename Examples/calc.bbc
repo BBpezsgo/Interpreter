@@ -4,7 +4,7 @@ List<char*>* splits = new List<char*>*(4);
 
 while (1)
 {
-    Print(" > ");
+    print(" > ");
     temp char* line = ReadLine();
     
     for (int i = 0; i < splits.Length(); i++)
@@ -16,7 +16,7 @@ while (1)
 
     if (splits.Length() < 3)
     {
-        PrintLine("Invalid input");
+        printline("Invalid input");
     }
     else
     {
@@ -26,8 +26,8 @@ while (1)
 
         if (_op.Length() != 1)
         {
-            PrintLine("Invalid operator");
-            PrintLine(_op);            
+            printline("Invalid operator");
+            printline(_op);            
         }
         else
         {
@@ -37,24 +37,24 @@ while (1)
 
             if (op == '+')
             {
-                PrintLine(numa + numb);
+                printline(numa + numb);
             }
             elseif (op == '-')
             {
-                PrintLine(numa - numb);
+                printline(numa - numb);
             }
             elseif (op == '*')
             {
-                PrintLine(numa * numb);
+                printline(numa * numb);
             }
             elseif (op == '/')
             {
-                PrintLine(numa / numb);
+                printline(numa / numb);
             }
             else
             {
-                PrintLine("Unknown operator");
-                PrintLine(op);
+                printline("Unknown operator");
+                printline(op);
             }
         }
     }

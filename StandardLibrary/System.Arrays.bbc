@@ -1,13 +1,13 @@
 using Primitives;
 
 template<T>
-export inline int BinarySearch(T[]* values, T element, int length)
+export inline int binary_search(T[]* values, T element, int length)
 {
-    return BinarySearch(values, element, 0, length - 1);
+    return binary_search(values, element, 0, length - 1);
 }
 
 template<T>
-export int BinarySearch(T[]* values, T element, int left, int right)
+export int binary_search(T[]* values, T element, int left, int right)
 {
     while (left < right)
     {

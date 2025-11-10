@@ -3,14 +3,14 @@ using System.String;
 using System.Memory;
 using System.Math;
 
-export string ToString(this u8 number)
+export string tostring(this u8 number)
 {
 	if (number == 0)
     { return "0"; }
 
 	u8 v = number;
 
-    int numberLength = Log10(v) + 2;
+    int numberLength = log10(v) + 2;
 
 	string result = new char[numberLength]*;
     result[numberLength - 1] = '\0';
@@ -27,7 +27,7 @@ export string ToString(this u8 number)
 	return result;
 }
 
-export string ToString(this i32 number)
+export string tostring(this i32 number)
 {
 	if (number == 0)
     { return "0"; }
@@ -38,7 +38,7 @@ export string ToString(this i32 number)
 	if (isNegative)
 	{ v = 0 - v; }
     
-    int numberLength = Log10(v) + 2;
+    int numberLength = log10(v) + 2;
     if (isNegative)
     { numberLength++; }
 
@@ -63,17 +63,17 @@ export string ToString(this i32 number)
 }
 
 template<T>
-export string ToString(List<T>* list)
+export string tostring(List<T>* list)
 {
     string result = "";
     
-    int length = list.Length();
+    int length = list.length();
     for (int i; i < length; i++)
     {
         if (i > 0)
         { result = (temp result) + ", "; }
 
-        result = (temp result) + (temp list.Raw()[i].ToString());
+        result = (temp result) + (temp list.raw()[i].tostring());
     }
     
     return "{ " + (temp result) + " }";

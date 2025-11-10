@@ -2,7 +2,7 @@ using System;
 
 void A(int a = 5)
 {
-    PrintLine(a);
+    printline(a);
 }
 
 A();

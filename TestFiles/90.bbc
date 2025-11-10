@@ -2,22 +2,22 @@ using System.Console;
 
 int[5] yeah;
 
-void Modify(int[]* ptr, int index, int value)
+void modify(int[]* ptr, int index, int value)
 {
     ptr[index] += value;
 }
 
-void Bruh()
+void bruh()
 {
-    Modify(&yeah, 3, 22);
+    modify(&yeah, 3, 22);
 }
 
 yeah[3] = 59;
 
-PrintLine(yeah[3]);
+printline(yeah[3]);
 
-Modify(&yeah, 3, 22);
-PrintLine(yeah[3]);
+modify(&yeah, 3, 22);
+printline(yeah[3]);
 
-Bruh();
-PrintLine(yeah[3]);
+bruh();
+printline(yeah[3]);

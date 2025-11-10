@@ -1,17 +1,17 @@
 using Primitives;
 using System.Memory;
 
-inline int GetHash(int v)
+inline int hash(int v)
 {
     return v;
 }
 
-inline int GetHash(float v)
+inline int hash(float v)
 {
     return v as int;
 }
 
-int GetHash(string v)
+int hash(string v)
 {
 #if IL
     int hash = 181;
@@ -41,17 +41,17 @@ int GetHash(string v)
 #endif
 }
 
-inline u8 Equals(int a, int b)
+inline u8 equals(int a, int b)
 {
     return a == b;
 }
 
-inline u8 Equals(float a, float b)
+inline u8 equals(float a, float b)
 {
     return a == b;
 }
 
-u8 Equals(string a, string b)
+u8 equals(string a, string b)
 {
     if (a == b) return (u8)1;
     if (a == 0 || b == 0) return (u8)0;
@@ -68,13 +68,13 @@ u8 Equals(string a, string b)
 template<TKey, TValue>
 struct Pair
 {
-    TKey Key;
-    TValue Value;
+    TKey key;
+    TValue value;
 
     Pair<TKey, TValue>*(TKey key, TValue value)
     {
-        this.Key = key;
-        this.Value = value;
+        this.key = key;
+        this.value = value;
     }
 }
 
@@ -87,17 +87,17 @@ struct HashMap
 
     export inline void indexer_set(TKey key, TValue value)
     {
-        this.Add(key, value);
+        this.add(key, value);
     }
 
     export TValue indexer_get(temp TKey key)
     {
         TValue result;
-        if (!this.Get(temp key, &result)) crash "Key isn't present in the hashmap";
+        if (!this.get(temp key, &result)) crash "key isn't present in the hashmap";
         return result;
     }
 
-    void EnsureCapacity(int capacity)
+    void ensure_capacity(int capacity)
     {
         if (this._capacity >= capacity) return;
 
@@ -114,28 +114,28 @@ struct HashMap
         {
             for (int i = this._capacity - 1; i >= 0; i--)
             {
-                if (old[i]) this.AddNoResize(old[i].Key, old[i].Value);
+                if (old[i]) this.add_noresize(old[i].key, old[i].value);
             }
             delete old;
         }
     }
 
-    export u8 Get(temp TKey key, TValue* value)
+    export u8 get(temp TKey key, TValue* value)
     {
         if (!this._ptr)
         {
             return (u8)0;
         }
 
-        int hash = GetHash(key);
+        int hash = hash(key);
         int i = hash % this._capacity;
         int started = i;
 
         while (this._ptr[i])
         {
-            if (Equals(this._ptr[i].Key, key))
+            if (equals(this._ptr[i].key, key))
             {
-                *value = this._ptr[i].Value;
+                *value = this._ptr[i].value;
                 return (u8)1;
             }
 
@@ -147,20 +147,20 @@ struct HashMap
         return (u8)0;
     }
 
-    export u8 Add(TKey key, TValue value)
+    export u8 add(TKey key, TValue value)
     {
-        this.EnsureCapacity(this._length + 1);
-        this.AddNoResize(key, value);
+        this.ensure_capacity(this._length + 1);
+        this.add_noresize(key, value);
     }
 
-    u8 AddNoResize(TKey key, TValue value)
+    u8 add_noresize(TKey key, TValue value)
     {
         if (!this._ptr)
         {
             crash "Map not initialized";
         }
 
-        int hash = GetHash(key);
+        int hash = hash(key);
         int i = hash % this._capacity;
 
         while (this._ptr[i])
@@ -173,15 +173,15 @@ struct HashMap
         this._length++;
     }
 
-    export u8 Remove(temp TKey key)
+    export u8 remove(temp TKey key)
     {
-        int hash = GetHash(key);
+        int hash = hash(key);
         int i = hash % this._capacity;
         int started = i;
 
         while (this._ptr[i])
         {
-            if (Equals(this._ptr[i].Key, key))
+            if (equals(this._ptr[i].key, key))
             {
                 this._ptr[i] = 0;
                 this._length--;

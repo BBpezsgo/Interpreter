@@ -4,8 +4,8 @@ temp string a = "";
 
 a = (temp a) + "a";
 
-PrintLine(a);
+printline(a);
 
 a = (temp a) + "a";
 
-PrintLine(a);
+printline(a);

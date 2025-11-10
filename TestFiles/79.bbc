@@ -2,4 +2,4 @@ using System.Console;
 
 i8 a = (i8)(-55);
 i8 b = (i8)55;
-Print(a + b);
+print(a + b);

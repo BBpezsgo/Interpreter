@@ -25,7 +25,7 @@ if ((!#BRAINFUCK) && (!#IL))
 }
 
 [MSILIncompatible]
-export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
+export void get_header(BlockHeader* headerPtr, int* size, bool* allocated)
 {
     BlockHeader header = *headerPtr;
     if (header >= StatusFlag) // value & StatusFlag
@@ -41,19 +41,19 @@ export void GetHeader(BlockHeader* headerPtr, int* size, bool* allocated)
 }
 
 [MSILIncompatible]
-export inline void SetHeaderUsed(BlockHeader* headerPtr, int size)
+export inline void set_header_used(BlockHeader* headerPtr, int size)
 {
     *headerPtr = (BlockHeader)size + StatusFlag;
 }
 
 [MSILIncompatible]
-export inline void SetHeaderFree(BlockHeader* headerPtr, int size)
+export inline void set_header_free(BlockHeader* headerPtr, int size)
 {
     *headerPtr = (BlockHeader)size;
 }
 
 [MSILIncompatible]
-bool JoinFreeBlocks()
+bool join_free_blocks()
 {
     BlockHeader* headerPointer = 0 as BlockHeader*;
     int prevBlockSize = 0;
@@ -61,7 +61,7 @@ bool JoinFreeBlocks()
     {
         int blockSize;
         bool blockUsed;
-        GetHeader(headerPointer, &blockSize, &blockUsed);
+        get_header(headerPointer, &blockSize, &blockUsed);
 
         if (headerPointer != 0 && blockUsed == false)
         {
@@ -69,11 +69,11 @@ bool JoinFreeBlocks()
 
             int _temp;
             bool prevBlockUsed;
-            GetHeader(prevOffset, &_temp, &prevBlockUsed);
+            get_header(prevOffset, &_temp, &prevBlockUsed);
 
             if (prevBlockUsed == false)
             {
-                SetHeaderFree(prevOffset, blockSize + prevBlockSize + HeaderSize);
+                set_header_free(prevOffset, blockSize + prevBlockSize + HeaderSize);
                 *headerPointer = (BlockHeader)0;
                 return true;
             }
@@ -89,7 +89,7 @@ bool JoinFreeBlocks()
 [Expose("alloc")]
 [Builtin("alloc")]
 [MSILIncompatible]
-export any* Alloc(int sizeNeed)
+export any* alloc(int sizeNeed)
 {
 #if IL
     crash "Nope";
@@ -103,14 +103,14 @@ export any* Alloc(int sizeNeed)
 
         int blockSize;
         bool blockUsed;
-        GetHeader(headerPointer, &blockSize, &blockUsed);
+        get_header(headerPointer, &blockSize, &blockUsed);
         any* dataPointer = (headerPointer + HeaderSize) as any*;
 
         if (blockUsed == false)
         {
             if (blockSize == sizeNeed)
             {
-                SetHeaderUsed(headerPointer, sizeNeed);
+                set_header_used(headerPointer, sizeNeed);
 
                 return dataPointer;
             }
@@ -121,14 +121,14 @@ export any* Alloc(int sizeNeed)
 
                 if (_remainingSize > 0)
                 {
-                    SetHeaderFree((dataPointer + sizeNeed) as BlockHeader*, _remainingSize);
+                    set_header_free((dataPointer + sizeNeed) as BlockHeader*, _remainingSize);
                 }
                 else
                 {
                     sizeNeed = blockSize;
                 }
 
-                SetHeaderUsed(headerPointer, sizeNeed);
+                set_header_used(headerPointer, sizeNeed);
 
                 return dataPointer;
             }
@@ -142,19 +142,19 @@ export any* Alloc(int sizeNeed)
 
 [Builtin("free")]
 [MSILIncompatible]
-export void Dealloc(any* pointer)
+export void free(any* pointer)
 {
     BlockHeader* headerPtr = (pointer as int - HeaderSize) as BlockHeader*;
 
     int size;
     bool allocated;
 
-    GetHeader(headerPtr, &size, &allocated);
+    get_header(headerPtr, &size, &allocated);
 
     if (allocated == false)
     { return; }
 
-    SetHeaderFree(headerPtr, size);
+    set_header_free(headerPtr, size);
 
-    while (JoinFreeBlocks()) { }
+    while (join_free_blocks()) { }
 }

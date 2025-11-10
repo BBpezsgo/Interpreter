@@ -7,11 +7,11 @@ struct Vector2
 	int y;
 }
 
-Vector2 Normalize(this Vector2 vec)
+Vector2 normalize(this Vector2 vec)
 {
 	int a = vec.x * vec.x;
 	int b = vec.y * vec.y;
-	int l = Sqrt(a + b);
+	int l = sqrt(a + b);
 
 	Vector2 res;
 	res.x = vec.x / l;
@@ -23,7 +23,7 @@ Vector2 vec;
 vec.x = 0;
 vec.y = 6;
 
-vec = vec.Normalize();
+vec = vec.normalize();
 
-PrintLine(vec.x);
-PrintLine(vec.y);
+printline(vec.x);
+printline(vec.y);

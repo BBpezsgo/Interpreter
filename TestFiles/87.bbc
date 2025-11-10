@@ -2,13 +2,13 @@ using System.Console;
 
 int yeah = 59;
 
-PrintLine(yeah);
+printline(yeah);
 
-void Bruh()
+void bruh()
 {
     yeah += 22;
-    PrintLine(yeah);
+    printline(yeah);
 }
 
-Bruh();
-PrintLine(yeah);
+bruh();
+printline(yeah);

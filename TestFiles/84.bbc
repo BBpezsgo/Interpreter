@@ -2,29 +2,29 @@ using System.Console;
 using System.Vectors;
 using System.Math;
 
-void PrintLine(float2 v)
+void printline(float2 v)
 {
-    Print('(');
-    Print(v.x);
-    Print(',');
-    Print(v.y);
-    Print(')');
-    PrintLine();
+    print('(');
+    print(v.x);
+    print(',');
+    print(v.y);
+    print(')');
+    printline();
 }
 
 float2 v1 = new float2(8f, 0f);
 float2 v2 = new float2(1f, 0f);
 
-PrintLine(v1);
-PrintLine(v2);
+printline(v1);
+printline(v2);
 
-PrintLine(Distance(v1, v2));
+printline(distance(v1, v2));
 
 v2.y = 0f;
 
-PrintLine(Distance(v1, v2));
+printline(distance(v1, v2));
 
-v1 = v1.Normalised();
-v2 = v2.Normalised();
+v1 = normalise(v1);
+v2 = normalise(v2);
 
-PrintLine(Dot(v1, v2));
+printline(dot(v1, v2));

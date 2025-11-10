@@ -3,12 +3,12 @@ using System;
 u16[] a = [ 3, 6, 5 ];
 char[] b = "763";
 
-Print(a[0]);
-Print(a[1]);
-Print(a[2]);
+print(a[0]);
+print(a[1]);
+print(a[2]);
 
-Print(b[0]);
-Print(b[1]);
-Print(b[2]);
+print(b[0]);
+print(b[1]);
+print(b[2]);
 
-PrintLine();
+printline();

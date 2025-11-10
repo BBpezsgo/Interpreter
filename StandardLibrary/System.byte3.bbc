@@ -16,22 +16,22 @@ export struct byte3
     }
 }
 
-export void ToByte3(float3* a, byte3* b)
+export void tobyte3(float3* a, byte3* b)
 {
-    b.x = (i8)(int)Round(a.x);
-    b.y = (i8)(int)Round(a.y);
-    b.z = (i8)(int)Round(a.z);
+    b.x = (i8)(int)round(a.x);
+    b.y = (i8)(int)round(a.y);
+    b.z = (i8)(int)round(a.z);
 }
 
-export float Distance(byte3 a, byte3 b)
+export float distance(byte3 a, byte3 b)
 {
     int dx = (int)a.x - (int)b.x;
     int dy = (int)a.y - (int)b.y;
     int dz = (int)a.z - (int)b.z;
-    return Sqrt((float)((dx * dx) + (dy * dy) + (dz * dz)));
+    return sqrt((float)((dx * dx) + (dy * dy) + (dz * dz)));
 }
 
-export float DistanceSqr(byte3 a, byte3 b)
+export float distancesqr(byte3 a, byte3 b)
 {
     int dx = (int)a.x - (int)b.x;
     int dy = (int)a.y - (int)b.y;

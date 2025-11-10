@@ -1,6 +1,6 @@
-int A(int a = 2, int b = 4)
+int fa(int a = 2, int b = 4)
 {
     return a + b;
 }
 
-return A(3);
+return fa(3);

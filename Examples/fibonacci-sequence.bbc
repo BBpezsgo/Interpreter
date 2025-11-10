@@ -12,5 +12,5 @@ while (1)
     
     if (sum < last) break;
     last = sum;
-    PrintLine(sum);
+    printline(sum);
 }

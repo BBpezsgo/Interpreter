@@ -1,4 +1,4 @@
 using System.Console;
 
 u8 v = (u8)55;
-Print(v);
+print(v);

@@ -3,4 +3,4 @@ using System;
 temp string a = "a";
 temp string b = "b";
 
-Print(a + b);
+print(a + b);

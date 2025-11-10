@@ -1,32 +1,32 @@
 using System.Console;
 
 [Expose("hello")]
-void Hello()
+void hello()
 {
-    PrintLine("This was called from C#!!!");
+    printline("This was called from C#!!!");
 }
 
 [Expose("with_arguments")]
-void WithArguments(i32 a, i32 b)
+void with_arguments(i32 a, i32 b)
 {
-    Print("This was called with these arguments: ");
-    Print(a);
-    Print(", ");
-    Print(b);
-    PrintLine();
+    print("This was called with these arguments: ");
+    print(a);
+    print(", ");
+    print(b);
+    printline();
 }
 
 [Expose("with_return_value")]
-i32 WithReturnValue(i32 a, i32 b)
+i32 with_return_value(i32 a, i32 b)
 {
     i32 result = a + b;
 
-    Print("This was called with these arguments: ");
-    Print(a);
-    Print(", ");
-    Print(b);
-    Print(" and the result is ");
-    Print(result);
-    PrintLine();
+    print("This was called with these arguments: ");
+    print(a);
+    print(", ");
+    print(b);
+    print(" and the result is ");
+    print(result);
+    printline();
     return result;
 }

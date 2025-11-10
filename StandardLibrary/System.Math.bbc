@@ -6,7 +6,7 @@ export const f32 NEGATIVE_INFINITY = -1f / 0f;
 export const f32 PI = 3.14159265359f;
 export const f32 TAU = PI * 2f;
 
-export inline byte IsNaN(this f32 v)
+export inline byte isnan(this f32 v)
 {
     return (
         (v as i32) & 0b_0_11111111_00000000000000000000000
@@ -16,7 +16,8 @@ export inline byte IsNaN(this f32 v)
 /*
  * Source: https://en.wikipedia.org/wiki/Lehmer_random_number_generator
  */
-export int Random(int state)
+[External("random")]
+export int random(int state)
 {
 	// Precomputed parameters for Schrage's method
 	int M = 0x7fffffff;
@@ -43,7 +44,7 @@ export int Random(int state)
  * Source: https://stackoverflow.com/a/67122267
  */
 [External("sin")]
-export float Sin(float x)
+export float sin(float x)
 {
     float value = x;
     float sum = value;
@@ -65,7 +66,7 @@ export float Sin(float x)
  * Source: https://stackoverflow.com/a/67122267
  */
 [External("cos")]
-export float Cos(float x)
+export float cos(float x)
 {
     float value = 1f;
     float sum = value;
@@ -86,7 +87,7 @@ export float Cos(float x)
  * 
  * Source: https://stackoverflow.com/a/101613
  */
-export int Pow(int base, int exp)
+export int pow(int base, int exp)
 {
     int result = 1;
 
@@ -106,7 +107,7 @@ export int Pow(int base, int exp)
 /*
  * Calculates the absolute value of `v`
  */
-export int Abs(int v)
+export int abs(int v)
 {
     if (v < 0) { return v * -1; };
     return v;
@@ -115,44 +116,44 @@ export int Abs(int v)
 /*
  * Calculates the absolute value of `v`
  */
-export f32 Abs(f32 v)
+export f32 abs(f32 v)
 {
     if (v < 0f) { return v * -1f; };
     return v;
 }
 
-export int Min(int a, int b)
+export int min(int a, int b)
 {
     if (a < b) { return a; };
     return b;
 }
 
-export f32 Min(f32 a, f32 b)
+export f32 min(f32 a, f32 b)
 {
     if (a < b) { return a; };
     return b;
 }
 
-export int Max(int a, int b)
+export int max(int a, int b)
 {
     if (a > b) { return a; };
     return b;
 }
 
-export f32 Max(f32 a, f32 b)
+export f32 max(f32 a, f32 b)
 {
     if (a > b) { return a; };
     return b;
 }
 
-export int Clamp(int value, int min, int max)
+export int clamp(int value, int min, int max)
 {
     if (value < min) { return min; }
     elseif (value > max) { return max; }
     else { return value; }
 }
 
-export f32 Clamp(f32 value, f32 min, f32 max)
+export f32 clamp(f32 value, f32 min, f32 max)
 {
     if (value < min) { return min; }
     elseif (value > max) { return max; }
@@ -161,7 +162,7 @@ export f32 Clamp(f32 value, f32 min, f32 max)
 
 /*
 // https://www.geeksforgeeks.org/c-program-to-find-square-root-of-a-given-number/
-float Sqrt(int number)
+float sqrt(int number)
 {
     int start = 0;
     int end = number;
@@ -218,7 +219,7 @@ float Sqrt(int number)
 }
 
 // https://stackoverflow.com/a/1101217
-int Sqrt(int number)
+int sqrt(int number)
 {
     int op  = number;
     int res = 0;
@@ -256,7 +257,7 @@ int Sqrt(int number)
  * 
  * Source: https://en.wikipedia.org/wiki/Integer_square_root
  */
-export int Sqrt(int s)
+export int sqrt(int s)
 {
     // Zero yields zero
     // One yields one
@@ -281,7 +282,7 @@ export int Sqrt(int s)
 /**
  * Calculates the base 10 logarithm of `v`
  */
-export int Log10(i32 v)
+export int log10(i32 v)
 {
     if (v >= 1000000000) { return 9; }
     if (v >= 100000000) { return 8; }
@@ -298,7 +299,7 @@ export int Log10(i32 v)
 /**
  * Calculates the base 10 logarithm of `v`
  */
-export byte Log10(u8 v)
+export byte log10(u8 v)
 {
     if (v >= 100) { return (u8)2; }
     if (v >= 10) { return (u8)1; }
@@ -309,14 +310,14 @@ export byte Log10(u8 v)
  * Source: https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Approximations_that_depend_on_the_floating_point_representation
  */
 [External("sqrt")]
-export float Sqrt(float z)
+export float sqrt(float z)
 {
     int _z = z as int;
 	_z = (((_z) - (1 << 23)) >> 1) + (1 << 29);
 	return _z as float;
 }
 
-export float Round(float v)
+export float round(float v)
 {
     f32 frac = v % 1f;
     if (v < 0.5f)

@@ -1,6 +1,6 @@
-int Func()
+int func()
 {
 	
 }
 
-return Func();
+return func();

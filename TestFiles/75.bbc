@@ -1,4 +1,4 @@
 using System.Console;
 
 i16 v = (i16)(-55);
-Print(v);
+print(v);

@@ -4,12 +4,12 @@ using System.Stack;
 
 temp Stack<byte>* stack = new Stack<byte>*;
 
-stack.Push((byte)3);
-stack.Push((byte)6);
-stack.Push((byte)8);
-stack.Push((byte)9);
+stack.push((byte)3);
+stack.push((byte)6);
+stack.push((byte)8);
+stack.push((byte)9);
 
-PrintLine(stack.Pop());
-PrintLine(stack.Pop());
-PrintLine(stack.Pop());
-PrintLine(stack.Pop());
+printline(stack.pop());
+printline(stack.pop());
+printline(stack.pop());
+printline(stack.pop());

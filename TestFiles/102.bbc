@@ -1,11 +1,11 @@
-inline int B(int a, int b)
+inline int fb(int a, int b)
 {
-    return a + A(b, 1);
+    return a + fa(b, 1);
 }
 
-inline int A(int a, int b)
+inline int fa(int a, int b)
 {
-    return a + B(b, 1);
+    return a + fb(b, 1);
 }
 
-A(3, 7);
+fa(3, 7);

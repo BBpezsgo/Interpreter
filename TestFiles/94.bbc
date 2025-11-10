@@ -4,19 +4,19 @@ using System.Tasks;
 
 void main(Task* self)
 {
-    PrintLine("hello");
+    printline("hello");
     Schedule(task, task_done);
     Schedule(task, task_done);
 }
 
 void task(Task* self)
 {
-    PrintLine("task");
+    printline("task");
 }
 
 void task_done(Task* self)
 {
-    PrintLine("task done");
+    printline("task done");
 }
 
 Schedule(main);

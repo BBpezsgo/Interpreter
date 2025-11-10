@@ -4,22 +4,22 @@ using Primitives;
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
 template<T>
-export inline void QuickSort(T[]* array, int length)
+export inline void quicksort(T[]* array, int length)
 {
-    QuickSort(array, 0, length - 1);
+    quicksort(array, 0, length - 1);
 }
 
 /*
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
 template<T>
-export void QuickSort(T[]* array, int left, int right)
+export void quicksort(T[]* array, int left, int right)
 {
     if (left >= 0 && right >= 0 && left < right)
     {
-        int p = Partition(array, left, right);
-        QuickSort(array, left, p);
-        QuickSort(array, p + 1, right);
+        int p = partition(array, left, right);
+        quicksort(array, left, p);
+        quicksort(array, p + 1, right);
     }
 }
 
@@ -27,7 +27,7 @@ export void QuickSort(T[]* array, int left, int right)
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
 template<T>
-int Partition(T[]* array, int left, int right)
+int partition(T[]* array, int left, int right)
 {
     T pivot = array[left];
     int i = left - 1;
@@ -53,7 +53,7 @@ int Partition(T[]* array, int left, int right)
  * Source: https://en.wikipedia.org/wiki/Insertion_sort
  */
 template<T>
-export void InsertSort(T[]* values, int length)
+export void insertsort(T[]* values, int length)
 {
     int i = 1;
     while (i < length)

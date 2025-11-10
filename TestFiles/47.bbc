@@ -6,4 +6,4 @@ struct Bruh
 	int hi;
 }
 
-A();
+a();

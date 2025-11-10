@@ -1,4 +1,4 @@
 using System.Console;
 
 u16 v = (u16)55;
-Print(v);
+print(v);

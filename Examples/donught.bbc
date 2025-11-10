@@ -60,7 +60,7 @@ struct Buffer
     
     for (int y = 0; y < screen_height; y++)
     {
-        PrintLine();
+        printline();
     };
 }
 

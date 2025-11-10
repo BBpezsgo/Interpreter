@@ -3,4 +3,4 @@ using System;
 temp string a = "你";
 temp string b = "好";
 
-PrintLine(a + b);
+printline(a + b);

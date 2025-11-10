@@ -5,8 +5,8 @@ struct Bruh
 	int hello;
 }
 
-export void A()
+export void a()
 {
   Bruh bruh;
-  PrintLine(bruh.hello);
+  printline(bruh.hello);
 }

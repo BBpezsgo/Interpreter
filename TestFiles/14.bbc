@@ -1,6 +1,6 @@
-int Func()
+int func()
 {
 	return 5;
 }
 
-return Func() * Func();
+return func() * func();

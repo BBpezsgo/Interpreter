@@ -2,4 +2,4 @@ using System;
 
 temp string text = "abc";
 
-Print(text);
+print(text);

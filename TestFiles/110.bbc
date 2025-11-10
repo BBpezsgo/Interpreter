@@ -1,14 +1,14 @@
 using System;
 
 List<int> list = new List<int>;
-list.Add(66);
-list.Add(67);
-PrintLine(&list);
+list.add(66);
+list.add(67);
+printline(&list);
 
-list.Remove(0);
-PrintLine(&list);
+list.remove(0);
+printline(&list);
 
-list.Clear();
-PrintLine(&list);
+list.clear();
+printline(&list);
 
 delete list;

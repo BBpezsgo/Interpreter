@@ -44,24 +44,24 @@ for (u8 py = (u8)0; py < Height; py++)
 
         if (iteration < 10)
         {
-            Print(' ');
+            print(' ');
         }
         else if (iteration < 10)
         {
-            Print('.');
+            print('.');
         }
         else if (iteration < 20)
         {
-            Print('-');
+            print('-');
         }
         else if (iteration < 40)
         {
-            Print('x');
+            print('x');
         }
         else
         {
-            Print('#');
+            print('#');
         }
     }
-    PrintLine();
+    printline();
 }

@@ -2,16 +2,16 @@ using System;
 
 temp string builder = "";
 
-PrintLine(builder);
+printline(builder);
 
 builder = (temp builder) + "a";
-PrintLine(builder);
+printline(builder);
 
 builder = (temp builder) + "b";
-PrintLine(builder);
+printline(builder);
 
 builder = (temp builder) + "c";
-PrintLine(builder);
+printline(builder);
 
 builder = (temp builder) + "d";
-PrintLine(builder);
+printline(builder);

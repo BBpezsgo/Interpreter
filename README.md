@@ -62,26 +62,26 @@ An interpreted language for mostly scripting purposes or simulations. I use this
 ```cs
 using "https://raw.githubusercontent.com/BBpezsgo/Interpreter/master/StandardLibrary/System.Console.bbc";
 
-PrintLine("hello, world");
+printline("hello, world");
 ```
 
 Without dependencies:
 
 ```cs
 [External("stdout")]
-void Print(char message);
+void print(char message);
 
-void PrintLine(temp string message)
+void printline(temp string message)
 {
     for (int i = 0; message[i]; i++)
     {
-        Print(message[i]);
+        print(message[i]);
     }
-    Print('\r');
-    Print('\n');
+    print('\r');
+    print('\n');
 }
 
-PrintLine("hello, world");
+printline("hello, world");
 ```
 
 ## Project Structure

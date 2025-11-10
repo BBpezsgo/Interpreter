@@ -6,7 +6,7 @@ using System.List;
  * Splits the string `string` based on the specified separator `separator` and adds
  * the substring to the list `result`
  */
-export void Split(this string string, char separator, List<string>* result)
+export void split(this string string, char separator, List<string>* result)
 {
 	string current = "";
 
@@ -14,9 +14,9 @@ export void Split(this string string, char separator, List<string>* result)
 	{
 		if (string[i] == separator)
 		{
-	        if (!current.IsNullOrEmpty())
+	        if (!current.empty())
 			{
-				result.Add(current);
+				result.add(current);
 				current = "";
 			}
 		}
@@ -26,16 +26,16 @@ export void Split(this string string, char separator, List<string>* result)
 		}
 	}
 
-	if (!current.IsNullOrEmpty())
+	if (!current.empty())
 	{
-		result.Add(current);
+		result.add(current);
 	}
 }
 
 /*
  * Checks if the string `text` is null or its length is zero
  */
-export int IsNullOrEmpty(this string text)
+export int empty(this string text)
 {
     if (text)
     {
@@ -51,9 +51,9 @@ export int IsNullOrEmpty(this string text)
 /*
  * Copies the string `text` and returns the copy
  */
-export string ToString(this string text)
+export string tostring(this string text)
 {
-    string res = Alloc(text.Length() * sizeof(char) + 1) as string;
+    string res = alloc(text.length() * sizeof(char) + 1) as string;
     int i = 0;
     while (text[i])
     {
@@ -71,8 +71,8 @@ export string ToString(this string text)
  */
 export string +(temp string a, temp string b)
 {
-    int al = a.Length();
-    int bl = b.Length();
+    int al = a.length();
+    int bl = b.length();
 
     int lengthSum = al + bl;
 
@@ -100,9 +100,9 @@ export string +(temp string a, temp string b)
  */
 export string +(char a, temp string b)
 {
-    int length = b.Length();
+    int length = b.length();
 
-    string result = Alloc((length + 2) * sizeof(char)) as string;
+    string result = alloc((length + 2) * sizeof(char)) as string;
   
     for (int i = 0; i < length; i++)
     {
@@ -123,9 +123,9 @@ export string +(char a, temp string b)
  */
 export string +(temp string a, char b)
 {
-    int length = a.Length();
+    int length = a.length();
 
-    string result = Alloc((length + 2) * sizeof(char)) as string;
+    string result = alloc((length + 2) * sizeof(char)) as string;
   
     for (int i = 0; i < length; i++)
     {
@@ -142,7 +142,7 @@ export string +(temp string a, char b)
 /*
  * Returns the length of the string `v`
  */
-export int Length(this string v)
+export int length(this string v)
 {
 	int i = 0;
 	while (v[i])
@@ -155,7 +155,7 @@ export int Length(this string v)
  * 
  * Note that both strings must be equal in length
  */
-export void CopyString(temp string from, string to)
+export void copy(temp string from, string to)
 {
     int i = 0;
     while (from[i] && to[i])
@@ -165,15 +165,15 @@ export void CopyString(temp string from, string to)
     }
 }
 
-export string Substring(temp this string v, int start)
+export string substring(temp this string v, int start)
 {
     int newLength = 0;
-    int length = v.Length();
+    int length = v.length();
     for (int i = start; i < length; i++)
     {
         newLength++;
     }
-    string newV = Alloc(newLength * sizeof(char)) as string;
+    string newV = alloc(newLength * sizeof(char)) as string;
     for (int i = start; i < length; i++)
     {
         newV[i - start] = v[i];
@@ -181,11 +181,11 @@ export string Substring(temp this string v, int start)
     return newV;
 }
 
-export string Substring(temp this string v, int start, int length)
+export string substring(temp this string v, int start, int length)
 {
-    int _length = v.Length();
-    string newV = Alloc(Min(_length, start + length) * sizeof(char)) as string;
-    for (int i = start; i < Min(_length, start + length); i++)
+    int _length = v.length();
+    string newV = alloc(min(_length, start + length) * sizeof(char)) as string;
+    for (int i = start; i < min(_length, start + length); i++)
     {
         newV[i - start] = v[i];
     }
@@ -197,10 +197,10 @@ export string Substring(temp this string v, int start, int length)
  * 
  * This will not modify the string `v`, it will allocates a new one
  */
-export string Reverse(temp this string v)
+export string reverse(temp this string v)
 {
-    int length = v.Length();
-    string newV = Alloc((length + 1) * sizeof(char)) as string;
+    int length = v.length();
+    string newV = alloc((length + 1) * sizeof(char)) as string;
     for (int i = 0; i < length; i++)
     {
         newV[i] = v[length - 1 - i];

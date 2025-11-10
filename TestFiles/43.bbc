@@ -1,9 +1,9 @@
 using System;
 
-void Callback(int item)
+void func(int item)
 {
-	PrintLine(item);
+	printline(item);
 }
 
-var callback = Callback;
+var callback = func;
 callback(5);

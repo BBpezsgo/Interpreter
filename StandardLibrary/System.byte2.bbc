@@ -14,20 +14,20 @@ export struct byte2
     }
 }
 
-export void ToByte2(float2* a, byte2* b)
+export void tobyte2(float2* a, byte2* b)
 {
-    b.x = (i8)(int)Round(a.x);
-    b.y = (i8)(int)Round(a.y);
+    b.x = (i8)(int)round(a.x);
+    b.y = (i8)(int)round(a.y);
 }
 
-export float Distance(byte2 a, byte2 b)
+export float distance(byte2 a, byte2 b)
 {
     int dx = (int)a.x - (int)b.x;
     int dy = (int)a.y - (int)b.y;
-    return Sqrt((float)((dx * dx) + (dy * dy)));
+    return sqrt((float)((dx * dx) + (dy * dy)));
 }
 
-export float DistanceSqr(byte2 a, byte2 b)
+export float distancesqr(byte2 a, byte2 b)
 {
     int dx = (int)a.x - (int)b.x;
     int dy = (int)a.y - (int)b.y;

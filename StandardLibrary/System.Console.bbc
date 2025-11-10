@@ -4,19 +4,19 @@ using System.Memory;
 using System.List;
 using System.Math;
 
-export void Clear()
+export void clear()
 {
-    Print("\e[2J");
-    Print("\e[H");
+    print("\e[2J");
+    print("\e[H");
 }
 
 [External("stdout")]
-export void Print(char message);
+export void print(char message);
 
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-u8 _FindMaxPowOf10(u8 num)
+u8 find_max_pow_of_10(u8 num)
 {
     u8 result = (u8)1;
     num /= (u8)10;
@@ -31,7 +31,7 @@ u8 _FindMaxPowOf10(u8 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-i8 _FindMaxPowOf10(i8 num)
+i8 find_max_pow_of_10(i8 num)
 {
     i8 result = (i8)1;
     num /= (i8)10;
@@ -46,7 +46,7 @@ i8 _FindMaxPowOf10(i8 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-u16 _FindMaxPowOf10(u16 num)
+u16 find_max_pow_of_10(u16 num)
 {
     u16 result = (u16)1;
     num /= (u16)10;
@@ -61,7 +61,7 @@ u16 _FindMaxPowOf10(u16 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-i16 _FindMaxPowOf10(i16 num)
+i16 find_max_pow_of_10(i16 num)
 {
     i16 result = (i16)1;
     num /= (i16)10;
@@ -76,7 +76,7 @@ i16 _FindMaxPowOf10(i16 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-u32 _FindMaxPowOf10(u32 num)
+u32 find_max_pow_of_10(u32 num)
 {
     u32 result = (u32)1;
     num /= (u32)10;
@@ -91,7 +91,7 @@ u32 _FindMaxPowOf10(u32 num)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-i32 _FindMaxPowOf10(i32 num)
+i32 find_max_pow_of_10(i32 num)
 {
     i32 result = (i32)1;
     num /= (i32)10;
@@ -105,14 +105,14 @@ i32 _FindMaxPowOf10(i32 num)
 
 #if BRAINFUCK
 
-export inline void Print(byte message)
+export inline void print(byte message)
 {
-    Print(message as u8);
+    print(message as u8);
 }
 
-export inline void Print(int message)
+export inline void print(int message)
 {
-    Print(message as u8);
+    print(message as u8);
 }
 
 #endif
@@ -120,13 +120,13 @@ export inline void Print(int message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export void Print(u8 message)
+export void print(u8 message)
 {
-    u8 pow10 = _FindMaxPowOf10(message);
+    u8 pow10 = find_max_pow_of_10(message);
     while (pow10)
     {
         u8 digit = message / pow10;
-        Print((char)(digit + (u8)'0'));
+        print((char)(digit + (u8)'0'));
         message -= digit * pow10;
         pow10 /= (u8)10;
     }
@@ -135,19 +135,19 @@ export void Print(u8 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export void Print(i8 message)
+export void print(i8 message)
 {
     if (message < (i8)0)
     {
-        Print('-');
+        print('-');
         message = message * (i8)(-1);
     }
     
-    i8 pow10 = _FindMaxPowOf10(message);
+    i8 pow10 = find_max_pow_of_10(message);
     while (pow10)
     {
         i8 digit = message / pow10;
-        Print((char)(digit + (i8)'0'));
+        print((char)(digit + (i8)'0'));
         message -= digit * pow10;
         pow10 /= (i8)10;
     }
@@ -156,13 +156,13 @@ export void Print(i8 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export void Print(u16 message)
+export void print(u16 message)
 {
-    u16 pow10 = _FindMaxPowOf10(message);
+    u16 pow10 = find_max_pow_of_10(message);
     while (pow10)
     {
         u16 digit = message / pow10;
-        Print((char)(digit + (u16)'0'));
+        print((char)(digit + (u16)'0'));
         message -= digit * pow10;
         pow10 /= (u16)10;
     }
@@ -171,19 +171,19 @@ export void Print(u16 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export void Print(i16 message)
+export void print(i16 message)
 {
     if (message < (i16)0)
     {
-        Print('-');
+        print('-');
         message = message * -1;
     }
     
-    i16 pow10 = _FindMaxPowOf10(message);
+    i16 pow10 = find_max_pow_of_10(message);
     while (pow10)
     {
         i16 digit = message / pow10;
-        Print((char)(digit + (i16)'0'));
+        print((char)(digit + (i16)'0'));
         message -= digit * pow10;
         pow10 /= (i16)10;
     }
@@ -192,13 +192,13 @@ export void Print(i16 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export void Print(u32 message)
+export void print(u32 message)
 {
-    u32 pow10 = _FindMaxPowOf10(message);
+    u32 pow10 = find_max_pow_of_10(message);
     while (pow10)
     {
         u32 digit = message / pow10;
-        Print((char)(digit + (u32)'0'));
+        print((char)(digit + (u32)'0'));
         message -= digit * pow10;
         pow10 /= (u32)10;
     }
@@ -207,180 +207,180 @@ export void Print(u32 message)
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
-export void Print(i32 message)
+export void print(i32 message)
 {
     if (message < 0)
     {
-        Print('-');
+        print('-');
         message = message * -1;
     }
     
-    int pow10 = _FindMaxPowOf10(message);
+    int pow10 = find_max_pow_of_10(message);
     while (pow10)
     {
         int digit = message / pow10;
-        Print((char)(digit + '0'));
+        print((char)(digit + '0'));
         message -= digit * pow10;
         pow10 /= 10;
     }
 }
 
-export void Print(f32 message)
+export void print(f32 message)
 {
     if (message as i32 == POSITIVE_INFINITY as i32)
     {
-        Print("+Infinity");
+        print("+Infinity");
         return;
     }
 
     if (message as i32 == NEGATIVE_INFINITY as i32)
     {
-        Print("-Infinity");
+        print("-Infinity");
         return;
     }
 
-    if (message.IsNaN())
+    if (message.isnan())
     {
-        Print("NaN");
+        print("NaN");
         return;
     }
 
     if (message < 0f)
     {
-        Print('-');
+        print('-');
         message *= -1f;
     }
 
-    Print((int)message);
-    Print('.');
+    print((int)message);
+    print('.');
     message = (message % 1f) * 10f;
-    Print((int)message);
+    print((int)message);
     message = (message % 1f) * 10f;
     if (message)
     {
-        Print((int)message);
+        print((int)message);
         message = (message % 1f) * 10f;
         if (message)
         {
-            Print((int)message);
+            print((int)message);
         }
     }
 }
 
-export void Print(temp string message)
+export void print(temp string message)
 {
     for (int i = 0; message[i]; i++)
     {
-        Print(message[i]);
+        print(message[i]);
     }
 }
 
 template<T>
-export void Print(List<T>* list)
+export void print(List<T>* list)
 {
 	if (!list)
 	{
-		Print("{ }");
+		print("{ }");
 		return;
 	}
 	
-    int length = list.Length();
+    int length = list.length();
 
 	if (!length)
 	{
-		Print("{ }");
+		print("{ }");
 		return;
 	}
 	
-	Print("{ ");
+	print("{ ");
 	
     for (int i = 0; i < length; i++)
     {
         if (i > 0)
-        { Print(", "); }
+        { print(", "); }
 
-        Print(list[i]);
+        print(list[i]);
     }
 
-	Print(" }");
+	print(" }");
 }
 
 template<T>
-export void Print(T[]* list, int length)
+export void print(T[]* list, int length)
 {
 	if (!list)
 	{
-		Print("{ }");
+		print("{ }");
 		return;
 	}
 	
 	if (!length)
 	{
-		Print("{ }");
+		print("{ }");
 		return;
 	}
 	
-	Print("{ ");
+	print("{ ");
 	
     for (int i = 0; i < length; i++)
     {
         if (i > 0)
-        { Print(", "); }
+        { print(", "); }
 
-        Print(list[i]);
+        print(list[i]);
     }
 
-	Print(" }");
+	print(" }");
 }
 
-export inline void PrintLine()
+export inline void printline()
 {
-    Print('\r');
-    Print('\n');
+    print('\r');
+    print('\n');
 }
 
-export inline void PrintLine(temp string message)
+export inline void printline(temp string message)
 {
-    Print(message);
-    PrintLine();
-}
-
-template<T>
-export inline void PrintLine(T value)
-{
-    Print(value);
-    PrintLine();
+    print(message);
+    printline();
 }
 
 template<T>
-export inline void PrintLine(T[]* array, int length)
+export inline void printline(T value)
 {
-    Print(array, length);
-    PrintLine();
+    print(value);
+    printline();
+}
+
+template<T>
+export inline void printline(T[]* array, int length)
+{
+    print(array, length);
+    printline();
 }
 
 [External("stdin")]
-char StdIn();
+char stdin();
 
-export char ReadKey()
+export char readkey()
 {
-    char in = StdIn();
-    Print(in);
+    char in = stdin();
+    print(in);
     return in;
 }
 
-export string ReadLine()
+export string readline()
 {
     string result = "";
     while (1)
     {
-        char inpChar = ReadKey();
+        char inpChar = readkey();
         if (inpChar == '\n') { break; }
         if (inpChar == '\r') { break; }
 
         result = (temp result) + inpChar;
     }
 
-    Print('\n');
+    print('\n');
     return result;
 }

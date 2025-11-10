@@ -1,6 +1,6 @@
 using System;
 
-string GetStuff()
+string get_stuff()
 {
 	string builder = "";
 	builder = (temp builder) + "a";
@@ -10,4 +10,4 @@ string GetStuff()
 	return builder;
 }
 
-PrintLine(temp GetStuff());
+printline(temp get_stuff());

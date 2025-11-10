@@ -5,8 +5,8 @@ using System.HashMap;
 temp HashMap<int, int>* map = new HashMap<int, int>*;
 int v;
 
-map.Add(175, 34);
+map.add(175, 34);
 
 v = 0;
-PrintLine(map.Get(175, &v));
-PrintLine(v);
+printline(map.get(175, &v));
+printline(v);

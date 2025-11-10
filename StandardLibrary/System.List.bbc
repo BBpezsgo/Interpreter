@@ -8,11 +8,11 @@ struct List
     private int _length;
     private T[]* _ptr;
 
-    export inline int Length() { return this._length; }
+    export inline int length() { return this._length; }
 
-    export inline void Clear() { this._length = 0; }
+    export inline void clear() { this._length = 0; }
 
-    export inline T[]* Raw() { return this._ptr; }
+    export inline T[]* raw() { return this._ptr; }
 
     export T indexer_get(int index)
     {
@@ -62,14 +62,14 @@ struct List
         { delete this._ptr; }
     }
 
-    export void Add(T item)
+    export void add(T item)
     {
         if (this._length + 1 > this._capacity)
         {
             if (this._capacity)
-            { this.EnsureCapacity(this._capacity + (this._capacity >> 1)); }
+            { this.ensure_capacity(this._capacity + (this._capacity >> 1)); }
             else
-            { this.EnsureCapacity(4); }
+            { this.ensure_capacity(4); }
         }
 
         if (!this._ptr)
@@ -79,7 +79,7 @@ struct List
         this._length++;
     }
 
-    export T Remove(int index)
+    export T remove(int index)
     {
         if (!this._ptr)
         { crash "List not initialized"; }
@@ -99,7 +99,7 @@ struct List
         return removed;
     }
 
-    export void SwapBack(int index)
+    export void swapback(int index)
     {
         if (!this._ptr)
         { crash "List not initialized"; }
@@ -111,7 +111,7 @@ struct List
         this._ptr[index] = this._ptr[this._length];
     }
 
-    void EnsureCapacity(int capacity)
+    void ensure_capacity(int capacity)
     {
         if (this._capacity < capacity)
         {

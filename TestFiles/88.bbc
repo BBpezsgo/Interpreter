@@ -2,14 +2,14 @@ using System.Console;
 
 int yeah = 59;
 
-PrintLine(yeah);
+printline(yeah);
 
-void Bruh()
+void bruh()
 {
     int* yeahPtr = &yeah;
     *yeahPtr += 22;
-    PrintLine(*yeahPtr);
+    printline(*yeahPtr);
 }
 
-Bruh();
-PrintLine(yeah);
+bruh();
+printline(yeah);

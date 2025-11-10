@@ -13,7 +13,7 @@ public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider
 
     public IEnumerable<string> GetQuery(string requestedFile, Uri? currentFile)
     {
-        if (requestedFile.StartsWith("file:///"))
+        if (requestedFile.StartsWith("file://"))
         {
             requestedFile = requestedFile["file://".Length..];
         }

@@ -15,7 +15,7 @@ public sealed class VoidIO : IO
 
     public override void Register(List<IExternalFunction> externalFunctions)
     {
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, static () => throw new InvalidOperationException("Trying to read from void")));
-        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, static () => { }));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(externalFunctions.GenerateId(ExternalFunctionNames.StdIn), ExternalFunctionNames.StdIn, static () => throw new InvalidOperationException("Trying to read from void")));
+        externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(externalFunctions.GenerateId(ExternalFunctionNames.StdOut), ExternalFunctionNames.StdOut, static _ => { }));
     }
 }

@@ -282,41 +282,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void Pop(int size)
     {
-        if (PointerBitWidth >= BitWidth._64)
-        {
-            int qwordCount = size / 8;
-            size %= 8;
-            for (int i = 0; i < qwordCount; i++)
-            {
-                Code.Emit(Opcode.Pop64);
-                ScopeSizes.LastRef -= 8;
-            }
-        }
-
-        if (PointerBitWidth != BitWidth._64)
-        {
-            int dwordCount = size / 4;
-            size %= 4;
-            for (int i = 0; i < dwordCount; i++)
-            {
-                Code.Emit(Opcode.Pop32);
-                ScopeSizes.LastRef -= 4;
-            }
-        }
-
-        int wordCount = size / 2;
-        size %= 2;
-        for (int i = 0; i < wordCount; i++)
-        {
-            Code.Emit(Opcode.Pop16);
-            ScopeSizes.LastRef -= 2;
-        }
-
-        for (int i = 0; i < size; i++)
-        {
-            Code.Emit(Opcode.Pop8);
-            ScopeSizes.LastRef -= 1;
-        }
+        Code.Emit(Opcode.MathAdd, Register.StackPointer, size);
+        ScopeSizes.LastRef -= size;
     }
 
     void StackAlloc(int size, bool initializeZero)

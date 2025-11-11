@@ -6,10 +6,6 @@ public static class OpcodeExtensions
     {
         Opcode.NOP => 0,
         Opcode.Push => 1,
-        Opcode.Pop8 => 0,
-        Opcode.Pop16 => 0,
-        Opcode.Pop32 => 0,
-        Opcode.Pop64 => 0,
         Opcode.PopTo8 => 1,
         Opcode.PopTo16 => 1,
         Opcode.PopTo32 => 1,

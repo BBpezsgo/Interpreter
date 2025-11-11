@@ -75,18 +75,6 @@ public static class ConverterForAsm
 
                     builder.CodeBuilder.AppendInstruction("HLT");
                     continue;
-                case Opcode.Pop8:
-                    builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 1");
-                    continue;
-                case Opcode.Pop16:
-                    builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 2");
-                    continue;
-                case Opcode.Pop32:
-                    builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 4");
-                    continue;
-                case Opcode.Pop64:
-                    builder.CodeBuilder.AppendTextLine($"ADD {registerBasePointer}, 8");
-                    continue;
                 default:
                 {
                     int paramCount = instruction.Opcode.ParameterCount();

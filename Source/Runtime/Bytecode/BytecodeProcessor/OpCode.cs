@@ -13,30 +13,6 @@ public enum Opcode : byte
     Push,
     /// <summary>
     /// <code>
-    /// <see langword="temp"/> = Pop8()
-    /// </code>
-    /// </summary>
-    Pop8,
-    /// <summary>
-    /// <code>
-    /// <see langword="temp"/> = Pop16()
-    /// </code>
-    /// </summary>
-    Pop16,
-    /// <summary>
-    /// <code>
-    /// <see langword="temp"/> = Pop32()
-    /// </code>
-    /// </summary>
-    Pop32,
-    /// <summary>
-    /// <code>
-    /// <see langword="temp"/> = Pop64()
-    /// </code>
-    /// </summary>
-    Pop64,
-    /// <summary>
-    /// <code>
     /// <paramref name="DST"/> = Pop()
     /// </code>
     /// </summary>

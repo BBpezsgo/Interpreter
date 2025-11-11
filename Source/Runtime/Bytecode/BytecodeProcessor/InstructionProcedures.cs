@@ -491,17 +491,6 @@ public ref partial struct ProcessorState
         Step();
     }
 
-    void POP_VALUE(BitWidth size)
-    {
-#if UNITY_PROFILER
-        using Unity.Profiling.ProfilerMarker.AutoScope marker = _ProcessMarkerPop.Auto();
-#endif
-
-        Pop(size);
-
-        Step();
-    }
-
     void POP_TO_VALUE(BitWidth size)
     {
 #if UNITY_PROFILER

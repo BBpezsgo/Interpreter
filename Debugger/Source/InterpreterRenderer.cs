@@ -125,26 +125,6 @@ public class InterpreterRenderer
 
                 break;
             }
-            case Opcode.Pop8:
-            {
-                memLoad = new DataMovement(processor.Registers.StackPointer, 1);
-                break;
-            }
-            case Opcode.Pop16:
-            {
-                memLoad = new DataMovement(processor.Registers.StackPointer, 2);
-                break;
-            }
-            case Opcode.Pop32:
-            {
-                memLoad = new DataMovement(processor.Registers.StackPointer, 4);
-                break;
-            }
-            case Opcode.Pop64:
-            {
-                memLoad = new DataMovement(processor.Registers.StackPointer, 8);
-                break;
-            }
             case Opcode.PopTo8:
             {
                 int address = processor.Registers.StackPointer;

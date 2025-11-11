@@ -3,11 +3,22 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.BBLang.Generator;
 
+[Flags]
+public enum OptimizationSettings : uint
+{
+    None = 0,
+    All = uint.MaxValue,
+    BytecodeLevel = 1,
+    BinaryOperatorFetchSkip = 2,
+    IndexerFetchSkip = 4,
+    TrimReturnBreak = 8,
+}
+
 [ExcludeFromCodeCoverage]
 public struct MainGeneratorSettings
 {
     public bool GenerateComments;
-    public bool DontOptimize;
+    public OptimizationSettings Optimizations;
     public bool CheckNullPointers;
     public int PointerSize;
     public int StackSize;
@@ -17,7 +28,7 @@ public struct MainGeneratorSettings
     public MainGeneratorSettings(MainGeneratorSettings other)
     {
         GenerateComments = other.GenerateComments;
-        DontOptimize = other.DontOptimize;
+        Optimizations = other.Optimizations;
         CheckNullPointers = other.CheckNullPointers;
         PointerSize = other.PointerSize;
         StackSize = other.StackSize;
@@ -28,7 +39,7 @@ public struct MainGeneratorSettings
     public static MainGeneratorSettings Default => new()
     {
         GenerateComments = true,
-        DontOptimize = false,
+        Optimizations = OptimizationSettings.All,
         CheckNullPointers = true,
         PointerSize = 4,
         StackSize = BytecodeInterpreterSettings.Default.StackSize,

@@ -31,85 +31,6 @@ public struct InstructionLabel : IEquatable<InstructionLabel>
     public override string ToString() => Id.ToString();
 }
 
-class RegisterUsage
-{
-    public readonly struct Auto : IDisposable, IEquatable<Auto>
-    {
-        readonly RegisterUsage _registers;
-        readonly GeneralPurposeRegister _register;
-
-        public Register Register => _register;
-
-        public Register Register8L => _register.Identifier switch
-        {
-            RegisterIdentifier.AX => Register.AL,
-            RegisterIdentifier.BX => Register.BL,
-            RegisterIdentifier.CX => Register.CL,
-            RegisterIdentifier.DX => Register.DL,
-            _ => throw new UnreachableException(),
-        };
-
-        public Auto(RegisterUsage registers, GeneralPurposeRegister register)
-        {
-            _registers = registers;
-            _register = register;
-
-            _registers.UsedRegisters.Add(_register);
-        }
-
-        public void Dispose() => _registers.UsedRegisters.Remove(_register);
-
-        public override string ToString() => _register.ToString();
-
-        public override bool Equals(object? obj) => obj is Auto other && _register == other._register;
-        public bool Equals(Auto other) => _register == other._register;
-        public override int GetHashCode() => _register.GetHashCode();
-        public static bool operator ==(Auto left, Auto right) => left._register == right._register;
-        public static bool operator !=(Auto left, Auto right) => left._register != right._register;
-    }
-
-    readonly HashSet<GeneralPurposeRegister> UsedRegisters = new();
-
-    public bool IsFree(GeneralPurposeRegister register)
-    {
-        foreach (GeneralPurposeRegister item in UsedRegisters)
-        {
-            if (item.Identifier != register.Identifier) continue;
-            if (item.Slice is RegisterSlice.R or RegisterSlice.D or RegisterSlice.W) return false;
-            if (register.Slice is RegisterSlice.R or RegisterSlice.D or RegisterSlice.W) return false;
-            if (register.Slice == item.Slice) return false;
-            return true;
-        }
-        return true;
-    }
-
-    public Auto GetFree(BitWidth bitWidth)
-    {
-        ReadOnlySpan<RegisterSlice> registerSlices = bitWidth switch
-        {
-            BitWidth._8 => stackalloc[] { RegisterSlice.L, RegisterSlice.H },
-            BitWidth._16 => stackalloc[] { RegisterSlice.W },
-            BitWidth._32 => stackalloc[] { RegisterSlice.D },
-            BitWidth._64 => stackalloc[] { RegisterSlice.R },
-            _ => throw new UnreachableException(),
-        };
-
-        foreach (RegisterIdentifier identifier in Enum.GetValues(typeof(RegisterIdentifier)))
-        {
-            foreach (RegisterSlice slice in registerSlices)
-            {
-                GeneralPurposeRegister reg = new(identifier, slice);
-                if (IsFree(reg))
-                {
-                    return new Auto(this, reg);
-                }
-            }
-        }
-
-        throw new InternalExceptionWithoutContext("No registers avaliable");
-    }
-}
-
 record struct CompiledScope(ImmutableArray<CompiledCleanup> Variables, bool IsFunction);
 
 class GeneratedInstructionLabel : IHaveInstructionOffset
@@ -125,6 +46,86 @@ class GeneratedVariable
 
 public partial class CodeGeneratorForMain : CodeGenerator
 {
+    class RegisterUsage
+    {
+        public readonly struct Auto : IDisposable, IEquatable<Auto>
+        {
+            readonly CodeGeneratorForMain generator;
+            readonly GeneralPurposeRegister register;
+
+            public Register Register => register;
+
+            public Auto(CodeGeneratorForMain generator, GeneralPurposeRegister register)
+            {
+                this.generator = generator;
+                this.register = register;
+
+                this.generator.Registers.UsedRegisters.Add(this.register);
+            }
+
+            public void Dispose()
+            {
+                generator.Registers.UsedRegisters.Remove(register);
+                generator.Code.FinishUsingRegister(register);
+            }
+
+            public override string ToString() => register.ToString();
+
+            public override bool Equals(object? obj) => obj is Auto other && register == other.register;
+            public bool Equals(Auto other) => register == other.register;
+            public override int GetHashCode() => register.GetHashCode();
+            public static bool operator ==(Auto left, Auto right) => left.register == right.register;
+            public static bool operator !=(Auto left, Auto right) => left.register != right.register;
+        }
+
+        readonly HashSet<GeneralPurposeRegister> UsedRegisters = new();
+        readonly CodeGeneratorForMain generator;
+
+        public RegisterUsage(CodeGeneratorForMain generator)
+        {
+            this.generator = generator;
+        }
+
+        public bool IsFree(GeneralPurposeRegister register)
+        {
+            foreach (GeneralPurposeRegister item in UsedRegisters)
+            {
+                if (item.Identifier != register.Identifier) continue;
+                if (item.Slice is RegisterSlice.R or RegisterSlice.D or RegisterSlice.W) return false;
+                if (register.Slice is RegisterSlice.R or RegisterSlice.D or RegisterSlice.W) return false;
+                if (register.Slice == item.Slice) return false;
+                return true;
+            }
+            return true;
+        }
+
+        public Auto GetFree(BitWidth bitWidth)
+        {
+            ReadOnlySpan<RegisterSlice> registerSlices = bitWidth switch
+            {
+                BitWidth._8 => stackalloc[] { RegisterSlice.L, RegisterSlice.H },
+                BitWidth._16 => stackalloc[] { RegisterSlice.W },
+                BitWidth._32 => stackalloc[] { RegisterSlice.D },
+                BitWidth._64 => stackalloc[] { RegisterSlice.R },
+                _ => throw new UnreachableException(),
+            };
+
+            foreach (RegisterIdentifier identifier in Enum.GetValues(typeof(RegisterIdentifier)))
+            {
+                foreach (RegisterSlice slice in registerSlices)
+                {
+                    GeneralPurposeRegister reg = new(identifier, slice);
+                    if (IsFree(reg))
+                    {
+                        return new Auto(generator, reg);
+                    }
+                }
+            }
+
+            throw new InternalExceptionWithoutContext("No registers avaliable");
+        }
+    }
+
     readonly struct UndefinedOffset
     {
         public InstructionLabel Label { get; }
@@ -247,7 +248,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         UndefinedFunctionOffsets = new();
         UndefinedInstructionLabels = new();
         Settings = settings;
-        Registers = new();
+        Registers = new(this);
         PointerSize = settings.PointerSize;
         DebugInfo = new(compilerResult.RawTokens.Select(v => new KeyValuePair<Uri, ImmutableArray<Tokenizing.Token>>(v.File, v.Tokens.Tokens)))
         {
@@ -259,7 +260,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         };
         Code = new BytecodeEmitter()
         {
-            EnableOptimizations = !settings.DontOptimize,
+            Optimizations = settings.Optimizations,
             DebugInfo = DebugInfo,
         };
     }

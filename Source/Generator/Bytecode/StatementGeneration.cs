@@ -454,8 +454,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         InstructionLabel skipLabel = Code.DefineLabel();
         using (RegisterUsage.Auto reg = Registers.GetFree(BitWidth._8))
         {
-            PopTo(reg.Register8L);
-            Code.Emit(Opcode.Compare, reg.Register8L, 0);
+            PopTo(reg.Register);
+            Code.Emit(Opcode.Compare, reg.Register, 0);
             Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
         }
 
@@ -684,17 +684,38 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledBinaryOperatorCall @operator)
     {
-        BitWidth leftBitWidth = @operator.Left.Type.GetBitWidth(this, Diagnostics, @operator.Left);
-        BitWidth rightBitWidth = @operator.Right.Type.GetBitWidth(this, Diagnostics, @operator.Right);
+        CompiledStatementWithValue Left = @operator.Left;
+        CompiledStatementWithValue Right = @operator.Right;
+
+        if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+            && @operator.Operator
+            is CompiledBinaryOperatorCall.LogicalAND
+            or CompiledBinaryOperatorCall.LogicalOR
+            or CompiledBinaryOperatorCall.BitwiseAND
+            or CompiledBinaryOperatorCall.BitwiseOR
+            or CompiledBinaryOperatorCall.BitwiseXOR
+            or CompiledBinaryOperatorCall.Multiplication
+            or CompiledBinaryOperatorCall.Addition
+            or CompiledBinaryOperatorCall.CompEQ
+            or CompiledBinaryOperatorCall.CompNEQ)
+        {
+            if (Left is CompiledEvaluatedValue && Right is not CompiledEvaluatedValue)
+            {
+                (Left, Right) = (Right, Left);
+            }
+        }
+
+        BitWidth leftBitWidth = Left.Type.GetBitWidth(this, Diagnostics, Left);
+        BitWidth rightBitWidth = Right.Type.GetBitWidth(this, Diagnostics, Right);
         BitWidth bitWidth = StatementCompiler.MaxBitWidth(leftBitWidth, rightBitWidth);
 
         InstructionLabel endLabel = Code.DefineLabel();
 
-        GenerateCodeForStatement(@operator.Left);
+        GenerateCodeForStatement(Left);
 
         if (@operator.Operator == CompiledBinaryOperatorCall.LogicalAND)
         {
-            PushFrom(StackTop, @operator.Left.Type.GetSize(this, Diagnostics, @operator.Left));
+            PushFrom(StackTop, Left.Type.GetSize(this, Diagnostics, Left));
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree(leftBitWidth))
             {
@@ -705,7 +726,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (@operator.Operator == CompiledBinaryOperatorCall.LogicalOR)
         {
-            PushFrom(StackTop, @operator.Left.Type.GetSize(this, Diagnostics, @operator.Left));
+            PushFrom(StackTop, Left.Type.GetSize(this, Diagnostics, Left));
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree(leftBitWidth))
             {
@@ -715,64 +736,78 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        GenerateCodeForStatement(@operator.Right);
+        InstructionOperand rightOperand;
+        RegisterUsage.Auto? regRight;
 
-        bool isFloat = @operator.Left.Type.SameAs(BasicType.F32) || @operator.Right.Type.SameAs(BasicType.F32);
+        if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+            && Right is CompiledEvaluatedValue rightValue)
+        {
+            rightOperand = new InstructionOperand(rightValue.Value);
+            regRight = null;
+        }
+        else
+        {
+            GenerateCodeForStatement(Right);
+            regRight = Registers.GetFree(bitWidth);
+            PopTo(regRight.Value.Register, rightBitWidth);
+            rightOperand = regRight.Value.Register;
+        }
+
+        bool isFloat = Left.Type.SameAs(BasicType.F32) || Right.Type.SameAs(BasicType.F32);
 
         using (RegisterUsage.Auto regLeft = Registers.GetFree(bitWidth))
-        using (RegisterUsage.Auto regRight = Registers.GetFree(bitWidth))
+        using (regRight)
         {
-            PopTo(regRight.Register, rightBitWidth);
             PopTo(regLeft.Register, leftBitWidth);
 
             switch (@operator.Operator)
             {
                 case CompiledBinaryOperatorCall.Addition:
-                    Code.Emit(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.Subtraction:
-                    Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.Multiplication:
-                    Code.Emit(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.Division:
-                    Code.Emit(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.Modulo:
-                    Code.Emit(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.LogicalAND:
-                    Code.Emit(Opcode.LogicAND, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.LogicAND, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.LogicalOR:
-                    Code.Emit(Opcode.LogicOR, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.LogicOR, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.BitwiseAND:
-                    Code.Emit(Opcode.BitsAND, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.BitsAND, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.BitwiseOR:
-                    Code.Emit(Opcode.BitsOR, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.BitsOR, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.BitwiseXOR:
-                    Code.Emit(Opcode.BitsXOR, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.BitsXOR, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.BitshiftLeft:
-                    Code.Emit(Opcode.BitsShiftLeft, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.BitsShiftLeft, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
                 case CompiledBinaryOperatorCall.BitshiftRight:
-                    Code.Emit(Opcode.BitsShiftRight, regLeft.Register, regRight.Register);
+                    Code.Emit(Opcode.BitsShiftRight, regLeft.Register, rightOperand);
                     Push(regLeft.Register);
                     break;
 
@@ -780,7 +815,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
-                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                     Code.Emit(Opcode.JumpIfEqual, labelSkipFalse.Relative());
                     Push(false);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -794,7 +829,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
-                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                     Code.Emit(Opcode.JumpIfNotEqual, labelSkipFalse.Relative());
                     Push(false);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -808,7 +843,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
-                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                     Code.Emit(Opcode.JumpIfLessOrEqual, labelSkipFalse.Relative());
                     Push(true);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -822,7 +857,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
-                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                     Code.Emit(Opcode.JumpIfLess, labelSkipFalse.Relative());
                     Push(true);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -836,7 +871,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
-                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                     Code.Emit(Opcode.JumpIfLess, labelSkipFalse.Relative());
                     Push(false);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -850,7 +885,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 {
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
-                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                    Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                     Code.Emit(Opcode.JumpIfLessOrEqual, labelSkipFalse.Relative());
                     Push(false);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -1364,19 +1399,26 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 GenerateAddressResolver(address);
                 PopTo(regPtr.Register);
 
-                GenerateCodeForStatement(index.Index);
-
                 if (!indexType.Is<BuiltinType>())
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Index must be a builtin type (i.e. int) and not \"{indexType}\"", index.Index));
                     return;
                 }
 
-                using (RegisterUsage.Auto regIndex = Registers.GetFree(indexType.GetBitWidth(this, Diagnostics, index.Index)))
+                if (Settings.Optimizations.HasFlag(OptimizationSettings.IndexerFetchSkip)
+                    && index.Index is CompiledEvaluatedValue evaluatedIndex)
                 {
-                    PopTo(regIndex.Register);
-                    Code.Emit(Opcode.MathMult, regIndex.Register, arrayType.Of.GetSize(this, Diagnostics, index.Base));
-                    Code.Emit(Opcode.MathAdd, regPtr.Register, regIndex.Register);
+                    Code.Emit(Opcode.MathAdd, regPtr.Register, (int)evaluatedIndex.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                }
+                else
+                {
+                    GenerateCodeForStatement(index.Index);
+                    using (RegisterUsage.Auto regIndex = Registers.GetFree(indexType.GetBitWidth(this, Diagnostics, index.Index)))
+                    {
+                        PopTo(regIndex.Register);
+                        Code.Emit(Opcode.MathMult, regIndex.Register, arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                        Code.Emit(Opcode.MathAdd, regPtr.Register, regIndex.Register);
+                    }
                 }
 
                 PushFrom(new AddressRegisterPointer(regPtr.Register), arrayType.Of.GetSize(this, Diagnostics, index.Base));
@@ -1441,17 +1483,31 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 }
 
-                GenerateCodeForStatement(runtimeIndex.IndexValue);
-
-                using (RegisterUsage.Auto regIndex = Registers.GetFree(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)))
+                if (Settings.Optimizations.HasFlag(OptimizationSettings.IndexerFetchSkip)
+                    && runtimeIndex.IndexValue is CompiledEvaluatedValue evaluatedIndex)
                 {
-                    PopTo(regIndex.Register);
-                    Code.Emit(Opcode.MathMult, regIndex.Register, runtimeIndex.ElementSize);
+                    int indexValue = (int)evaluatedIndex.Value;
                     using (RegisterUsage.Auto regBase = Registers.GetFree(PointerBitWidth))
                     {
                         PopTo(regBase.Register);
-                        Code.Emit(Opcode.MathAdd, regBase.Register, regIndex.Register);
+                        Code.Emit(Opcode.MathAdd, regBase.Register, indexValue * runtimeIndex.ElementSize);
                         Push(regBase.Register);
+                    }
+                }
+                else
+                {
+                    GenerateCodeForStatement(runtimeIndex.IndexValue);
+
+                    using (RegisterUsage.Auto regIndex = Registers.GetFree(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)))
+                    {
+                        PopTo(regIndex.Register);
+                        Code.Emit(Opcode.MathMult, regIndex.Register, runtimeIndex.ElementSize);
+                        using (RegisterUsage.Auto regBase = Registers.GetFree(PointerBitWidth))
+                        {
+                            PopTo(regBase.Register);
+                            Code.Emit(Opcode.MathAdd, regBase.Register, regIndex.Register);
+                            Push(regBase.Register);
+                        }
                     }
                 }
 
@@ -1555,7 +1611,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Statements {");
         foreach (CompiledStatement v in block.Statements)
         {
-            if (!Settings.DontOptimize &&
+            if (Settings.Optimizations.HasFlag(OptimizationSettings.TrimReturnBreak) &&
                 ((ReturnInstructions.Count > 0 && ReturnInstructions.Last.IsSkipping) ||
                 (BreakInstructions.Count > 0 && BreakInstructions.Last.IsSkipping)) &&
                 !StatementCompiler.Visit(v).Any(v => v is CompiledInstructionLabelDeclaration))
@@ -1726,100 +1782,136 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            GenerateCodeForStatement(@operator.Left);
-            GenerateCodeForStatement(@operator.Right);
+            CompiledStatementWithValue Left = @operator.Left;
+            CompiledStatementWithValue Right = @operator.Right;
 
-            bool isFloat = @operator.Left.Type.SameAs(BasicType.F32) || @operator.Right.Type.SameAs(BasicType.F32);
+            if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+                && @operator.Operator
+                is CompiledBinaryOperatorCall.LogicalAND
+                or CompiledBinaryOperatorCall.LogicalOR
+                or CompiledBinaryOperatorCall.BitwiseAND
+                or CompiledBinaryOperatorCall.BitwiseOR
+                or CompiledBinaryOperatorCall.BitwiseXOR
+                or CompiledBinaryOperatorCall.Multiplication
+                or CompiledBinaryOperatorCall.Addition
+                or CompiledBinaryOperatorCall.CompEQ
+                or CompiledBinaryOperatorCall.CompNEQ)
+            {
+                if (Left is CompiledEvaluatedValue && Right is not CompiledEvaluatedValue)
+                {
+                    (Left, Right) = (Right, Left);
+                }
+            }
+
+            GenerateCodeForStatement(Left);
+                
+            InstructionOperand rightOperand;
+            RegisterUsage.Auto? regRight;
+
+            if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+                && Right is CompiledEvaluatedValue rightValue)
+            {
+                rightOperand = new InstructionOperand(rightValue.Value);
+                regRight = null;
+            }
+            else
+            {
+                GenerateCodeForStatement(Right);
+                regRight = Registers.GetFree(bitWidth);
+                PopTo(regRight.Value.Register, rightBitWidth);
+                rightOperand = regRight.Value.Register;
+            }
+
+            bool isFloat = Left.Type.SameAs(BasicType.F32) || Right.Type.SameAs(BasicType.F32);
 
             using (RegisterUsage.Auto regLeft = Registers.GetFree(bitWidth))
-            using (RegisterUsage.Auto regRight = Registers.GetFree(bitWidth))
+            using (regRight)
             {
-                PopTo(regRight.Register, rightBitWidth);
                 PopTo(regLeft.Register, leftBitWidth);
 
                 switch (@operator.Operator)
                 {
                     case CompiledBinaryOperatorCall.Addition:
-                        Code.Emit(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.FMathAdd : Opcode.MathAdd, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.Subtraction:
-                        Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.FMathSub : Opcode.MathSub, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.Multiplication:
-                        Code.Emit(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.FMathMult : Opcode.MathMult, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.Division:
-                        Code.Emit(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.FMathDiv : Opcode.MathDiv, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.Modulo:
-                        Code.Emit(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.FMathMod : Opcode.MathMod, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.LogicalAND:
-                        Code.Emit(Opcode.LogicAND, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.LogicAND, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.LogicalOR:
-                        Code.Emit(Opcode.LogicOR, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.LogicOR, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.BitwiseAND:
-                        Code.Emit(Opcode.BitsAND, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.BitsAND, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.BitwiseOR:
-                        Code.Emit(Opcode.BitsOR, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.BitsOR, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.BitwiseXOR:
-                        Code.Emit(Opcode.BitsXOR, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.BitsXOR, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.BitshiftLeft:
-                        Code.Emit(Opcode.BitsShiftLeft, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.BitsShiftLeft, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
                     case CompiledBinaryOperatorCall.BitshiftRight:
-                        Code.Emit(Opcode.BitsShiftRight, regLeft.Register, regRight.Register);
+                        Code.Emit(Opcode.BitsShiftRight, regLeft.Register, rightOperand);
                         Push(regLeft.Register);
                         break;
 
                     case CompiledBinaryOperatorCall.CompEQ:
-                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                         Code.Emit(Opcode.JumpIfNotEqual, falseLabel.Relative());
                         didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompNEQ:
-                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                         Code.Emit(Opcode.JumpIfEqual, falseLabel.Relative());
                         didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompGT:
-                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                         Code.Emit(Opcode.JumpIfLessOrEqual, falseLabel.Relative());
                         didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompGEQ:
-                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                         Code.Emit(Opcode.JumpIfLess, falseLabel.Relative());
                         didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompLT:
-                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                         Code.Emit(Opcode.JumpIfGreaterOrEqual, falseLabel.Relative());
                         didJump = true;
                         break;
 
                     case CompiledBinaryOperatorCall.CompLEQ:
-                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, regRight.Register);
+                        Code.Emit(isFloat ? Opcode.CompareF : Opcode.Compare, regLeft.Register, rightOperand);
                         Code.Emit(Opcode.JumpIfGreater, falseLabel.Relative());
                         didJump = true;
                         break;
@@ -2421,9 +2513,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             //using (RegisterUsage.Auto reg = Registers.GetFree())
             //{
-                // Code.AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
-                // Code.AddInstruction(Opcode.MathAdd, reg.Register, GlobalVariablesSize);
-                Push(Register.StackPointer);
+            // Code.AddInstruction(Opcode.Move, reg.Register, Register.StackPointer);
+            // Code.AddInstruction(Opcode.MathAdd, reg.Register, GlobalVariablesSize);
+            Push(Register.StackPointer);
             //}
 
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()

@@ -369,8 +369,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
                 {
                     PopTo(reg.Register);
-                    Code.Emit(Opcode.MathAdd, reg.Register, address.Offset);
-                    PopTo(new AddressRegisterPointer(reg.Register), size);
+                    PopTo(new AddressRegisterPointer(reg.Register), size, address.Offset);
                 }
 
                 break;

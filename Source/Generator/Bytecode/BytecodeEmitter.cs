@@ -24,7 +24,7 @@ public class BytecodeEmitter
         public static bool operator !=(BytecodeJump left, BytecodeJump right) => left.Index != right.Index;
     }
 
-    public bool EnableOptimizations { get; init; }
+    public OptimizationSettings Optimizations { get; init; }
     public required DebugInformation DebugInfo { get; init; }
 
     readonly List<PreparationInstruction> Code = new();
@@ -146,7 +146,7 @@ public class BytecodeEmitter
 
     bool OptimizeCodeAt(int i)
     {
-        if (!EnableOptimizations) return false;
+        if (!Optimizations.HasFlag(OptimizationSettings.BytecodeLevel)) return false;
 
         PreparationInstruction prev0 = Code[i];
 
@@ -180,46 +180,6 @@ public class BytecodeEmitter
             && prev0.Operand2.Value == 0)
         {
             RemoveAt(i);
-            return true;
-        }
-
-        if (prev0.Opcode == Opcode.Pop64)
-        {
-            Code[i] = new PreparationInstruction(
-                Opcode.MathAdd,
-                Register.StackPointer,
-                8
-            );
-            return true;
-        }
-
-        if (prev0.Opcode == Opcode.Pop32)
-        {
-            Code[i] = new PreparationInstruction(
-                Opcode.MathAdd,
-                Register.StackPointer,
-                4
-            );
-            return true;
-        }
-
-        if (prev0.Opcode == Opcode.Pop16)
-        {
-            Code[i] = new PreparationInstruction(
-                Opcode.MathAdd,
-                Register.StackPointer,
-                2
-            );
-            return true;
-        }
-
-        if (prev0.Opcode == Opcode.Pop8)
-        {
-            Code[i] = new PreparationInstruction(
-                Opcode.MathAdd,
-                Register.StackPointer,
-                1
-            );
             return true;
         }
 
@@ -444,6 +404,46 @@ public class BytecodeEmitter
         }
 
         return false;
+    }
+
+    bool OptimizeCodeAtWithFinishedRegister(int i, Register finishedRegister)
+    {
+        if (!Optimizations.HasFlag(OptimizationSettings.BytecodeLevel)) return false;
+
+        PreparationInstruction prev0 = Code[i];
+
+        if (prev0.Operand1.IsLabelAddress || prev0.Operand2.IsLabelAddress) return false;
+
+        if (i < 1) return false;
+
+        if (Labels.Any(v => v.Index == i)) return false;
+
+        PreparationInstruction prev1 = Code[i - 1];
+        if (prev1.Operand1.IsLabelAddress || prev1.Operand2.IsLabelAddress) return false;
+
+        if (prev1.Opcode == Opcode.Move
+            && prev1.Operand1 == finishedRegister
+
+            && prev0.Opcode == Opcode.Push
+            && prev0.Operand1 == finishedRegister)
+        {
+            RemoveAt(i--);
+            Code[i] = new(
+                Opcode.Push,
+                prev1.Operand2
+            );
+            return true;
+        }
+
+        return false;
+    }
+
+    internal void FinishUsingRegister(Register register)
+    {
+        while (OptimizeCodeAt(Code.Count - 1) || OptimizeCodeAtWithFinishedRegister(Code.Count - 1, register))
+        {
+
+        }
     }
 
     public void Emit(PreparationInstruction instruction)

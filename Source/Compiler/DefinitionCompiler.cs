@@ -43,7 +43,12 @@ public partial class StatementCompiler
         {
             FieldDefinition field = @struct.Fields[i];
 
-            compiledFields.Add(new CompiledField(GeneralType.From(field.Type, FindType), null! /* CompiledStruct constructor will set this */, field));
+            if (!GeneralType.From(field.Type, FindType, out GeneralType? fieldType, out PossibleDiagnostic? error))
+            {
+                Diagnostics.Add(error.ToError(field.Type));
+                continue;
+            }
+            compiledFields.Add(new CompiledField(fieldType, null! /* CompiledStruct constructor will set this */, field));
         }
 
         if (@struct.Template is not null)
@@ -58,7 +63,11 @@ public partial class StatementCompiler
         TypeInstance? typeInstance = null;
         if (function is IHaveType haveType)
         {
-            type = GeneralType.From(typeInstance = haveType.Type, FindType);
+            if (!GeneralType.From(typeInstance = haveType.Type, FindType, out type, out PossibleDiagnostic? error))
+            {
+                Diagnostics.Add(error.ToError(typeInstance));
+                return;
+            }
         }
 
         foreach (AttributeUsage attribute in function.Attributes)
@@ -134,7 +143,11 @@ public partial class StatementCompiler
                         if (i >= function.Parameters.Count) break;
 
                         Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
-                        GeneralType passedParameterType = GeneralType.From(function.Parameters.Parameters[i].Type, FindType);
+                        if (!GeneralType.From(function.Parameters.Parameters[i].Type, FindType, out GeneralType? passedParameterType, out PossibleDiagnostic? error))
+                        {
+                            Diagnostics.Add(error.ToError(function.Parameters.Parameters[i].Type));
+                            continue;
+                        }
                         function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
 
                         if (definedParameterType.Invoke(passedParameterType))
@@ -257,8 +270,10 @@ public partial class StatementCompiler
         }
     }
 
-    CompiledFunctionDefinition CompileFunctionDefinition(FunctionDefinition function, CompiledStruct? context)
+    bool CompileFunctionDefinition(FunctionDefinition function, CompiledStruct? context, [NotNullWhen(true)] out CompiledFunctionDefinition? result)
     {
+        result = null;
+
         if (function.Template is not null)
         {
             GenericParameters.Push(function.Template.Parameters);
@@ -266,14 +281,21 @@ public partial class StatementCompiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        GeneralType type = GeneralType.From(function.Type, FindType);
-        function.Type.SetAnalyzedType(type);
+        if (!GeneralType.From(function.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Type));
+            return false;
+        }
 
-        ImmutableArray<GeneralType> parameterTypes = GeneralType.FromArray(function.Parameters.Parameters, FindType);
+        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Type));
+            return false;
+        }
 
         CompileFunctionAttributes(function);
 
-        CompiledFunctionDefinition result = new(
+        result = new(
             type,
             parameterTypes,
             context,
@@ -320,40 +342,61 @@ public partial class StatementCompiler
         if (function.Template is not null)
         { GenericParameters.Pop(); }
 
-        return result;
+        return true;
     }
 
-    CompiledOperatorDefinition CompileOperatorDefinition(FunctionDefinition function, CompiledStruct? context)
+    bool CompileOperatorDefinition(FunctionDefinition function, CompiledStruct? context, [NotNullWhen(true)] out CompiledOperatorDefinition? result)
     {
-        GeneralType type = GeneralType.From(function.Type, FindType);
-        function.Type.SetAnalyzedType(type);
+        result = null;
 
-        ImmutableArray<GeneralType> parameterTypes = GeneralType.FromArray(function.Parameters.Parameters, FindType);
+        if (!GeneralType.From(function.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Type));
+            return false;
+        }
+
+        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Type));
+            return false;
+        }
 
         CompileFunctionAttributes(function);
 
-        return new CompiledOperatorDefinition(
+        result = new(
             type,
             parameterTypes,
             context,
             function
         );
+        return true;
     }
 
-    CompiledGeneralFunctionDefinition CompileGeneralFunctionDefinition(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context)
+    bool CompileGeneralFunctionDefinition(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context, [NotNullWhen(true)] out CompiledGeneralFunctionDefinition? result)
     {
+        result = null;
+
         CompileFunctionAttributes(function);
 
-        return new CompiledGeneralFunctionDefinition(
+        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Parameters, function.File));
+            return false;
+        }
+
+        result = new(
             returnType,
-            GeneralType.FromArray(function.Parameters.Parameters, FindType),
+            parameterTypes,
             context,
             function
         );
+        return true;
     }
 
-    CompiledConstructorDefinition CompileConstructorDefinition(ConstructorDefinition function, CompiledStruct context)
+    bool CompileConstructorDefinition(ConstructorDefinition function, CompiledStruct context, [NotNullWhen(true)] out CompiledConstructorDefinition? result)
     {
+        result = null;
+
         if (function.Template is not null)
         {
             GenericParameters.Push(function.Template.Parameters);
@@ -361,21 +404,30 @@ public partial class StatementCompiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        GeneralType type = GeneralType.From(function.Type, FindType);
-        function.Type.SetAnalyzedType(type);
+        if (!GeneralType.From(function.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Type));
+            return false;
+        }
+
+        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out typeError))
+        {
+            Diagnostics.Add(typeError.ToError(function.Type));
+            return false;
+        }
 
         CompileFunctionAttributes(function);
 
-        CompiledConstructorDefinition result = new(
+        result = new(
             type,
-            GeneralType.FromArray(function.Parameters.Parameters, FindType),
+            parameterTypes,
             context,
             function);
 
         if (function.Template is not null)
         { GenericParameters.Pop(); }
 
-        return result;
+        return true;
     }
 
     void AddAST(ParsedFile collectedAST, bool addTopLevelStatements = true)
@@ -490,7 +542,10 @@ public partial class StatementCompiler
                 Block = method.Block,
             };
 
-            CompiledFunctionDefinition compiledMethod = CompileFunctionDefinition(copy, @struct);
+            if (!CompileFunctionDefinition(copy, @struct, out CompiledFunctionDefinition? compiledMethod))
+            {
+                continue;
+            }
 
             if (CompiledFunctions.Any(compiledMethod.IsSame))
             {
@@ -705,8 +760,14 @@ public partial class StatementCompiler
                 continue;
             }
 
+            if (!GeneralType.From(aliasDefinition.Value, FindType, out GeneralType? aliasType, out PossibleDiagnostic? typeError))
+            {
+                Diagnostics.Add(typeError.ToError(aliasDefinition.Value));
+                continue;
+            }
+
             CompiledAlias alias = new(
-                GeneralType.From(aliasDefinition.Value, FindType),
+                aliasType,
                 aliasDefinition
             );
             aliasDefinition.Value.SetAnalyzedType(alias.Value);
@@ -743,7 +804,10 @@ public partial class StatementCompiler
 
         foreach (FunctionDefinition @operator in OperatorDefinitions)
         {
-            CompiledOperatorDefinition compiled = CompileOperatorDefinition(@operator, null);
+            if (!CompileOperatorDefinition(@operator, null, out CompiledOperatorDefinition? compiled))
+            {
+                continue;
+            }
 
             if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
             {
@@ -756,7 +820,10 @@ public partial class StatementCompiler
 
         foreach (FunctionDefinition function in FunctionDefinitions)
         {
-            CompiledFunctionDefinition compiled = CompileFunctionDefinition(function, null);
+            if (!CompileFunctionDefinition(function, null, out CompiledFunctionDefinition? compiled))
+            {
+                continue;
+            }
 
             if (CompiledFunctions.Any(other => FunctionEquality(compiled, other)))
             {
@@ -813,7 +880,10 @@ public partial class StatementCompiler
 
                     returnType = BuiltinType.Void;
 
-                    CompiledGeneralFunctionDefinition methodWithRef = CompileGeneralFunctionDefinition(copy, returnType, compiledStruct);
+                    if (!CompileGeneralFunctionDefinition(copy, returnType, compiledStruct, out CompiledGeneralFunctionDefinition? methodWithRef))
+                    {
+                        continue;
+                    }
 
                     parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
@@ -833,7 +903,10 @@ public partial class StatementCompiler
                         Block = method.Block,
                     };
 
-                    CompiledGeneralFunctionDefinition methodWithPointer = CompileGeneralFunctionDefinition(copy, returnType, compiledStruct);
+                    if (!CompileGeneralFunctionDefinition(copy, returnType, compiledStruct, out CompiledGeneralFunctionDefinition? methodWithPointer))
+                    {
+                        continue;
+                    }
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
@@ -852,7 +925,10 @@ public partial class StatementCompiler
                 }
                 else
                 {
-                    CompiledGeneralFunctionDefinition methodWithRef = CompileGeneralFunctionDefinition(method, returnType, compiledStruct);
+                    if (!CompileGeneralFunctionDefinition(method, returnType, compiledStruct, out CompiledGeneralFunctionDefinition? methodWithRef))
+                    {
+                        continue;
+                    }
 
                     if (CompiledGeneralFunctions.Any(methodWithRef.IsSame))
                     {
@@ -893,7 +969,10 @@ public partial class StatementCompiler
                     Block = method.Block,
                 };
 
-                CompiledFunctionDefinition methodWithPointer = CompileFunctionDefinition(copy, compiledStruct);
+                if (!CompileFunctionDefinition(copy, compiledStruct, out CompiledFunctionDefinition? methodWithPointer))
+                {
+                    continue;
+                }
 
                 if (CompiledFunctions.Any(methodWithPointer.IsSame))
                 {
@@ -933,7 +1012,10 @@ public partial class StatementCompiler
                     Context = constructor.Context,
                 };
 
-                CompiledConstructorDefinition compiledConstructor = CompileConstructorDefinition(constructorWithThisParameter, compiledStruct);
+                if (!CompileConstructorDefinition(constructorWithThisParameter, compiledStruct, out CompiledConstructorDefinition? compiledConstructor))
+                {
+                    continue;
+                }
 
                 if (CompiledConstructors.Any(compiledConstructor.IsSame))
                 {
@@ -947,7 +1029,10 @@ public partial class StatementCompiler
             // TODO: this
             foreach (FunctionDefinition @operator in compiledStruct.Operators)
             {
-                CompiledOperatorDefinition compiled = CompileOperatorDefinition(@operator, null);
+                if (!CompileOperatorDefinition(@operator, null, out CompiledOperatorDefinition? compiled))
+                {
+                    continue;
+                }
 
                 if (CompiledOperators.Any(other => FunctionEquality(compiled, other)))
                 {
@@ -966,6 +1051,24 @@ public partial class StatementCompiler
     CompilerResult CompileMainFile(string file)
     {
         SourceCodeManagerResult res = SourceCodeManager.Collect(file, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings);
+
+        foreach (ParsedFile parsedFile in res.ParsedFiles)
+        { AddAST(parsedFile, parsedFile.File != res.ResolvedEntry); }
+
+        foreach (ParsedFile parsedFile in res.ParsedFiles)
+        {
+            if (parsedFile.File != res.ResolvedEntry) continue;
+            TopLevelStatements.Add((parsedFile.AST.TopLevelStatements, parsedFile.File));
+        }
+
+        // This should not be null ...
+        if (res.ResolvedEntry is null) throw new InternalExceptionWithoutContext($"I can't really explain this error ...");
+        return CompileInternal(res.ResolvedEntry, res.ParsedFiles);
+    }
+
+    CompilerResult CompileFiles(ReadOnlySpan<string> files)
+    {
+        SourceCodeManagerResult res = SourceCodeManager.CollectMultiple(files, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings);
 
         foreach (ParsedFile parsedFile in res.ParsedFiles)
         { AddAST(parsedFile, parsedFile.File != res.ResolvedEntry); }
@@ -1035,6 +1138,15 @@ public partial class StatementCompiler
             CompiledTopLevelStatements.ToImmutable(),
             GeneratedFunctions.ToImmutableArray()
         );
+    }
+
+    public static CompilerResult CompileFiles(
+        ReadOnlySpan<string> files,
+        CompilerSettings settings,
+        DiagnosticsCollection diagnostics)
+    {
+        StatementCompiler compiler = new(settings, diagnostics, null);
+        return compiler.CompileFiles(files);
     }
 
     public static CompilerResult CompileFile(

@@ -1,3 +1,4 @@
+using System.IO.Pipelines;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
@@ -665,8 +666,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region CompileConstant()
 
-    CompiledVariableConstant CompileConstant(VariableDeclaration variableDeclaration)
+    bool CompileConstant(VariableDeclaration variableDeclaration, [NotNullWhen(true)] out CompiledVariableConstant? result)
     {
+        result = null;
         variableDeclaration.Identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
 
         if (GetConstant(variableDeclaration.Identifier.Content, variableDeclaration.File, out _, out _))
@@ -677,7 +679,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         GeneralType? constantType = null;
         if (variableDeclaration.Type != StatementKeywords.Var)
         {
-            constantType = CompileType(variableDeclaration.Type, variableDeclaration.File);
+            if (!CompileType(variableDeclaration.Type, out constantType, out PossibleDiagnostic? typeError))
+            {
+                Diagnostics.Add(typeError.ToError(variableDeclaration.Type));
+            }
         }
 
         CompiledValue constantValue;
@@ -724,7 +729,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             {
                 if (!constantValue.TryCast(builtinType.RuntimeType, out CompiledValue castedConstantValue))
                 {
-                    Diagnostics.Add(Diagnostic.Error($"Can't cast constant value {constantValue} of type \"{new BuiltinType(constantValue.Type)}\" to {constantType}", variableDeclaration));
+                    Diagnostics.Add(Diagnostic.Error($"Can't cast constant value {constantValue} of type \"{constantValue.Type}\" to {constantType}", variableDeclaration));
                 }
                 else
                 {
@@ -734,11 +739,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         else
         {
-            constantType = new BuiltinType(constantValue.Type);
+            if (!CompileType(constantValue.Type, out constantType, out var typeError))
+            {
+                Diagnostics.Add(typeError.ToError((ILocated?)variableDeclaration.InitialValue ?? (ILocated)variableDeclaration));
+                return false;
+            }
         }
         variableDeclaration.Type.SetAnalyzedType(constantType);
 
-        return new(constantValue, constantType, variableDeclaration);
+        result = new CompiledVariableConstant(constantValue, constantType, variableDeclaration);
+        return true;
     }
 
     #endregion
@@ -1614,7 +1624,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return BuiltinType.Void;
         }
 
-        result = new BuiltinType(predictedValue.Type);
+        if (!CompileType(predictedValue.Type, out result!, out var typeError))
+        {
+            Diagnostics.Add(typeError.ToError(@operator));
+            result = expectedType ?? BuiltinType.Void;
+        }
 
         if (expectedType is not null)
         {
@@ -1874,13 +1888,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     GeneralType FindStatementType(NewInstance newInstance)
     {
-        GeneralType type = GeneralType.From(newInstance.Type, FindType);
-        newInstance.Type.SetAnalyzedType(type);
+        if (!GeneralType.From(newInstance.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(newInstance.Type));
+            return BuiltinType.Void;
+        }
         return OnGotStatementType(newInstance, type);
     }
     GeneralType FindStatementType(ConstructorCall constructorCall)
     {
-        GeneralType type = GeneralType.From(constructorCall.Type, FindType);
+        if (!GeneralType.From(constructorCall.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(constructorCall.Type));
+            return BuiltinType.Void;
+        }
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructorDefinition>? result, out PossibleDiagnostic? notFound))
@@ -1926,13 +1947,21 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     GeneralType FindStatementType(BasicTypeCast @as)
     {
-        GeneralType type = GeneralType.From(@as.Type, FindType);
+        if (!GeneralType.From(@as.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(@as.Type));
+            return BuiltinType.Void;
+        }
         @as.Type.SetAnalyzedType(type);
         return OnGotStatementType(@as, type);
     }
     GeneralType FindStatementType(ManagedTypeCast @as)
     {
-        GeneralType type = GeneralType.From(@as.Type, FindType);
+        if (!GeneralType.From(@as.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(@as.Type));
+            return BuiltinType.Void;
+        }
         @as.Type.SetAnalyzedType(type);
         return OnGotStatementType(@as, type);
     }

@@ -59,22 +59,6 @@ public class BuiltinType : GeneralType,
         Type = type;
     }
 
-    public BuiltinType(RuntimeType type)
-    {
-        Type = type switch
-        {
-            RuntimeType.U8 => BasicType.U8,
-            RuntimeType.I8 => BasicType.I8,
-            RuntimeType.U16 => BasicType.U16,
-            RuntimeType.I16 => BasicType.I16,
-            RuntimeType.U32 => BasicType.U32,
-            RuntimeType.I32 => BasicType.I32,
-            RuntimeType.F32 => BasicType.F32,
-            RuntimeType.Null => throw new NotImplementedException(),
-            _ => throw new UnreachableException(),
-        };
-    }
-
     public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = default;

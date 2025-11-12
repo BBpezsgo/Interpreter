@@ -1,3 +1,4 @@
+using System.IO.Pipelines;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
@@ -213,90 +214,95 @@ public partial class StatementCompiler
         GeneralType? type = null;
         if (newVariable.Type != StatementKeywords.Var)
         {
-            type = CompileType(newVariable.Type);
-
-            if (type is ArrayType arrayType)
+            if (!CompileType(newVariable.Type, out type, out var typeError))
             {
-                if (newVariable.InitialValue is LiteralList literalList &&
-                    arrayType.Length is null)
-                {
-                    type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
-                    {
-                        Value = literalList.Values.Length,
-                        Location = newVariable.Type.Location,
-                        Type = ArrayLengthType,
-                        SaveValue = true,
-                    });
-                }
-
-                if (newVariable.InitialValue is LiteralStatement literalStatement &&
-                    literalStatement.Type == LiteralType.String)
-                {
-                    if (arrayType.Of.SameAs(BasicType.U16))
-                    {
-                        int length = literalStatement.Value.Length + 1;
-
-                        if (arrayType.ComputedLength.HasValue)
-                        {
-                            length = arrayType.ComputedLength.Value;
-                        }
-                        else if (arrayType.Length is not null)
-                        {
-                            if (arrayType.Length is CompiledEvaluatedValue evaluatedLength)
-                            {
-                                length = (int)evaluatedLength.Value;
-                            }
-                        }
-
-                        if (length != literalStatement.Value.Length &&
-                            length != literalStatement.Value.Length + 1)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
-                        }
-
-                        type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
-                        {
-                            Value = length,
-                            Location = newVariable.Type.Location,
-                            Type = ArrayLengthType,
-                            SaveValue = true,
-                        });
-                    }
-                    else if (arrayType.Of.SameAs(BasicType.U8))
-                    {
-                        int length = literalStatement.Value.Length + 1;
-
-                        if (arrayType.ComputedLength.HasValue)
-                        {
-                            length = arrayType.ComputedLength.Value;
-                        }
-                        else if (arrayType.Length is not null)
-                        {
-                            if (arrayType.Length is CompiledEvaluatedValue evaluatedLength)
-                            {
-                                length = (int)evaluatedLength.Value;
-                            }
-                        }
-
-                        if (length != literalStatement.Value.Length &&
-                            length != literalStatement.Value.Length + 1)
-                        {
-                            Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
-                        }
-
-                        type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
-                        {
-                            Value = length,
-                            Location = newVariable.Type.Location,
-                            Type = ArrayLengthType,
-                            SaveValue = true,
-                        });
-                    }
-                }
+                Diagnostics.Add(typeError.ToError(newVariable.Type));
             }
+            else
+            {
+                if (type is ArrayType arrayType)
+                {
+                    if (newVariable.InitialValue is LiteralList literalList &&
+                        arrayType.Length is null)
+                    {
+                        type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                        {
+                            Value = literalList.Values.Length,
+                            Location = newVariable.Type.Location,
+                            Type = ArrayLengthType,
+                            SaveValue = true,
+                        });
+                    }
 
-            newVariable.Type.SetAnalyzedType(type);
-            newVariable.CompiledType = type;
+                    if (newVariable.InitialValue is LiteralStatement literalStatement &&
+                        literalStatement.Type == LiteralType.String)
+                    {
+                        if (arrayType.Of.SameAs(BasicType.U16))
+                        {
+                            int length = literalStatement.Value.Length + 1;
+
+                            if (arrayType.ComputedLength.HasValue)
+                            {
+                                length = arrayType.ComputedLength.Value;
+                            }
+                            else if (arrayType.Length is not null)
+                            {
+                                if (arrayType.Length is CompiledEvaluatedValue evaluatedLength)
+                                {
+                                    length = (int)evaluatedLength.Value;
+                                }
+                            }
+
+                            if (length != literalStatement.Value.Length &&
+                                length != literalStatement.Value.Length + 1)
+                            {
+                                Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
+                            }
+
+                            type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                            {
+                                Value = length,
+                                Location = newVariable.Type.Location,
+                                Type = ArrayLengthType,
+                                SaveValue = true,
+                            });
+                        }
+                        else if (arrayType.Of.SameAs(BasicType.U8))
+                        {
+                            int length = literalStatement.Value.Length + 1;
+
+                            if (arrayType.ComputedLength.HasValue)
+                            {
+                                length = arrayType.ComputedLength.Value;
+                            }
+                            else if (arrayType.Length is not null)
+                            {
+                                if (arrayType.Length is CompiledEvaluatedValue evaluatedLength)
+                                {
+                                    length = (int)evaluatedLength.Value;
+                                }
+                            }
+
+                            if (length != literalStatement.Value.Length &&
+                                length != literalStatement.Value.Length + 1)
+                            {
+                                Diagnostics.Add(Diagnostic.Error($"String literal's length ({literalStatement.Value.Length}) doesn't match with the type's length ({length})", literalStatement));
+                            }
+
+                            type = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                            {
+                                Value = length,
+                                Location = newVariable.Type.Location,
+                                Type = ArrayLengthType,
+                                SaveValue = true,
+                            });
+                        }
+                    }
+                }
+
+                newVariable.Type.SetAnalyzedType(type);
+                newVariable.CompiledType = type;
+            }
         }
 
         newVariable.Identifier.AnalyzedType = TokenAnalyzedType.VariableName;
@@ -320,10 +326,15 @@ public partial class StatementCompiler
             }
             else
             {
-                type ??= new BuiltinType(externalConstant.Value.Type);
+                if (type is null && !CompileType(externalConstant.Value.Type, out type, out var typeError))
+                {
+                    Diagnostics.Add(typeError.ToError(newVariable));
+                    return false;
+                }
+
                 if (!externalConstant.Value.TryCast(type, out CompiledValue castedValue))
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Can't cast external constant value {externalConstant.Value} of type \"{new BuiltinType(externalConstant.Value.Type)}\" to {type}", newVariable));
+                    Diagnostics.Add(Diagnostic.Critical($"Can't cast external constant value {externalConstant.Value} of type \"{externalConstant.Value.Type}\" to {type}", newVariable));
                     return false;
                 }
 
@@ -1221,9 +1232,17 @@ public partial class StatementCompiler
             StatementWithValue param = anyCall.Arguments[0];
             GeneralType? paramType;
             if (param is TypeStatement typeStatement)
-            { paramType = CompileType(typeStatement.Type); }
+            {
+                if (!CompileType(typeStatement.Type, out paramType, out PossibleDiagnostic? typeError))
+                {
+                    Diagnostics.Add(typeError.ToError(typeStatement.Type));
+                    return false;
+                }
+            }
             else if (param is CompiledTypeStatement compiledTypeStatement)
-            { paramType = compiledTypeStatement.Type; }
+            {
+                paramType = compiledTypeStatement.Type;
+            }
             else if (param is Identifier identifier)
             {
                 if (FindType(identifier.Token, identifier.File, out paramType))
@@ -1567,7 +1586,11 @@ public partial class StatementCompiler
                         return false;
                     }
 
-                    resultType = new BuiltinType(predictedValue.Type);
+                    if (!CompileType(predictedValue.Type, out resultType!, out PossibleDiagnostic? typeError))
+                    {
+                        Diagnostics.Add(typeError.ToError(@operator));
+                        return false;
+                    }
                 }
             }
 
@@ -1809,8 +1832,11 @@ public partial class StatementCompiler
 
         for (int paramIndex = 0; paramIndex < lambdaStatement.Parameters.Count; paramIndex++)
         {
-            GeneralType parameterType = CompileType(lambdaStatement.Parameters[paramIndex].Type);
-            lambdaStatement.Parameters[paramIndex].Type.SetAnalyzedType(parameterType);
+            if (!CompileType(lambdaStatement.Parameters[paramIndex].Type, out GeneralType? parameterType, out var typeError))
+            {
+                Diagnostics.Add(typeError.ToError(lambdaStatement.Parameters[paramIndex].Type));
+                return false;
+            }
 
             compiledParameters.Add(new CompiledParameter(paramIndex, parameterType, lambdaStatement.Parameters[paramIndex]));
         }
@@ -2677,7 +2703,12 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        if (!CompileStatement(@if.Condition, out CompiledStatementWithValue? condition)) return false;
+        if (!CompileStatement(@if.Condition, out CompiledStatementWithValue? condition))
+        {
+            if (@if.NextLink is not null) CompileStatement(@if.NextLink, out _);
+            CompileStatement(@if.Block, out _);
+            return false;
+        }
 
         if (condition is CompiledEvaluatedValue evaluatedCondition)
         {
@@ -2706,7 +2737,11 @@ public partial class StatementCompiler
 
         CompiledStatement? next = null;
 
-        if (@if.NextLink is not null && !CompileStatement(@if.NextLink, out next)) return false;
+        if (@if.NextLink is not null && !CompileStatement(@if.NextLink, out next))
+        {
+            CompileStatement(@if.Block, out _);
+            return false;
+        }
         if (!CompileStatement(@if.Block, out CompiledStatement? body)) return false;
 
         compiledStatement = new CompiledIf()
@@ -2734,7 +2769,11 @@ public partial class StatementCompiler
     bool CompileStatement(NewInstance newInstance, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
-        GeneralType instanceType = CompileType(newInstance.Type);
+        if (!CompileType(newInstance.Type, out GeneralType? instanceType, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(newInstance.Type));
+            return false;
+        }
 
         newInstance.Type.SetAnalyzedType(instanceType);
         OnGotStatementType(newInstance, instanceType);
@@ -2795,7 +2834,11 @@ public partial class StatementCompiler
     bool CompileStatement(ConstructorCall constructorCall, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
-        GeneralType instanceType = CompileType(constructorCall.Type);
+        if (!CompileType(constructorCall.Type, out GeneralType? instanceType, out PossibleDiagnostic? typeError))
+        {
+            Diagnostics.Add(typeError.ToError(constructorCall.Type));
+            return false;
+        }
         ImmutableArray<GeneralType> parameters = FindStatementTypes(constructorCall.Arguments);
 
         if (!GetConstructor(instanceType, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructorDefinition>? result, out PossibleDiagnostic? notFound, v => AddCompilable(v)))
@@ -3039,7 +3082,11 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        GeneralType targetType = CompileType(typeCast.Type);
+        if (!CompileType(typeCast.Type, out GeneralType? targetType, out var typeError))
+        {
+            Diagnostics.Add(typeError.ToError(typeCast.Type));
+            return false;
+        }
 
         if (!CompileStatement(typeCast.PrevStatement, out CompiledStatementWithValue? prev)) return false;
 
@@ -3067,7 +3114,11 @@ public partial class StatementCompiler
     bool CompileStatement(ManagedTypeCast typeCast, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
-        GeneralType targetType = CompileType(typeCast.Type);
+        if (!CompileType(typeCast.Type, out GeneralType? targetType, out var typeError))
+        {
+            Diagnostics.Add(typeError.ToError(typeCast.Type));
+            return false;
+        }
         typeCast.Type.SetAnalyzedType(targetType);
         OnGotStatementType(typeCast, targetType);
 
@@ -3589,7 +3640,7 @@ public partial class StatementCompiler
             {
                 if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
                 {
-                    CompiledVariableConstant variable = CompileConstant(variableDeclaration);
+                    if (!CompileConstant(variableDeclaration, out CompiledVariableConstant? variable)) continue;
                     localConstants.Add(variable);
                 }
             }
@@ -3600,80 +3651,110 @@ public partial class StatementCompiler
 
     #region CompileType
 
-    public GeneralType CompileType(
-        TypeInstance type,
-        Uri? file = null) => type switch
+    public static bool CompileType(
+        RuntimeType type,
+        [NotNullWhen(true)] out GeneralType? result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        switch (type)
         {
-            TypeInstanceSimple simpleType => CompileType(simpleType, file),
-            TypeInstanceFunction functionType => CompileType(functionType, file),
-            TypeInstanceStackArray stackArrayType => CompileType(stackArrayType, file),
-            TypeInstancePointer pointerType => CompileType(pointerType, file),
+            case RuntimeType.U8: result = BuiltinType.U8; error = null; return true;
+            case RuntimeType.I8: result = BuiltinType.I8; error = null; return true;
+            case RuntimeType.U16: result = BuiltinType.Char; error = null; return true;
+            case RuntimeType.I16: result = BuiltinType.I16; error = null; return true;
+            case RuntimeType.U32: result = BuiltinType.U32; error = null; return true;
+            case RuntimeType.I32: result = BuiltinType.I32; error = null; return true;
+            case RuntimeType.F32: result = BuiltinType.F32; error = null; return true;
+            case RuntimeType.Null: result = result = null; error = new($"Invalid type"); return false;
+            default: throw new UnreachableException();
+        }
+    }
+
+    public bool CompileType(
+        TypeInstance type,
+        [NotNullWhen(true)] out GeneralType? result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
+        {
+            TypeInstanceSimple simpleType => CompileType(simpleType, out result, out error),
+            TypeInstanceFunction functionType => CompileType(functionType, out result, out error),
+            TypeInstanceStackArray stackArrayType => CompileType(stackArrayType, out result, out error),
+            TypeInstancePointer pointerType => CompileType(pointerType, out result, out error),
             _ => throw new UnreachableException(),
         };
 
-    public ArrayType CompileType(
+    public bool CompileType(
         TypeInstanceStackArray type,
-        Uri? file = null)
+        [NotNullWhen(true)] out GeneralType? result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        GeneralType? of = CompileType(type.StackArrayOf, file);
+        result = null;
+
+        if (!CompileType(type.StackArrayOf, out GeneralType? of, out error)) return false;
 
         if (type.StackArraySize is not null)
         {
             CompileStatement(type.StackArraySize, out CompiledStatementWithValue? stackArraySizeStatement);
-            ArrayType result = new(of, stackArraySizeStatement);
+            result = new ArrayType(of, stackArraySizeStatement);
             type.SetAnalyzedType(result);
-            return result;
+            return true;
         }
         else
         {
-            ArrayType result = new(of, null);
+            result = new ArrayType(of, null);
             type.SetAnalyzedType(result);
-            return result;
+            return true;
         }
     }
 
-    public FunctionType CompileType(
+    public bool CompileType(
         TypeInstanceFunction type,
-        Uri? file = null)
+        [NotNullWhen(true)] out GeneralType? result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        GeneralType returnType = CompileType(type.FunctionReturnType, file);
-        ImmutableArray<GeneralType> parameters = CompileTypes(type.FunctionParameterTypes, file);
+        result = null;
 
-        FunctionType result = new(returnType, parameters);
+        if (!CompileType(type.FunctionReturnType, out GeneralType? returnType, out error)) return false;
+        if (!CompileTypes(type.FunctionParameterTypes, out ImmutableArray<GeneralType> parameters, out error)) return false;
+
+        result = new FunctionType(returnType, parameters);
         type.SetAnalyzedType(result);
 
-        return result;
+        return true;
     }
 
-    public PointerType CompileType(
+    public bool CompileType(
         TypeInstancePointer type,
-        Uri? file = null)
+        [NotNullWhen(true)] out GeneralType? result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        GeneralType to = CompileType(type.To, file);
+        result = null;
 
-        PointerType result = new(to);
+        if (!CompileType(type.To, out GeneralType? to, out error)) return false;
+
+        result = new PointerType(to);
         type.SetAnalyzedType(result);
 
-        return result;
+        return true;
     }
 
-    public GeneralType CompileType(
+    public bool CompileType(
         TypeInstanceSimple type,
-        Uri? file = null)
+        [NotNullWhen(true)] out GeneralType? result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        GeneralType? result;
+        error = null;
 
         if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);
             type.SetAnalyzedType(result);
-            return result;
+            return true;
         }
 
         if (!FindType(type.Identifier, type.File, out result))
         {
-            Diagnostic.Critical($"Can't parse \"{type}\" to \"{nameof(GeneralType)}\"", type, file).Throw();
-            return default;
+            error = new($"Can't parse \"{type}\" to \"{nameof(GeneralType)}\"", type);
+            return false;
         }
 
         if (result.Is(out StructType? resultStructType) &&
@@ -3681,7 +3762,7 @@ public partial class StatementCompiler
         {
             if (type.TypeArguments.HasValue)
             {
-                ImmutableArray<GeneralType> typeParameters = CompileTypes(type.TypeArguments.Value, file);
+                if (!CompileTypes(type.TypeArguments.Value, out ImmutableArray<GeneralType> typeParameters, out error)) return false;
                 result = new StructType(resultStructType.Struct, type.File, typeParameters);
             }
             else
@@ -3692,23 +3773,33 @@ public partial class StatementCompiler
         else
         {
             if (type.TypeArguments.HasValue)
-            { throw new InternalExceptionWithoutContext($"Asd"); }
+            {
+                error = new($"Asd", type);
+                return false;
+            }
         }
 
         type.SetAnalyzedType(result);
-        return result;
+        return true;
     }
 
-    public ImmutableArray<GeneralType> CompileTypes(
+    public bool CompileTypes(
         ImmutableArray<TypeInstance> types,
-        Uri? file = null)
+        [NotNullWhen(true)] out ImmutableArray<GeneralType> result,
+        [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
+        error = null;
+        result = default;
+
+        ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (TypeInstance item in types)
         {
-            result.Add(CompileType(item, file));
+            if (!CompileType(item, out GeneralType? _item, out error)) return false;
+            _result.Add(_item);
         }
-        return result.MoveToImmutable();
+
+        result = _result.MoveToImmutable();
+        return true;
     }
 
     #endregion
@@ -4023,7 +4114,10 @@ public partial class StatementCompiler
             {
                 if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
                 {
-                    CompiledGlobalConstants.Add(CompileConstant(variableDeclaration));
+                    if (CompileConstant(variableDeclaration, out var result))
+                    {
+                        CompiledGlobalConstants.Add(result);
+                    }
                 }
             }
             else if (item is InstructionLabel instructionLabel)

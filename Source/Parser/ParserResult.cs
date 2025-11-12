@@ -17,7 +17,7 @@ public readonly struct ParserResult
     public readonly ImmutableArray<Token> OriginalTokens;
     public readonly ImmutableArray<Token> Tokens;
 
-    public bool IsEmpty { get; private init; }
+    public bool IsNotEmpty { get; private init; }
 
     public static ParserResult Empty => new(
         ImmutableArray<FunctionDefinition>.Empty,
@@ -27,8 +27,7 @@ public readonly struct ParserResult
         ImmutableArray<AliasDefinition>.Empty,
         ImmutableArray<Statement>.Empty,
         ImmutableArray<Token>.Empty,
-        ImmutableArray<Token>.Empty)
-    { IsEmpty = true };
+        ImmutableArray<Token>.Empty);
 
     public ParserResult(
         ImmutableArray<FunctionDefinition> functions,
@@ -49,21 +48,19 @@ public readonly struct ParserResult
         OriginalTokens = originalTokens;
         Tokens = tokens;
 
-        IsEmpty = false;
+        IsNotEmpty = true;
     }
 
     public IEnumerable<Statement> GetStatementsRecursively()
     {
-        for (int i = 0; i < TopLevelStatements.Length; i++)
+        foreach (Statement v in TopLevelStatements.IsDefault ? ImmutableArray<Statement>.Empty : TopLevelStatements)
         {
-            foreach (Statement statement in TopLevelStatements[i].GetStatementsRecursively(true))
+            foreach (Statement statement in v.GetStatementsRecursively(true))
             { yield return statement; }
         }
 
-        for (int i = 0; i < Functions.Length; i++)
+        foreach (FunctionDefinition function in Functions.IsDefault ? ImmutableArray<FunctionDefinition>.Empty : Functions)
         {
-            FunctionDefinition function = Functions[i];
-
             if (function.Block == null)
             { continue; }
 
@@ -71,10 +68,8 @@ public readonly struct ParserResult
             { yield return statement; }
         }
 
-        for (int i = 0; i < Operators.Length; i++)
+        foreach (FunctionDefinition @operator in Operators.IsDefault ? ImmutableArray<FunctionDefinition>.Empty : Operators)
         {
-            FunctionDefinition @operator = Operators[i];
-
             if (@operator.Block == null)
             { continue; }
 
@@ -82,10 +77,8 @@ public readonly struct ParserResult
             { yield return statement; }
         }
 
-        for (int i = 0; i < Structs.Length; i++)
+        foreach (StructDefinition structs in Structs.IsDefault ? ImmutableArray<StructDefinition>.Empty : Structs)
         {
-            StructDefinition structs = Structs[i];
-
             foreach (GeneralFunctionDefinition method in structs.GeneralFunctions)
             {
                 if (method.Block == null)
@@ -126,7 +119,7 @@ public readonly struct ParserResult
 
     public bool GetFieldAt(Uri file, SinglePosition position, [NotNullWhen(true)] out FieldDefinition? result)
     {
-        foreach (StructDefinition @struct in Structs)
+        foreach (StructDefinition @struct in Structs.IsDefault ? ImmutableArray<StructDefinition>.Empty : Structs)
         {
             if (@struct.File != file) continue;
 

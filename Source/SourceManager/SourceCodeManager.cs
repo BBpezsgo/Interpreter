@@ -415,6 +415,80 @@ public class SourceCodeManager
         };
     }
 
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _marker = new("LanguageCore.SourceCodeManager.Collect");
+    static readonly Unity.Profiling.ProfilerMarker _markerWait = new("LanguageCore.SourceCodeManager.WaitForFiles");
+#endif
+    SourceCodeManagerResult Entry(ReadOnlySpan<string> files, ImmutableArray<string> additionalImports)
+    {
+#if UNITY
+        using Unity.Profiling.ProfilerMarker.AutoScope _1 = _marker.Auto();
+#endif
+
+        Uri? resolvedEntry = null;
+
+        ImportIndex rootIndex = new();
+
+        foreach (string file in files)
+        {
+            if (!LoadSource(null, rootIndex, file, null, out resolvedEntry))
+            {
+                if (resolvedEntry is null)
+                { Uri.TryCreate(file, UriKind.RelativeOrAbsolute, out resolvedEntry); }
+
+                return new()
+                {
+                    ParsedFiles = ImmutableArray<ParsedFile>.Empty,
+                    ResolvedEntry = resolvedEntry,
+                };
+            }
+        }
+
+        if (!additionalImports.IsDefault)
+        {
+            foreach (string additionalImport in additionalImports)
+            {
+                LoadSource(null, rootIndex, additionalImport, null, out _);
+            }
+        }
+
+#if UNITY
+        using Unity.Profiling.ProfilerMarker.AutoScope _2 = _markerWait.Auto();
+#endif
+        while (PendingFiles.Count > 0)
+        {
+#if UNITY
+#else
+            PendingFiles[0].Task.Wait();
+#endif
+            ProcessPendingFiles();
+        }
+
+        List<ImportIndex> importIndices = new(ParsedFiles.Count + 1);
+        rootIndex.ToList(importIndices);
+
+        List<ParsedFile> sortedParsedFiles = new(ParsedFiles.Count);
+
+        foreach (ImportIndex importIndex in importIndices.Skip(1)) // Skip root
+        {
+            ParsedFile? found = default;
+            foreach (ParsedFile parsedFile in ParsedFiles)
+            {
+                if (parsedFile.Index != importIndex) continue;
+                found = parsedFile;
+                break;
+            }
+            if (!found.HasValue) continue; // FIXME: is this correct?
+            sortedParsedFiles.Add(found.Value);
+        }
+
+        return new()
+        {
+            ParsedFiles = sortedParsedFiles.ToImmutableArray(),
+            ResolvedEntry = resolvedEntry,
+        };
+    }
+
     public static SourceCodeManagerResult Collect(
         string? file,
         DiagnosticsCollection diagnostics,
@@ -425,5 +499,17 @@ public class SourceCodeManager
     {
         SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, sourceProviders, tokenizerSettings);
         return sourceCodeManager.Entry(file, additionalImports);
+    }
+
+    public static SourceCodeManagerResult CollectMultiple(
+        ReadOnlySpan<string> files,
+        DiagnosticsCollection diagnostics,
+        ImmutableHashSet<string> preprocessorVariables,
+        ImmutableArray<string> additionalImports,
+        ImmutableArray<ISourceProvider> sourceProviders,
+        TokenizerSettings? tokenizerSettings)
+    {
+        SourceCodeManager sourceCodeManager = new(diagnostics, preprocessorVariables, sourceProviders, tokenizerSettings);
+        return sourceCodeManager.Entry(files, additionalImports);
     }
 }

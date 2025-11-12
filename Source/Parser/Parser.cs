@@ -411,14 +411,11 @@ public sealed class Parser
 
     bool ExpectTemplateInfo([NotNullWhen(true)] out TemplateInfo? templateInfo)
     {
-        if (!ExpectIdentifier(DeclarationKeywords.Template, out Token? keyword))
+        if (!ExpectOperator("<", out Token? startBracket))
         {
             templateInfo = null;
             return false;
         }
-
-        if (!ExpectOperator("<", out Token? startBracket))
-        { throw new SyntaxException($"There should be an \"<\" (after \"{keyword}\" keyword) and not \"{CurrentToken}\"", keyword.Position.After(), File); }
 
         List<Token> parameters = new();
 
@@ -441,7 +438,7 @@ public sealed class Parser
             { expectParameter = true; }
         }
 
-        templateInfo = new(keyword, new TokenPair(startBracket, endBracket), parameters.ToImmutableArray());
+        templateInfo = new(new TokenPair(startBracket, endBracket), parameters.ToImmutableArray());
 
         return true;
     }
@@ -452,8 +449,6 @@ public sealed class Parser
         function = null;
 
         ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
-
-        ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
         ImmutableArray<Token> modifiers = ExpectModifiers();
 
@@ -470,6 +465,8 @@ public sealed class Parser
             CurrentTokenIndex = parseStart;
             return false;
         }
+
+        ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
         OrderedDiagnosticCollection parameterDiagnostics = new();
         if (!ExpectParameters(ParameterModifiers, true, out ParameterDefinitionCollection? parameters, parameterDiagnostics))
@@ -611,8 +608,6 @@ public sealed class Parser
 
         ImmutableArray<AttributeUsage> attributes = ExpectAttributes();
 
-        ExpectTemplateInfo(out TemplateInfo? templateInfo);
-
         ImmutableArray<Token> modifiers = ExpectModifiers();
 
         if (!ExpectIdentifier(DeclarationKeywords.Struct, out Token? keyword))
@@ -628,6 +623,8 @@ public sealed class Parser
             CurrentTokenIndex = startTokenIndex;
             return false;
         }
+
+        ExpectTemplateInfo(out TemplateInfo? templateInfo);
 
         if (!ExpectOperator("{", out Token? bracketStart))
         {

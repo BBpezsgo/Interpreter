@@ -7,7 +7,6 @@ public static class DeclarationKeywords
 {
     public const string Struct = "struct";
     public const string Using = "using";
-    public const string Template = "template";
     public const string Alias = "alias";
 }
 
@@ -103,7 +102,6 @@ public static class LanguageConstants
     (
         DeclarationKeywords.Struct,
         DeclarationKeywords.Using,
-        DeclarationKeywords.Template,
         DeclarationKeywords.Alias,
 
         ModifierKeywords.Temp,

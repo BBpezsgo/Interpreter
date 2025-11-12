@@ -1,8 +1,7 @@
 using Primitives;
 using System.Memory;
 
-template<T>
-struct List
+struct List<T>
 {
     private int _capacity;
     private int _length;

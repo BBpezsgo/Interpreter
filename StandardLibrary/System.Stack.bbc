@@ -1,8 +1,7 @@
 using Primitives;
 using System.Memory;
 
-template<T>
-export struct Stack
+export struct Stack<T>
 {
     private T[]* _array;
     private int _length;

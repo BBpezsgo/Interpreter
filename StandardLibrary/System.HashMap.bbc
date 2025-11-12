@@ -65,8 +65,7 @@ u8 equals(string a, string b)
     return (u8)1;
 }
 
-template<TKey, TValue>
-struct Pair
+struct Pair<TKey, TValue>
 {
     TKey key;
     TValue value;
@@ -78,8 +77,7 @@ struct Pair
     }
 }
 
-template<TKey, TValue>
-struct HashMap
+struct HashMap<TKey, TValue>
 {
     private int _capacity;
     private int _length;

@@ -275,8 +275,7 @@ export void print(temp string message)
     }
 }
 
-template<T>
-export void print(List<T>* list)
+export void print<T>(List<T>* list)
 {
 	if (!list)
 	{
@@ -305,8 +304,7 @@ export void print(List<T>* list)
 	print(" }");
 }
 
-template<T>
-export void print(T[]* list, int length)
+export void print<T>(T[]* list, int length)
 {
 	if (!list)
 	{
@@ -345,15 +343,13 @@ export inline void printline(temp string message)
     printline();
 }
 
-template<T>
-export inline void printline(T value)
+export inline void printline<T>(T value)
 {
     print(value);
     printline();
 }
 
-template<T>
-export inline void printline(T[]* array, int length)
+export inline void printline<T>(T[]* array, int length)
 {
     print(array, length);
     printline();

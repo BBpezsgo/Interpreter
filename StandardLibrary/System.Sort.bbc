@@ -3,8 +3,7 @@ using Primitives;
 /*
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
-template<T>
-export inline void quicksort(T[]* array, int length)
+export inline void quicksort<T>(T[]* array, int length)
 {
     quicksort(array, 0, length - 1);
 }
@@ -12,8 +11,7 @@ export inline void quicksort(T[]* array, int length)
 /*
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
-template<T>
-export void quicksort(T[]* array, int left, int right)
+export void quicksort<T>(T[]* array, int left, int right)
 {
     if (left >= 0 && right >= 0 && left < right)
     {
@@ -26,8 +24,7 @@ export void quicksort(T[]* array, int left, int right)
 /*
  * Source: https://en.wikipedia.org/wiki/Quicksort
  */
-template<T>
-int partition(T[]* array, int left, int right)
+int partition<T>(T[]* array, int left, int right)
 {
     T pivot = array[left];
     int i = left - 1;
@@ -52,8 +49,7 @@ int partition(T[]* array, int left, int right)
 /*
  * Source: https://en.wikipedia.org/wiki/Insertion_sort
  */
-template<T>
-export void insertsort(T[]* values, int length)
+export void insertsort<T>(T[]* values, int length)
 {
     int i = 1;
     while (i < length)

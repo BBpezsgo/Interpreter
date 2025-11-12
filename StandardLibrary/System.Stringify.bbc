@@ -62,8 +62,7 @@ export string tostring(this i32 number)
 	return result;
 }
 
-template<T>
-export string tostring(List<T>* list)
+export string tostring<T>(List<T>* list)
 {
     string result = "";
     

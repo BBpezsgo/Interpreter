@@ -1752,7 +1752,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     void EmitStatement(CompiledLiteralList statement, ILProxy il, ref bool successful)
     {
         successful = false;
-        Diagnostics.Add(Diagnostic.Critical($"no", statement));
+        Diagnostics.Add(Diagnostic.Critical($"Arrays on stack aren't supported in MSIL", statement));
     }
     void EmitStatement(CompilerVariableGetter statement, ILProxy il, ref bool successful)
     {
@@ -2169,7 +2169,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             if (!EmittedFunctions.Contains(function))
             {
-                throw new UnreachableException();
+                // Recursive call
             }
             return true;
         }

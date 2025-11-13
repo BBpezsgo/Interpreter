@@ -130,10 +130,14 @@ public ref partial struct ProcessorState
 
             case Opcode.JumpIfEqual: JumpIfEqual(); break;
             case Opcode.JumpIfNotEqual: JumpIfNotEqual(); break;
-            case Opcode.JumpIfGreater: JumpIfGreater(); break;
-            case Opcode.JumpIfGreaterOrEqual: JumpIfGreaterOrEqual(); break;
-            case Opcode.JumpIfLess: JumpIfLess(); break;
-            case Opcode.JumpIfLessOrEqual: JumpIfLessOrEqual(); break;
+            case Opcode.JumpIfGreaterS: JumpIfGreaterS(); break;
+            case Opcode.JumpIfGreaterOrEqualS: JumpIfGreaterOrEqualS(); break;
+            case Opcode.JumpIfLessS: JumpIfLessS(); break;
+            case Opcode.JumpIfLessOrEqualS: JumpIfLessOrEqualS(); break;
+            case Opcode.JumpIfGreaterU: JumpIfGreaterU(); break;
+            case Opcode.JumpIfGreaterOrEqualU: JumpIfGreaterOrEqualU(); break;
+            case Opcode.JumpIfLessU: JumpIfLessU(); break;
+            case Opcode.JumpIfLessOrEqualU: JumpIfLessOrEqualU(); break;
 
             case Opcode.Jump: JUMP_BY(); break;
 
@@ -159,9 +163,12 @@ public ref partial struct ProcessorState
 
             case Opcode.MathAdd: MathAdd(); break;
             case Opcode.MathSub: MathSub(); break;
-            case Opcode.MathMult: MathMult(); break;
-            case Opcode.MathDiv: MathDiv(); break;
-            case Opcode.MathMod: MathMod(); break;
+            case Opcode.MathMultS: MathMultS(); break;
+            case Opcode.MathMultU: MathMultU(); break;
+            case Opcode.MathDivS: MathDivS(); break;
+            case Opcode.MathDivU: MathDivU(); break;
+            case Opcode.MathModS: MathModS(); break;
+            case Opcode.MathModU: MathModU(); break;
 
             case Opcode.FMathAdd: FMathAdd(); break;
             case Opcode.FMathSub: FMathSub(); break;

@@ -153,10 +153,14 @@ public class BytecodeEmitter
         if (prev0.Opcode
             is Opcode.Jump
             or Opcode.JumpIfEqual
-            or Opcode.JumpIfGreater
-            or Opcode.JumpIfGreaterOrEqual
-            or Opcode.JumpIfLess
-            or Opcode.JumpIfLessOrEqual
+            or Opcode.JumpIfGreaterS
+            or Opcode.JumpIfGreaterOrEqualS
+            or Opcode.JumpIfLessS
+            or Opcode.JumpIfLessOrEqualS
+            or Opcode.JumpIfGreaterU
+            or Opcode.JumpIfGreaterOrEqualU
+            or Opcode.JumpIfLessU
+            or Opcode.JumpIfLessOrEqualU
             or Opcode.JumpIfNotEqual
             && prev0.Operand1.IsLabelAddress
             && prev0.Operand1.LabelValue.AdditionalLabelOffset == 0

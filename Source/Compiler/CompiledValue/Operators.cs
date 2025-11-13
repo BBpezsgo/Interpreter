@@ -319,7 +319,7 @@ public partial struct CompiledValue
         { throw new RuntimeException($"Can't do | operation with type {a.Type} and {b.Type}"); }
 
         Flags flags = default;
-        int result = ALU.BitwiseOr(a.I32, b.I32, ref flags, a.BitWidth);
+        int result = ALU.BitwiseOr(a.I32, b.I32, a.BitWidth, ref flags);
         return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
@@ -329,7 +329,7 @@ public partial struct CompiledValue
         { throw new RuntimeException($"Can't do & operation with type {a.Type} and {b.Type}"); }
 
         Flags flags = default;
-        int result = ALU.BitwiseAnd(a.I32, b.I32, ref flags, a.BitWidth);
+        int result = ALU.BitwiseAnd(a.I32, b.I32, a.BitWidth, ref flags);
         return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
@@ -339,14 +339,14 @@ public partial struct CompiledValue
         { throw new RuntimeException($"Can't do ^ operation with type {a.Type} and {b.Type}"); }
 
         Flags flags = default;
-        int result = ALU.BitwiseXor(a.I32, b.I32, ref flags, a.BitWidth);
+        int result = ALU.BitwiseXor(a.I32, b.I32, a.BitWidth, ref flags);
         return new CompiledValue(result, a.Type);
     }
     /// <inheritdoc/>
     public static CompiledValue operator ~(CompiledValue value)
     {
         Flags flags = default;
-        int result = ALU.BitwiseNot(value.I32, ref flags, value.BitWidth);
+        int result = ALU.BitwiseNot(value.I32, value.BitWidth, ref flags);
         return new CompiledValue(result, value.Type);
     }
 }

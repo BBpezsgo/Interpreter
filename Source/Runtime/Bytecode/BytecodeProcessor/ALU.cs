@@ -5,24 +5,54 @@
 #endif
 public static class ALU
 {
-    public const byte SignBit8 = unchecked((byte)0x80);
-    public const char SignBit16 = unchecked((char)0x8000);
-    public const int SignBit32 = unchecked((int)0x80000000);
-    public const int SignBit64 = unchecked((int)0x8000000000000000);
-
-    public const byte AllBit8 = unchecked((byte)0xFF);
-    public const char AllBit16 = unchecked((char)0xFFFF);
-    public const int AllBit32 = unchecked((int)0xFFFFFFFF);
-    public const int AllBit64 = unchecked((int)0xFFFFFFFFFFFFFFFF);
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    static long SignExtend(int value, BitWidth width)
+    {
+        unchecked
+        {
+            long mask = GetMask(width);
+            long sign = GetSignBit(width);
+            value &= (int)mask;
+            return (((long)value & sign) != 0) ? ((long)value | ~mask) : (long)value;
+        }
+    }
 
 #if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
-    public static int AddI(int a, int b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
+    public static int Add(int a, int b, BitWidth width, ref Flags flags)
     {
-        BitWidth._8 => AddI8(a.I8(), b.I8(), ref flags).I32(),
-        BitWidth._16 => AddI16(a.I16(), b.I16(), ref flags).I32(),
-        BitWidth._32 => AddI32(a.I32(), b.I32(), ref flags).I32(),
+        uint mask = GetMask(width);
+        uint sign = GetSignBit(width);
+        uint ua = (uint)a & mask;
+        uint ub = (uint)b & mask;
+
+        ulong full = (ulong)ua + (ulong)ub;
+        uint r = (uint)full & mask;
+
+        bool cf = (full & ~mask) != 0;
+        bool zf = r == 0;
+        bool sf = (r & sign) != 0;
+        bool of = ((~(ua ^ ub)) & (ua ^ r) & sign) != 0;
+
+        flags.Set(Flags.Carry, cf);
+        flags.Set(Flags.Zero, zf);
+        flags.Set(Flags.Sign, sf);
+        flags.Set(Flags.Overflow, of);
+
+        return r.I32();
+    }
+
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    static uint GetSignBit(BitWidth width) => width switch
+    {
+        BitWidth._8 => 0x80,
+        BitWidth._16 => 0x8000,
+        BitWidth._32 => 0x80000000,
         BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
@@ -30,56 +60,11 @@ public static class ALU
 #if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
-    public static byte AddI8(sbyte a, sbyte b, ref Flags flags)
+    static uint GetMask(BitWidth width) => width switch
     {
-        long result = a + b;
-
-        flags.Set(Flags.Sign, unchecked(result & SignBit8) != 0);
-        flags.Set(Flags.Zero, (result & AllBit8) == 0);
-        flags.Set(Flags.Carry, result > AllBit8);
-        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit8) == SignBit8);
-
-        return unchecked((byte)result);
-    }
-
-#if UNITY_BURST
-    [Unity.Burst.BurstCompile]
-#endif
-    public static short AddI16(short a, short b, ref Flags flags)
-    {
-        long result = a + b;
-
-        flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
-        flags.Set(Flags.Zero, (result & AllBit16) == 0);
-        flags.Set(Flags.Carry, result > AllBit16);
-        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit16) == SignBit16);
-
-        return unchecked((short)result);
-    }
-
-#if UNITY_BURST
-    [Unity.Burst.BurstCompile]
-#endif
-    public static int AddI32(int a, int b, ref Flags flags)
-    {
-        long result = a + b;
-
-        flags.Set(Flags.Sign, unchecked(result & SignBit32) != 0);
-        flags.Set(Flags.Zero, (result & AllBit32) == 0);
-        flags.Set(Flags.Carry, result > AllBit32);
-        flags.Set(Flags.Overflow, ((result ^ a) & (result ^ b) & SignBit32) == SignBit32);
-
-        return unchecked((int)result);
-    }
-
-#if UNITY_BURST
-    [Unity.Burst.BurstCompile]
-#endif
-    public static int SubtractI(int a, int b, BitWidth bitWidth, ref Flags flags) => bitWidth switch
-    {
-        BitWidth._8 => SubtractI8(a.I8(), b.I8(), ref flags).I32(),
-        BitWidth._16 => SubtractI16(a.I16(), b.I16(), ref flags).I32(),
-        BitWidth._32 => SubtractI32(a.I32(), b.I32(), ref flags).I32(),
+        BitWidth._8 => 0xFFu,
+        BitWidth._16 => 0xFFFFu,
+        BitWidth._32 => 0xFFFFFFFFu,
         BitWidth._64 => throw new NotImplementedException(),
         _ => throw new UnreachableException(),
     };
@@ -87,120 +72,163 @@ public static class ALU
 #if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
-    public static sbyte SubtractI8(sbyte a, sbyte b, ref Flags flags)
+    public static int Subtract(int a, int b, BitWidth width, ref Flags flags)
     {
-        long result = a - b;
+        uint mask = GetMask(width);
 
-        flags.Set(Flags.Sign, unchecked(result & SignBit8) != 0);
-        flags.Set(Flags.Zero, (result & AllBit8) == 0);
-        flags.Set(Flags.Carry, result > AllBit8);
-        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit8) == (long)SignBit8);
+        uint signBit = GetSignBit(width);
 
-        return unchecked((sbyte)result);
+        uint ua = (uint)a & mask;
+        uint ub = (uint)b & mask;
+
+        uint result = (ua - ub) & mask;
+
+        flags.Set(Flags.Carry, ua < ub);
+        flags.Set(Flags.Zero, result == 0);
+        flags.Set(Flags.Sign, (result & signBit) != 0);
+        flags.Set(Flags.Overflow, ((ua ^ ub) & (ua ^ result) & signBit) != 0);
+
+        return result.I32();
     }
 
 #if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
-    public static short SubtractI16(short a, short b, ref Flags flags)
+    public static int DivSigned(int a, int b, BitWidth width, ref Flags flags, out int remainder)
     {
-        long result = a - b;
+        long sa = SignExtend(a, width);
+        long sb = SignExtend(b, width);
+        if (sb == 0) throw new DivideByZeroException();
 
-        flags.Set(Flags.Sign, unchecked(result & SignBit16) != 0);
-        flags.Set(Flags.Zero, (result & AllBit16) == 0);
-        flags.Set(Flags.Carry, result > AllBit16);
-        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit16) == (long)SignBit16);
+        long q = sa / sb;
+        long r = sa % sb;
 
-        return unchecked((short)result);
+        long max = (long)(GetSignBit(width) - 1);
+        long min = -GetSignBit(width);
+        if (q > max || q < min) throw new OverflowException();
+
+        remainder = (int)(r & GetMask(width));
+
+        flags.Set(Flags.Carry, false);
+        flags.Set(Flags.Zero, q == 0);
+        flags.Set(Flags.Sign, (q & GetSignBit(width)) != 0);
+        flags.Set(Flags.Overflow, false);
+
+        return (int)(q & GetMask(width));
     }
 
 #if UNITY_BURST
     [Unity.Burst.BurstCompile]
 #endif
-    public static int SubtractI32(int a, int b, ref Flags flags)
+    public static int DivUnsigned(int a, int b, BitWidth width, ref Flags flags, out int remainder)
     {
-        long result = a - b;
+        uint mask = GetMask(width);
+        uint ua = (uint)a & mask;
+        uint ub = (uint)b & mask;
+        if (ub == 0) throw new DivideByZeroException();
 
-        flags.Set(Flags.Sign, unchecked(result & SignBit32) != 0);
-        flags.Set(Flags.Zero, (result & AllBit32) == 0);
-        flags.Set(Flags.Carry, result > AllBit32);
-        // flags.Set(Flags.Overflow, ((result ^ _a) & (result ^ _b) & (long)SignBit32) == (long)SignBit32);
+        uint q = ua / ub;
+        uint r = ua % ub;
 
-        return unchecked((int)result);
+        if (q > mask) throw new OverflowException();
+
+        remainder = (int)(r & mask);
+
+        flags.Set(Flags.Carry, false);
+        flags.Set(Flags.Zero, q == 0);
+        flags.Set(Flags.Sign, (q & GetSignBit(width)) != 0);
+        flags.Set(Flags.Overflow, false);
+
+        return (int)(q & mask);
     }
 
-    public static int DivideI(int a, int b, ref Flags flags, BitWidth bitWidth)
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    public static int MulSigned(int a, int b, BitWidth width, ref Flags flags)
     {
-        return bitWidth switch
-        {
-            BitWidth._8 => ((byte)(a.U8() / b.U8())).I32(),
-            BitWidth._16 => ((char)(a.U16() / b.U16())).I32(),
-            BitWidth._32 => ((int)(a.I32() / b.I32())).I32(),
-            _ => throw new UnreachableException(),
-        };
+        long mask = (long)GetMask(width);
+        long sign = (long)GetSignBit(width);
+
+        long sa = SignExtend(a, width);
+        long sb = SignExtend(b, width);
+        long full = sa * sb;
+
+        long result = full & mask;
+        flags.Set(Flags.Carry | Flags.Overflow, full > mask || full < -sign);
+        flags.Set(Flags.Zero, result == 0);
+        flags.Set(Flags.Sign, (result & sign) != 0);
+
+        return (int)result;
     }
 
-    public static int MultiplyI(int a, int b, ref Flags flags, BitWidth bitWidth)
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    public static int MulUnsigned(int a, int b, BitWidth width, ref Flags flags)
     {
-        return bitWidth switch
-        {
-            BitWidth._8 => ((byte)(a.U8() * b.U8())).I32(),
-            BitWidth._16 => ((char)(a.U16() * b.U16())).I32(),
-            BitWidth._32 => ((int)(a.I32() * b.I32())).I32(),
-            _ => throw new UnreachableException(),
-        };
+        ulong mask = GetMask(width);
+        ulong full = ((ulong)a & mask) * ((ulong)b & mask);
+        ulong result = full & mask;
+
+        flags.Set(Flags.Carry | Flags.Overflow, (full >> (int)width) != 0);
+        flags.Set(Flags.Zero, result == 0);
+        flags.Set(Flags.Sign, (result & GetSignBit(width)) != 0);
+
+        return (int)result;
     }
 
-    public static int ModuloI(int a, int b, ref Flags flags, BitWidth bitWidth)
-    {
-        return bitWidth switch
-        {
-            BitWidth._8 => ((byte)(a.U8() % b.U8())).I32(),
-            BitWidth._16 => ((char)(a.U16() % b.U16())).I32(),
-            BitWidth._32 => ((int)(a.I32() % b.I32())).I32(),
-            _ => throw new UnreachableException(),
-        };
-    }
-
-    public static int BitwiseAnd(int a, int b, ref Flags flags, BitWidth bitWidth)
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    public static int BitwiseAnd(int a, int b, BitWidth width, ref Flags flags)
     {
         int result = (a.U32() & b.U32()).I32();
 
-        flags.SetSign(result, bitWidth);
-        flags.SetZero(result, bitWidth);
+        flags.SetSign(result, width);
+        flags.SetZero(result, width);
         flags.Set(Flags.Carry, false);
 
         return result;
     }
 
-    public static int BitwiseOr(int a, int b, ref Flags flags, BitWidth bitWidth)
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    public static int BitwiseOr(int a, int b, BitWidth width, ref Flags flags)
     {
         int result = (a.U32() | b.U32()).I32();
 
-        flags.SetSign(result, bitWidth);
-        flags.SetZero(result, bitWidth);
+        flags.SetSign(result, width);
+        flags.SetZero(result, width);
         flags.Set(Flags.Carry, false);
 
         return result;
     }
 
-    public static int BitwiseXor(int a, int b, ref Flags flags, BitWidth bitWidth)
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    public static int BitwiseXor(int a, int b, BitWidth width, ref Flags flags)
     {
         int result = (a.U32() ^ b.U32()).I32();
 
-        flags.SetSign(result, bitWidth);
-        flags.SetZero(result, bitWidth);
+        flags.SetSign(result, width);
+        flags.SetZero(result, width);
         flags.Set(Flags.Carry, false);
 
         return result;
     }
 
-    public static int BitwiseNot(int a, ref Flags flags, BitWidth bitWidth)
+#if UNITY_BURST
+    [Unity.Burst.BurstCompile]
+#endif
+    public static int BitwiseNot(int a, BitWidth width, ref Flags flags)
     {
         int result = (~a.U32()).I32();
 
-        flags.SetSign(result, bitWidth);
-        flags.SetZero(result, bitWidth);
+        flags.SetSign(result, width);
+        flags.SetZero(result, width);
         flags.Set(Flags.Carry, false);
 
         return result;

@@ -4,7 +4,7 @@ using LanguageCore.Runtime;
 namespace LanguageCore.BBLang.Generator;
 
 [Flags]
-public enum OptimizationSettings : uint
+public enum GeneratorOptimizationSettings : uint
 {
     None = 0,
     All = uint.MaxValue,
@@ -18,7 +18,7 @@ public enum OptimizationSettings : uint
 public struct MainGeneratorSettings
 {
     public bool GenerateComments;
-    public OptimizationSettings Optimizations;
+    public GeneratorOptimizationSettings Optimizations;
     public bool CheckNullPointers;
     public int PointerSize;
     public int StackSize;
@@ -39,7 +39,7 @@ public struct MainGeneratorSettings
     public static MainGeneratorSettings Default => new()
     {
         GenerateComments = true,
-        Optimizations = OptimizationSettings.All,
+        Optimizations = GeneratorOptimizationSettings.All,
         CheckNullPointers = true,
         PointerSize = 4,
         StackSize = BytecodeInterpreterSettings.Default.StackSize,

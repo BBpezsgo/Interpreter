@@ -77,7 +77,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             new ExternalFunctionStub(0, "stdin", 0, 1),
             new ExternalFunctionStub(1, "stdout", 1, 0)
         ),
-        DontOptimize = false,
+        Optimizations = OptimizationSettings.All,
         SourceProviders = ImmutableArray.Create<ISourceProvider>(
             FileSourceProvider.Instance
         ),

@@ -24,7 +24,7 @@ public class BytecodeEmitter
         public static bool operator !=(BytecodeJump left, BytecodeJump right) => left.Index != right.Index;
     }
 
-    public OptimizationSettings Optimizations { get; init; }
+    public GeneratorOptimizationSettings Optimizations { get; init; }
     public required DebugInformation DebugInfo { get; init; }
 
     readonly List<PreparationInstruction> Code = new();
@@ -146,7 +146,7 @@ public class BytecodeEmitter
 
     bool OptimizeCodeAt(int i)
     {
-        if (!Optimizations.HasFlag(OptimizationSettings.BytecodeLevel)) return false;
+        if (!Optimizations.HasFlag(GeneratorOptimizationSettings.BytecodeLevel)) return false;
 
         PreparationInstruction prev0 = Code[i];
 
@@ -412,7 +412,7 @@ public class BytecodeEmitter
 
     bool OptimizeCodeAtWithFinishedRegister(int i, Register finishedRegister)
     {
-        if (!Optimizations.HasFlag(OptimizationSettings.BytecodeLevel)) return false;
+        if (!Optimizations.HasFlag(GeneratorOptimizationSettings.BytecodeLevel)) return false;
 
         PreparationInstruction prev0 = Code[i];
 

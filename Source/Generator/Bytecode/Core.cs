@@ -165,7 +165,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         BooleanType = BuiltinType.U8,
         ExitCodeType = BuiltinType.I32,
         SizeofStatementType = BuiltinType.I32,
-        DontOptimize = false,
+        Optimizations = OptimizationSettings.All,
         ExternalConstants = ImmutableArray<ExternalConstant>.Empty,
         ExternalFunctions = ImmutableArray<IExternalFunction>.Empty,
         PreprocessorVariables = PreprocessorVariables.Normal,

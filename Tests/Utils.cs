@@ -325,7 +325,7 @@ public static class Utils
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BytecodeCompilerSettings)
         {
             ExternalFunctions = externalFunctions.ToImmutableArray(),
-            DontOptimize = false,
+            Optimizations = OptimizationSettings.All,
             PreprocessorVariables = PreprocessorVariables.Normal,
             AdditionalImports = AdditionalImports,
             SourceProviders = ImmutableArray.Create<ISourceProvider>(
@@ -510,7 +510,7 @@ public static class Utils
         DiagnosticsCollection diagnostics = new();
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(BrainfuckCompilerSettings)
         {
-            DontOptimize = false,
+            Optimizations = OptimizationSettings.All,
             AdditionalImports = AdditionalImports,
             SourceProviders = ImmutableArray.Create<ISourceProvider>(
                 new FileSourceProvider()
@@ -528,7 +528,7 @@ public static class Utils
         diagnostics = new DiagnosticsCollection();
         CompilerResult compiledUnoptimized = StatementCompiler.CompileFile(file, new CompilerSettings(BrainfuckCompilerSettings)
         {
-            DontOptimize = true,
+            Optimizations = OptimizationSettings.None,
             AdditionalImports = AdditionalImports,
             SourceProviders = ImmutableArray.Create<ISourceProvider>(
                 new FileSourceProvider()

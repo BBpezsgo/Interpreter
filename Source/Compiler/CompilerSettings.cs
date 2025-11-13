@@ -2,9 +2,19 @@ using LanguageCore.Runtime;
 
 namespace LanguageCore.Compiler;
 
+[Flags]
+public enum OptimizationSettings : uint
+{
+    None = 0,
+    All = uint.MaxValue,
+    FunctionEvaluating = 1,
+    StatementEvaluating = 2,
+    FunctionInlining = 4,
+}
+
 public struct CompilerSettings
 {
-    public required bool DontOptimize { get; set; }
+    public required OptimizationSettings Optimizations { get; set; }
     public required ImmutableArray<IExternalFunction> ExternalFunctions { get; set; }
     public required ImmutableArray<ExternalConstant> ExternalConstants { get; set; }
     public required BuiltinType ExitCodeType { get; set; }
@@ -23,7 +33,7 @@ public struct CompilerSettings
     [SetsRequiredMembers]
     public CompilerSettings(CompilerSettings other)
     {
-        DontOptimize = other.DontOptimize;
+        Optimizations = other.Optimizations;
         ExternalFunctions = other.ExternalFunctions;
         ExternalConstants = other.ExternalConstants;
         ExitCodeType = other.ExitCodeType;

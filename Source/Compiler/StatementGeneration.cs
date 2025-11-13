@@ -9,9 +9,6 @@ namespace LanguageCore.Compiler;
 
 public partial class StatementCompiler
 {
-    bool AllowFunctionInlining => !Settings.DontOptimize;
-    bool AllowEvaluating => !Settings.DontOptimize;
-
     bool CompileAllocation(StatementWithValue size, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {
         compiledStatement = null;
@@ -1076,7 +1073,7 @@ public partial class StatementCompiler
 
         CompileFunction(callee, typeArguments);
 
-        if (AllowEvaluating &&
+        if (Settings.Optimizations.HasFlag(OptimizationSettings.FunctionEvaluating) &&
             TryEvaluate(callee, compiledArguments, new EvaluationContext(), out CompiledValue? returnValue, out ImmutableArray<RuntimeStatement2> runtimeStatements) &&
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
@@ -1093,7 +1090,7 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (AllowFunctionInlining &&
+        if (Settings.Optimizations.HasFlag(OptimizationSettings.FunctionInlining) &&
             callee.IsInlineable)
         {
             CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == callee);
@@ -1414,7 +1411,7 @@ public partial class StatementCompiler
 
             if (!CompileFunctionCall(@operator, @operator.Arguments, result, out compiledStatement)) return false;
 
-            if (AllowEvaluating &&
+            if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                 TryCompute(compiledStatement, out CompiledValue evaluated) &&
                 evaluated.TryCast(compiledStatement.Type, out evaluated))
             {
@@ -1614,7 +1611,7 @@ public partial class StatementCompiler
                 SaveValue = @operator.SaveValue,
             };
 
-            if (AllowEvaluating &&
+            if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                 TryCompute(compiledStatement, out CompiledValue evaluated) &&
                 evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
             {
@@ -1689,7 +1686,7 @@ public partial class StatementCompiler
                 Type = operatorDefinition.Type,
             };
 
-            if (AllowEvaluating &&
+            if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                 TryCompute(compiledStatement, out CompiledValue evaluated) &&
                 evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
             {
@@ -1722,7 +1719,7 @@ public partial class StatementCompiler
                         Type = BuiltinType.U8,
                     };
 
-                    if (AllowEvaluating &&
+                    if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                         TryCompute(compiledStatement, out CompiledValue evaluated) &&
                         evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
                     {
@@ -1746,7 +1743,7 @@ public partial class StatementCompiler
                         Type = left.Type,
                     };
 
-                    if (AllowEvaluating &&
+                    if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                         TryCompute(compiledStatement, out CompiledValue evaluated) &&
                         evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
                     {
@@ -1770,7 +1767,7 @@ public partial class StatementCompiler
                         Type = left.Type,
                     };
 
-                    if (AllowEvaluating &&
+                    if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                         TryCompute(compiledStatement, out CompiledValue evaluated) &&
                         evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
                     {
@@ -1794,7 +1791,7 @@ public partial class StatementCompiler
                         Type = left.Type,
                     };
 
-                    if (AllowEvaluating &&
+                    if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
                         TryCompute(compiledStatement, out CompiledValue evaluated) &&
                         evaluated.TryCast(compiledStatement.Type, out CompiledValue casted))
                     {
@@ -3131,12 +3128,12 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (AllowEvaluating &&
+        if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
             targetType.Is(out BuiltinType? targetBuiltinType) &&
             TryComputeSimple(typeCast.PrevStatement, out CompiledValue prevValue) &&
             prevValue.TryCast(targetBuiltinType.RuntimeType, out CompiledValue castedValue))
         {
-            Diagnostics.Add(Diagnostic.OptimizationNotice($"Type cast evaluated, converting {prevValue} to {castedValue}", typeCast));
+            Diagnostics.Add(Diagnostic.OptimizationNotice($"Type cast evaluated, converting {prevValue} ({prevValue.Type}) to {castedValue} ({castedValue.Type})", typeCast));
             compiledStatement = new CompiledEvaluatedValue()
             {
                 Value = castedValue,

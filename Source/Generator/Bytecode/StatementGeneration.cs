@@ -687,7 +687,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledStatementWithValue Left = @operator.Left;
         CompiledStatementWithValue Right = @operator.Right;
 
-        if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+        if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
             && @operator.Operator
             is CompiledBinaryOperatorCall.LogicalAND
             or CompiledBinaryOperatorCall.LogicalOR
@@ -739,7 +739,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         InstructionOperand rightOperand;
         RegisterUsage.Auto? regRight;
 
-        if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+        if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
             && Right is CompiledEvaluatedValue rightValue)
         {
             rightOperand = new InstructionOperand(rightValue.Value);
@@ -1410,7 +1410,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 }
 
-                if (Settings.Optimizations.HasFlag(OptimizationSettings.IndexerFetchSkip)
+                if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
                     && index.Index is CompiledEvaluatedValue evaluatedIndex)
                 {
                     Code.Emit(Opcode.MathAdd, regPtr.Register, (int)evaluatedIndex.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
@@ -1488,7 +1488,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     return;
                 }
 
-                if (Settings.Optimizations.HasFlag(OptimizationSettings.IndexerFetchSkip)
+                if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
                     && runtimeIndex.IndexValue is CompiledEvaluatedValue evaluatedIndex)
                 {
                     int indexValue = (int)evaluatedIndex.Value;
@@ -1616,7 +1616,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment("Statements {");
         foreach (CompiledStatement v in block.Statements)
         {
-            if (Settings.Optimizations.HasFlag(OptimizationSettings.TrimReturnBreak) &&
+            if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.TrimReturnBreak) &&
                 ((ReturnInstructions.Count > 0 && ReturnInstructions.Last.IsSkipping) ||
                 (BreakInstructions.Count > 0 && BreakInstructions.Last.IsSkipping)) &&
                 !StatementCompiler.Visit(v).Any(v => v is CompiledInstructionLabelDeclaration))
@@ -1790,7 +1790,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompiledStatementWithValue Left = @operator.Left;
             CompiledStatementWithValue Right = @operator.Right;
 
-            if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+            if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
                 && @operator.Operator
                 is CompiledBinaryOperatorCall.LogicalAND
                 or CompiledBinaryOperatorCall.LogicalOR
@@ -1813,7 +1813,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             InstructionOperand rightOperand;
             RegisterUsage.Auto? regRight;
 
-            if (Settings.Optimizations.HasFlag(OptimizationSettings.BinaryOperatorFetchSkip)
+            if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
                 && Right is CompiledEvaluatedValue rightValue)
             {
                 rightOperand = new InstructionOperand(rightValue.Value);

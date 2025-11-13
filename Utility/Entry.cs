@@ -88,7 +88,7 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     ExternalConstants = externalConstants.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
@@ -106,7 +106,7 @@ public static class Entry
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
                     CheckNullPointers = !arguments.NoNullcheck,
-                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
+                    Optimizations = arguments.DontOptimize ? GeneratorOptimizationSettings.None : GeneratorOptimizationSettings.All,
                     StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
                     ILGeneratorSettings = new IL.Generator.ILGeneratorSettings()
                     {
@@ -395,7 +395,7 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
                     AdditionalImports = additionalImports,
@@ -447,7 +447,7 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForBrainfuck.DefaultCompilerSettings)
                 {
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     PreprocessorVariables = PreprocessorVariables.Brainfuck,
                     AdditionalImports = additionalImports,
                     SourceProviders = ImmutableArray.Create<ISourceProvider>(
@@ -687,7 +687,7 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
                     AdditionalImports = additionalImports,
@@ -704,7 +704,7 @@ public static class Entry
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
                     CheckNullPointers = !arguments.NoNullcheck,
-                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
+                    Optimizations = arguments.DontOptimize ? GeneratorOptimizationSettings.None : GeneratorOptimizationSettings.All,
                     StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
                 };
                 BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
@@ -782,7 +782,7 @@ public static class Entry
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
                 {
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     ExternalFunctions = externalFunctions.ToImmutableArray(),
                     PreprocessorVariables = PreprocessorVariables.Normal,
                     AdditionalImports = additionalImports,

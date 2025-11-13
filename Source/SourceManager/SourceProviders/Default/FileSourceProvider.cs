@@ -66,7 +66,7 @@ public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider
 
     public SourceProviderResultSync TryLoad(string requestedFile, Uri? currentFile)
     {
-        if (currentFile is not null && !currentFile.IsFile && !AllowLocalFilesFromWeb)
+        if (currentFile is not null && !currentFile.IsFile && currentFile.Scheme is "http" or "https" && !AllowLocalFilesFromWeb)
         {
             return SourceProviderResultSync.NextHandler();
         }

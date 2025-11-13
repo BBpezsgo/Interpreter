@@ -106,7 +106,7 @@ public static class Entry
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
                     CheckNullPointers = !arguments.NoNullcheck,
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
                     ILGeneratorSettings = new IL.Generator.ILGeneratorSettings()
                     {
@@ -704,7 +704,7 @@ public static class Entry
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
                     CheckNullPointers = !arguments.NoNullcheck,
-                    DontOptimize = arguments.DontOptimize,
+                    Optimizations = arguments.DontOptimize ? OptimizationSettings.None : OptimizationSettings.All,
                     StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
                 };
                 BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)

@@ -7,6 +7,7 @@ public partial class StatementCompiler
 {
     public static class FunctionQuery
     {
+        [DebuggerStepThrough]
         public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, GeneralType> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
             ImmutableArray<GeneralType>? arguments = null,
@@ -26,6 +27,7 @@ public partial class StatementCompiler
                 AddCompilable = addCompilable,
             };
 
+        [DebuggerStepThrough]
         public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, StatementWithValue> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
             ImmutableArray<StatementWithValue> arguments,
@@ -45,6 +47,7 @@ public partial class StatementCompiler
                 AddCompilable = addCompilable,
             };
 
+        [DebuggerStepThrough]
         public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, GeneralType> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
             ImmutableArray<GeneralType> arguments,
@@ -288,30 +291,6 @@ public partial class StatementCompiler
         FunctionMatch<TFunction> best;
 
         readableName = query.ToReadable() ?? readableName;
-        if (query.Arguments.HasValue)
-        {
-            ImmutableArray<GeneralType>.Builder argumentTypes = ImmutableArray.CreateBuilder<GeneralType>(query.Arguments.Value.Length);
-            for (int i = 0; i < query.Arguments.Value.Length; i++)
-            {
-                if (!query.Converter.Invoke(query.Arguments.Value[i], null, null, out GeneralType? converted))
-                {
-                    goto bad;
-                }
-                argumentTypes.Add(converted);
-            }
-            FunctionQuery<TFunction, TPassedIdentifier, TDefinedIdentifier, GeneralType> typeConvertedQuery = new()
-            {
-                AddCompilable = query.AddCompilable,
-                ArgumentCount = query.ArgumentCount,
-                Arguments = argumentTypes.MoveToImmutable(),
-                Converter = FunctionArgumentConverter,
-                Identifier = query.Identifier,
-                RelevantFile = query.RelevantFile,
-                ReturnType = query.ReturnType,
-            };
-            readableName = typeConvertedQuery.ToReadable() ?? readableName;
-        bad:;
-        }
 
         if (functionMatches.Count > 0)
         {

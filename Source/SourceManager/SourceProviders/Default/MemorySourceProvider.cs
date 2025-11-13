@@ -11,12 +11,19 @@ public class MemorySourceProvider : ISourceProviderSync
 
     public SourceProviderResultSync TryLoad(string requestedFile, Uri? currentFile)
     {
-        Uri uri = new($"memory:///{requestedFile}");
-        if (Sources.TryGetValue(requestedFile, out string? content))
+        if (!Uri.TryCreate(currentFile, requestedFile, out Uri? uri) ||
+            uri.Scheme != "memory")
+        {
+            return SourceProviderResultSync.NextHandler();
+        }
+
+        if (Sources.TryGetValue(uri.LocalPath, out string? content))
         {
             return SourceProviderResultSync.Success(uri, content);
         }
-
-        return SourceProviderResultSync.NotFound(uri);
+        else
+        {
+            return SourceProviderResultSync.NotFound(uri);
+        }
     }
 }

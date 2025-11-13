@@ -277,24 +277,28 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         public IEnumerable<CompliableTemplate<TFunction>> Compilable { get; init; }
     }
 
+    [DebuggerStepThrough]
     Functions<CompiledFunctionDefinition> GetFunctions() => new()
     {
         Compiled = CompiledFunctions,
         Compilable = CompilableFunctions,
     };
 
+    [DebuggerStepThrough]
     Functions<CompiledOperatorDefinition> GetOperators() => new()
     {
         Compiled = CompiledOperators,
         Compilable = CompilableOperators,
     };
 
+    [DebuggerStepThrough]
     Functions<CompiledGeneralFunctionDefinition> GetGeneralFunctions() => new()
     {
         Compiled = CompiledGeneralFunctions,
         Compilable = CompilableGeneralFunctions,
     };
 
+    [DebuggerStepThrough]
     Functions<CompiledConstructorDefinition> GetConstructors() => new()
     {
         Compiled = CompiledConstructors,
@@ -576,7 +580,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         string identifier,
         GeneralType? type,
         [NotNullWhen(true)] out FunctionQueryResult<CompiledFunctionDefinition>? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error)
+        [NotNullWhen(false)] out PossibleDiagnostic? error,
+        Action<CompliableTemplate<CompiledFunctionDefinition>>? addCompilable = null)
     {
         if (type is null || !type.Is(out FunctionType? functionType))
         {
@@ -588,7 +593,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
 
         return GetFunction(
-            FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(identifier, functionType.Parameters, null, functionType.ReturnType, null),
+            FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(identifier, functionType.Parameters, null, functionType.ReturnType, addCompilable),
             out result,
             out error
         );

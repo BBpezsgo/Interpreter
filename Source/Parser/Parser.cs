@@ -1749,7 +1749,11 @@ public sealed class Parser
         modifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
         if (!ExpectOneValue(out StatementWithValue? value))
-        { throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.Position.After(), File); }
+        {
+            oneValue = new Identifier(modifier, File);
+            return true;
+            // throw new SyntaxException($"Expected one value after modifier \"{modifier}\"", modifier.Position.After(), File);
+        }
 
         oneValue = new ModifiedStatement(modifier, value, File);
         return true;

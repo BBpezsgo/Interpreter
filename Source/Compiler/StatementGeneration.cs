@@ -2502,7 +2502,7 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (GetFunction(variable.Content, expectedType, out FunctionQueryResult<CompiledFunctionDefinition>? result, out PossibleDiagnostic? functionNotFoundError))
+        if (GetFunction(variable.Content, expectedType, out FunctionQueryResult<CompiledFunctionDefinition>? result, out PossibleDiagnostic? functionNotFoundError, AddCompilable))
         {
             CompiledFunctionDefinition? compiledFunction = result.Function;
 

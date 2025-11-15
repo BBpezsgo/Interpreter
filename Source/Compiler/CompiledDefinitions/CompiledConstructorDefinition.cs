@@ -19,28 +19,26 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
 
     public bool ReturnSomething => true;
     public new GeneralType Type { get; }
-    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public new ImmutableArray<CompiledParameter> Parameters { get; }
     public new CompiledStruct Context { get; set; }
     public List<Reference<ConstructorCall>> References { get; }
 
-    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
-    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
     GeneralType IIdentifiable<GeneralType>.Identifier => Type;
 
     string? IExternalFunctionDefinition.ExternalFunctionName => null;
 
-    public CompiledConstructorDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
+    public CompiledConstructorDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledStruct context, ConstructorDefinition functionDefinition) : base(functionDefinition)
     {
         Type = type;
-        ParameterTypes = parameterTypes;
+        Parameters = parameters;
         Context = context;
         References = new List<Reference<ConstructorCall>>();
     }
 
-    public CompiledConstructorDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledConstructorDefinition other) : base(other)
+    public CompiledConstructorDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledConstructorDefinition other) : base(other)
     {
         Type = type;
-        ParameterTypes = parameterTypes;
+        Parameters = parameters;
         Context = other.Context;
         References = new List<Reference<ConstructorCall>>(other.References);
     }
@@ -48,7 +46,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
     public bool DefinitionEquals(CompiledConstructorDefinition other)
     {
         if (!Type.Equals(other.Type)) return false;
-        if (!Utils.SequenceEquals(ParameterTypes, other.ParameterTypes)) return false;
+        if (!Utils.SequenceEquals(Parameters.Select(v => v.Type), other.Parameters.Select(v => v.Type))) return false;
         return true;
     }
 
@@ -59,7 +57,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
         if (IsExported)
         { result.Append("export "); }
         result.Append(Type);
-        result.Append(Parameters.ToString(ParameterTypes));
+        result.AppendJoin(", ", Parameters.Select(v => $"{v.Type} {v.Identifier}"));
         result.Append(Block?.ToString() ?? ";");
 
         return result.ToString();
@@ -67,9 +65,17 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
 
     public CompiledConstructorDefinition InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {
-        ImmutableArray<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
-        return new CompiledConstructorDefinition(newType, newParameters, this);
+        ImmutableArray<CompiledParameter>.Builder newParameters = ImmutableArray.CreateBuilder<CompiledParameter>(Parameters.Length);
+        foreach (CompiledParameter parameter in Parameters)
+        {
+            newParameters.Add(new CompiledParameter(GeneralType.InsertTypeParameters(parameter.Type, parameters), parameter));
+        }
+        return new CompiledConstructorDefinition(
+            newType,
+            newParameters.MoveToImmutable(),
+            this
+        );
     }
 
     public static string ToReadable(GeneralType identifier, IEnumerable<GeneralType> parameters)

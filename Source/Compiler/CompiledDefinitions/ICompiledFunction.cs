@@ -1,5 +1,3 @@
-using LanguageCore.Parser;
-
 namespace LanguageCore.Compiler;
 
 public interface ICompiledFunctionDefinition :
@@ -10,6 +8,5 @@ public interface ICompiledFunctionDefinition :
     IMsilCompatible
 {
     bool ReturnSomething { get; }
-    ImmutableArray<ParameterDefinition> Parameters { get; }
-    ImmutableArray<GeneralType> ParameterTypes { get; }
+    ImmutableArray<CompiledParameter> Parameters { get; }
 }

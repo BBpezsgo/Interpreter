@@ -5,7 +5,7 @@ namespace Tests;
 [TestClass, TestCategory("Main"), TestCategory("Generic")]
 public class MainTests
 {
-    const int Timeout = 50000 * 1000;
+    const int Timeout = 20 * 1000;
 
     [TestMethod, Timeout(Timeout)] public void Test001() => Utils.GetTest(01).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test002() => Utils.GetTest(02).DoMain();
@@ -132,4 +132,8 @@ public class MainTests
     [TestMethod, Timeout(Timeout)] public void Test113() => Utils.GetTest(113).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test123() => Utils.GetTest(123).DoMain();
     [TestMethod, Timeout(Timeout)] public void Test124() => Utils.GetTest(124).DoMain();
+    [TestMethod, Timeout(Timeout), Ignore] public void Test125() => Utils.GetTest(125).DoMain();
+    [TestMethod, Timeout(Timeout), Ignore] public void Test126() => Utils.GetTest(126).DoMain();
+    [TestMethod, Timeout(Timeout), Ignore] public void Test127() => Utils.GetTest(127).DoMain();
+    [TestMethod, Timeout(Timeout)] public void Test128() => Utils.GetTest(128).DoMain();
 }

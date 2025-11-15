@@ -6,7 +6,9 @@ class CompiledFrame
     public required ImmutableArray<CompiledParameter> CompiledParameters { get; init; }
     public required Stack<Scope> Scopes { get; init; }
     public required CompiledGeneratorContext? CompiledGeneratorContext { get; init; }
-    public required GeneralType? CurrentReturnType { get; init; }
+    public required GeneralType? CurrentReturnType { get; set; }
+    public HashSet<CompiledVariableDeclaration> CapturedVariables { get; } = new();
+    public HashSet<CompiledParameter> CapturedParameters { get; } = new();
     public bool IsMsilCompatible { get; set; } = true;
 
     public static CompiledFrame Empty => new()
@@ -15,6 +17,6 @@ class CompiledFrame
         CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
         Scopes = new(),
         CompiledGeneratorContext = null,
-        CurrentReturnType = null,
+        CurrentReturnType = BuiltinType.Void,
     };
 }

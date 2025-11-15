@@ -13,12 +13,6 @@ public class AliasType : GeneralType,
     public override GeneralType FinalValue => Value is AliasType aliasType ? aliasType.FinalValue : Value;
     public string Identifier => Definition.Identifier.Content;
 
-    public AliasType(AliasType other)
-    {
-        Value = other.Value;
-        Definition = other.Definition;
-    }
-
     public AliasType(GeneralType value, CompiledAlias definition)
     {
         Value = value;

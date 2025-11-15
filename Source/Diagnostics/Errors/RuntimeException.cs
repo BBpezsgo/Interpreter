@@ -359,7 +359,7 @@ public class RuntimeException : LanguageExceptionWithoutContext
                 }
                 else
                 {
-                    AppendType(compiledFunction.ParameterTypes[j]);
+                    AppendType(compiledFunction.Parameters[j].Type);
                     if (colored) result.ResetStyle();
                 }
 

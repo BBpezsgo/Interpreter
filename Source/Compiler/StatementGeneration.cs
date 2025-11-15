@@ -1,4 +1,3 @@
-using System.IO.Pipelines;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
@@ -150,6 +149,19 @@ public partial class StatementCompiler
         {
             if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out result, out PossibleDiagnostic? error, AddCompilable))
             {
+                if (AllowDeallocate(deallocateableType))
+                {
+                    if (!CompileDeallocation(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
+
+                    compiledCleanup = new CompiledCleanup()
+                    {
+                        Destructor = null,
+                        Deallocator = deallocator,
+                        Location = location,
+                        TrashType = deallocateableType,
+                    };
+                    return true;
+                }
                 Diagnostics.Add(Diagnostic.Warning($"Destructor for type \"{deallocateableType}\" not found", location).WithSuberrors(error.ToWarning(location)));
                 return false;
             }
@@ -165,7 +177,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (deallocateableType.Is<PointerType>())
+        if (AllowDeallocate(deallocateableType))
         {
             if (!CompileDeallocation(deallocateableType, location, out CompiledFunctionDefinition? deallocator)) return false;
 
@@ -434,6 +446,7 @@ public partial class StatementCompiler
                         Type = thisParameter.Type,
                         SaveValue = true,
                         Location = compiledVariable.Location,
+                        IsCapturedLocal = false,
                     },
                     Value = initialValue,
                     Location = compiledVariable.Location,
@@ -474,9 +487,10 @@ public partial class StatementCompiler
 
             if (keywordCall.Arguments.Length == 1)
             {
-                if (!CompileStatement(keywordCall.Arguments[0], out returnValue, Frames.Last.CurrentReturnType ?? ExitCodeType)) return false;
+                if (!CompileStatement(keywordCall.Arguments[0], out returnValue, Frames.Last.CurrentReturnType)) return false;
+                Frames.Last.CurrentReturnType ??= returnValue.Type;
 
-                if (!CanCastImplicitly(returnValue.Type, Frames.Last.CurrentReturnType ?? ExitCodeType, keywordCall.Arguments[0], out PossibleDiagnostic? castError))
+                if (!CanCastImplicitly(returnValue.Type, Frames.Last.CurrentReturnType, keywordCall.Arguments[0], out PossibleDiagnostic? castError))
                 {
                     Diagnostics.Add(castError.ToError(keywordCall.Arguments[0]));
                 }
@@ -523,6 +537,7 @@ public partial class StatementCompiler
                         Location = keywordCall.Location,
                         SaveValue = true,
                         Type = Frames.Last.CompiledGeneratorContext.ResultParameter.Type,
+                        IsCapturedLocal = false,
                     },
                     Value = yieldValue,
                     Location = keywordCall.Location,
@@ -544,13 +559,14 @@ public partial class StatementCompiler
                     Location = keywordCall.Location,
                     SaveValue = true,
                     Type = Frames.Last.CompiledGeneratorContext.ThisParameter.Type,
+                    IsCapturedLocal = false,
                 },
                 Field = Frames.Last.CompiledGeneratorContext.State.StateField,
                 Value = new InstructionLabelAddressGetter()
                 {
                     InstructionLabel = l,
                     Location = keywordCall.Location,
-                    Type = new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty),
+                    Type = new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty, false),
                     SaveValue = true,
                 },
                 Type = Frames.Last.CompiledGeneratorContext.State.StateField.Type,
@@ -675,7 +691,7 @@ public partial class StatementCompiler
         for (int i = 0; i < arguments.Count; i++)
         {
             ParameterDefinition parameter = compiledFunction.Parameters[i + alreadyPassed];
-            GeneralType parameterType = compiledFunction.ParameterTypes[i + alreadyPassed];
+            GeneralType parameterType = compiledFunction.Parameters[i + alreadyPassed].Type;
             StatementWithValue argument = arguments[i];
 
             if (!CompileStatement(argument, out CompiledStatementWithValue? compiledArgument, parameterType)) return false;
@@ -698,7 +714,7 @@ public partial class StatementCompiler
             if (compiledArgument.Type.GetSize(this, Diagnostics, argument) != parameterType.GetSize(this, Diagnostics, parameter))
             { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{compiledArgument.Type}\"", argument)); }
 
-            bool typeAllowsTemp = compiledArgument.Type.Is<PointerType>();
+            bool typeAllowsTemp = AllowDeallocate(compiledArgument.Type);
 
             bool calleeAllowsTemp = parameter.Modifiers.Contains(ModifierKeywords.Temp);
 
@@ -746,7 +762,7 @@ public partial class StatementCompiler
             for (int i = 0; i < remaining; i++)
             {
                 ParameterDefinition parameter = compiledFunction.Parameters[arguments.Count + i + alreadyPassed];
-                GeneralType parameterType = compiledFunction.ParameterTypes[arguments.Count + i + alreadyPassed];
+                GeneralType parameterType = compiledFunction.Parameters[arguments.Count + i + alreadyPassed].Type;
                 StatementWithValue? argument = compiledFunction.Parameters[arguments.Count + i + alreadyPassed].DefaultValue;
                 if (argument is null)
                 {
@@ -766,7 +782,7 @@ public partial class StatementCompiler
                 if (compiledArgument.Type.GetSize(this, Diagnostics, argument) != parameterType.GetSize(this, Diagnostics, parameter))
                 { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{compiledArgument.Type}\"", argument)); }
 
-                bool typeAllowsTemp = compiledArgument.Type.Is<PointerType>();
+                bool typeAllowsTemp = StatementCompiler.AllowDeallocate(compiledArgument.Type);
 
                 bool calleeAllowsTemp = parameter.Modifiers.Contains(ModifierKeywords.Temp);
 
@@ -831,7 +847,7 @@ public partial class StatementCompiler
 
             bool canDeallocate = true; // temp type maybe?
 
-            canDeallocate = canDeallocate && compiledArgument.Type.Is<PointerType>();
+            canDeallocate = canDeallocate && StatementCompiler.AllowDeallocate(compiledArgument.Type);
 
             if (StatementCanBeDeallocated(argument, out bool explicitDeallocate))
             {
@@ -949,16 +965,16 @@ public partial class StatementCompiler
                         Value = new CompiledFakeTypeCast()
                         {
                             Value = allocation,
-                            Type = new PointerType(BuiltinType.Any),
+                            Type = PointerType.Any,
                             Location = caller.Location,
                             SaveValue = true,
                         },
                         Cleanup = new CompiledCleanup()
                         {
                             Location = callee.Location,
-                            TrashType = new PointerType(BuiltinType.Any),
+                            TrashType = PointerType.Any,
                         },
-                        Type = new PointerType(BuiltinType.Any),
+                        Type = PointerType.Any,
                         Location = caller.Location,
                         SaveValue = true,
                     }
@@ -1044,7 +1060,7 @@ public partial class StatementCompiler
                     Field = GeneratorStructDefinition.FunctionField,
                     Object = compiledArguments[0].Value,
                     // FIXME: dirty ahh
-                    Type = GeneralType.InsertTypeParameters(GeneratorStructDefinition.FunctionField.Type, ((StructType)((PointerType)callee.ParameterTypes[0]).To).TypeArguments) ?? GeneratorStructDefinition.FunctionField.Type,
+                    Type = GeneralType.InsertTypeParameters(GeneratorStructDefinition.FunctionField.Type, ((StructType)((PointerType)((ICompiledFunctionDefinition)callee).Parameters[0].Type).To).TypeArguments) ?? GeneratorStructDefinition.FunctionField.Type,
                     Location = caller.Location,
                     SaveValue = true,
                 },
@@ -1819,23 +1835,19 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        if (expectedType is not FunctionType functionType)
-        {
-            Diagnostics.Add(Diagnostic.Error($"Pls", lambdaStatement));
-            return false;
-        }
+        FunctionType? functionType = expectedType as FunctionType;
 
         ImmutableArray<CompiledParameter>.Builder compiledParameters = ImmutableArray.CreateBuilder<CompiledParameter>();
 
-        for (int paramIndex = 0; paramIndex < lambdaStatement.Parameters.Count; paramIndex++)
+        for (int i = 0; i < lambdaStatement.Parameters.Count; i++)
         {
-            if (!CompileType(lambdaStatement.Parameters[paramIndex].Type, out GeneralType? parameterType, out var typeError))
+            if (!CompileType(lambdaStatement.Parameters[i].Type, out GeneralType? parameterType, out PossibleDiagnostic? typeError))
             {
-                Diagnostics.Add(typeError.ToError(lambdaStatement.Parameters[paramIndex].Type));
+                Diagnostics.Add(typeError.ToError(lambdaStatement.Parameters[i].Type));
                 return false;
             }
 
-            compiledParameters.Add(new CompiledParameter(paramIndex, parameterType, lambdaStatement.Parameters[paramIndex]));
+            compiledParameters.Add(new CompiledParameter(parameterType, lambdaStatement.Parameters[i]));
         }
 
         ImmutableArray<CompiledInstructionLabelDeclaration>.Builder localInstructionLabels = ImmutableArray.CreateBuilder<CompiledInstructionLabelDeclaration>();
@@ -1857,7 +1869,7 @@ public partial class StatementCompiler
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
             Scopes = new(),
-            CurrentReturnType = functionType.ReturnType,
+            CurrentReturnType = functionType?.ReturnType,
             CompiledGeneratorContext = null,
         });
 
@@ -1877,7 +1889,7 @@ public partial class StatementCompiler
             }
             else if (_body is CompiledStatementWithValue _compiledStatementWithValue)
             {
-                if (frame.CurrentReturnType!.SameAs(BuiltinType.Void))
+                if (frame.CurrentReturnType.SameAs(BuiltinType.Void))
                 {
                     _compiledStatementWithValue.SaveValue = false;
                     block = new CompiledBlock()
@@ -1918,18 +1930,46 @@ public partial class StatementCompiler
                 Frames.LastRef.IsMsilCompatible = false;
             }
 
+            ImmutableArray<CapturedLocal> closure = frame.CapturedVariables.ToImmutableArray(v => new CapturedLocal()
+            {
+                Variable = v,
+            });
+
+            functionType = new FunctionType(frame.CurrentReturnType ?? BuiltinType.Void, functionType?.Parameters ?? frame.CompiledParameters.ToImmutableArray(v => v.Type), !closure.IsEmpty);
+
+            CompiledStatementWithValue? allocator = null;
+            if (!closure.IsEmpty)
+            {
+                compiledParameters.Insert(0, new CompiledParameter(PointerType.Any, new ParameterDefinition(
+                    ImmutableArray<Token>.Empty,
+                    null,
+                    Token.CreateAnonymous("closure"),
+                    null
+                )));
+
+                int closureSize = 0;
+                foreach (CapturedLocal? item in closure)
+                {
+                    closureSize += item.Variable.Type.GetSize(this);
+                }
+                closureSize += PointerSize;
+                if (!CompileAllocation(LiteralStatement.CreateAnonymous(closureSize, lambdaStatement.Position, lambdaStatement.File), out allocator)) return false;
+            }
+
             compiledStatement = new CompiledLambda(
                 functionType.ReturnType,
-                functionType.Parameters,
+                compiledParameters.ToImmutable(),
                 block,
                 lambdaStatement.Parameters,
+                closure,
                 lambdaStatement.File
             )
             {
                 InstructionOffset = InvalidFunctionAddress,
                 Location = lambdaStatement.Location,
                 SaveValue = lambdaStatement.SaveValue,
-                Type = expectedType,
+                Type = functionType,
+                Allocator = allocator,
             };
 
             return true;
@@ -2424,6 +2464,7 @@ public partial class StatementCompiler
                 Location = variable.Location,
                 SaveValue = variable.SaveValue,
                 Type = param.Type,
+                IsCapturedLocal = false,
             };
             return true;
         }
@@ -2462,6 +2503,7 @@ public partial class StatementCompiler
                         Type = thisParameter.Type,
                         SaveValue = true,
                         Location = variable.Location,
+                        IsCapturedLocal = false,
                     },
                     Type = field.Type,
                     SaveValue = variable.SaveValue,
@@ -2476,6 +2518,7 @@ public partial class StatementCompiler
                 Type = val.Type,
                 Location = variable.Location,
                 SaveValue = variable.SaveValue,
+                IsCapturedLocal = false,
             };
             return true;
         }
@@ -2495,6 +2538,7 @@ public partial class StatementCompiler
                 Type = globalVariable.Type,
                 Location = variable.Location,
                 SaveValue = variable.SaveValue,
+                IsCapturedLocal = false,
             };
             return true;
         }
@@ -2535,6 +2579,33 @@ public partial class StatementCompiler
                 Location = variable.Location,
                 SaveValue = variable.SaveValue,
             };
+            return true;
+        }
+
+        if (Frames.Count > 1 && GetVariable(variable.Content, Frames[^2], out val, out _))
+        {
+            variable.AnalyzedType = TokenAnalyzedType.VariableName;
+            variable.Reference = val;
+            OnGotStatementType(variable, val.Type);
+
+            if (val.IsGlobal)
+            { Diagnostics.Add(Diagnostic.Internal($"Trying to get local variable \"{val.Identifier}\" but it was compiled as a global variable.", variable)); }
+
+            if (Frames.Last.CompiledGeneratorContext is not null)
+            {
+                Diagnostics.Add(Diagnostic.Internal($"aaaaaaa", variable));
+                return false;
+            }
+
+            compiledStatement = new CompiledVariableGetter()
+            {
+                Variable = val,
+                Type = val.Type,
+                Location = variable.Location,
+                SaveValue = variable.SaveValue,
+                IsCapturedLocal = true,
+            };
+            Frames.Last.CapturedVariables.Add(val);
             return true;
         }
 
@@ -3346,6 +3417,7 @@ public partial class StatementCompiler
                     _value is CompiledBinaryOperatorCall _v1 &&
                     _v1.Left is CompiledParameterGetter _v2 &&
                     _v2.Variable == parameter,
+                IsCapturedLocal = false,
             };
             return true;
         }
@@ -3386,6 +3458,7 @@ public partial class StatementCompiler
                         Type = thisParameter.Type,
                         SaveValue = true,
                         Location = variable.Location,
+                        IsCapturedLocal = false,
                     },
                     Value = _value,
                     Location = statementToSet.Location.Union(value.Location),
@@ -3407,6 +3480,7 @@ public partial class StatementCompiler
                     _value is CompiledBinaryOperatorCall _v1 &&
                     _v1.Left is CompiledVariableGetter _v2 &&
                     _v2.Variable == variable,
+                IsCapturedLocal = false,
             };
             return true;
         }
@@ -3431,6 +3505,7 @@ public partial class StatementCompiler
                     _value is CompiledBinaryOperatorCall _v1 &&
                     _v1.Left is CompiledVariableGetter _v2 &&
                     _v2.Variable == globalVariable,
+                IsCapturedLocal = false,
             };
             return true;
         }
@@ -3713,7 +3788,7 @@ public partial class StatementCompiler
         if (!CompileType(type.FunctionReturnType, out GeneralType? returnType, out error)) return false;
         if (!CompileTypes(type.FunctionParameterTypes, out ImmutableArray<GeneralType> parameters, out error)) return false;
 
-        result = new FunctionType(returnType, parameters);
+        result = new FunctionType(returnType, parameters, type.ClosureModifier is not null);
         type.SetAnalyzedType(result);
 
         return true;
@@ -3863,7 +3938,7 @@ public partial class StatementCompiler
             CompiledParameter resultParameter;
 
             compiledParameters.Add(thisParmater = new CompiledParameter(
-                paramIndex,
+                //paramIndex,
                 new PointerType(new StructType(generatorState.Struct, function.File)),
                 new ParameterDefinition(
                     ImmutableArray.Create<Token>(Token.CreateAnonymous(ModifierKeywords.This)),
@@ -3875,8 +3950,8 @@ public partial class StatementCompiler
             paramIndex++;
 
             compiledParameters.Add(resultParameter = new CompiledParameter(
-                paramIndex,
-                GeneralType.InsertTypeParameters(GeneratorStructDefinition.NextFunction.ParameterTypes[1], _v.TypeArguments),
+                //paramIndex,
+                GeneralType.InsertTypeParameters(GeneratorStructDefinition.NextFunction.Parameters[1].Type, _v.TypeArguments),
                 GeneratorStructDefinition.NextFunction.Parameters[1]
             ));
             paramIndex++;
@@ -3895,6 +3970,7 @@ public partial class StatementCompiler
                         Type = thisParmater.Type,
                         Location = l,
                         SaveValue = true,
+                        IsCapturedLocal = false,
                     },
                     Field = generatorState.Struct.Fields[0],
                     Type = generatorState.Struct.Fields[0].Type,
@@ -3911,6 +3987,7 @@ public partial class StatementCompiler
                             Type = thisParmater.Type,
                             Location = l,
                             SaveValue = true,
+                            IsCapturedLocal = false,
                         },
                         Field = generatorState.Struct.Fields[0],
                         Type = generatorState.Struct.Fields[0].Type,
@@ -3945,10 +4022,9 @@ public partial class StatementCompiler
         }
         else
         {
-            for (; paramIndex < function.Parameters.Count; paramIndex++)
+            for (int i = 0; i < function.Parameters.Count; i++)
             {
-                GeneralType parameterType = function.ParameterTypes[paramIndex];
-                compiledParameters.Add(new CompiledParameter(paramIndex, parameterType, function.Parameters[paramIndex]));
+                compiledParameters.Add(((ICompiledFunctionDefinition)function).Parameters[i]);
             }
         }
 
@@ -3999,6 +4075,8 @@ public partial class StatementCompiler
             }
 
             if (frame.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
+
+            if (frame.CapturedParameters.Count > 0 || frame.CapturedVariables.Count > 0) throw new NotImplementedException();
 
             function.IsMsilCompatible = function.IsMsilCompatible && frame.IsMsilCompatible;
 
@@ -4091,6 +4169,8 @@ public partial class StatementCompiler
                 ImmutableArray<CompiledStatement> reduced = ReduceStatements(compiledStatement, true);
                 res.AddRange(reduced);
             }
+
+            if (frame.CapturedParameters.Count > 0 || frame.CapturedVariables.Count > 0) throw new UnreachableException();
         }
         finally
         {

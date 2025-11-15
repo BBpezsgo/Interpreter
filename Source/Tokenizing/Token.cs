@@ -111,6 +111,21 @@ public class Token :
         return (left, right);
     }
 
+    public Token this[Range range]
+    {
+        get
+        {
+            (int start, int length) = range.GetOffsetAndLength(Content.Length);
+
+            Position position = new(
+                ((Position.Range.Start.Character + start, Position.Range.Start.Line), (Position.Range.Start.Character + start + length, Position.Range.Start.Line)),
+                (Position.AbsoluteRange.Start + start, Position.AbsoluteRange.Start + start + length)
+            );
+
+            return new Token(TokenType, Content[range], IsAnonymous, position) { AnalyzedType = AnalyzedType };
+        }
+    }
+
     public static Token operator +(Token a, Token b)
     {
         if (a.TokenType != b.TokenType)

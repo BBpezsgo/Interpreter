@@ -36,9 +36,7 @@ public class CompiledGeneratorState
     public CompiledField AddVariable(string variableName, GeneralType type)
     {
         if (GetVariable(variableName, out CompiledField? field, out _)) return field;
-        CompiledField[] newFields = new CompiledField[Struct.Fields.Length + 1];
-        Struct.Fields.CopyTo(newFields);
-        newFields[^1] = new CompiledField(
+        CompiledField newField = new(
             type,
             Struct,
             new FieldDefinition(
@@ -48,8 +46,8 @@ public class CompiledGeneratorState
                 ImmutableArray<AttributeUsage>.Empty
             )
         );
-        Struct.SetFields(newFields.ToImmutableArray());
-        return newFields[^1];
+        Struct.SetFields(Struct.Fields.Add(newField));
+        return newField;
     }
 
     public CompiledGeneratorState()

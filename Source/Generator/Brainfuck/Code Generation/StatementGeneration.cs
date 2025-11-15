@@ -16,9 +16,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         GeneralType deallocateableType = value.Type;
 
-        ImmutableArray<CompiledStatementWithValue> parameters = ImmutableArray.Create(value);
-        ImmutableArray<GeneralType> parameterTypes = parameters.Select(v => v.Type).ToImmutableArray();
-
         if (!deallocateableType.Is(out PointerType? deallocateablePointerType))
         {
             Diagnostics.Add(Diagnostic.Warning($"The \"{StatementKeywords.Delete}\" keyword-function is only working on pointers so I skip this", value));
@@ -57,6 +54,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 Location = variable.Declaration.Location,
                 SaveValue = true,
                 Type = variable.Type,
+                IsCapturedLocal = false,
             },
             variable.Cleanup
         );
@@ -414,6 +412,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForSetter(CompiledVariableSetter _statement)
     {
+        if (_statement.IsCapturedLocal) throw null;
+
         if (!GetVariable(_statement.Variable.Identifier, _statement.Variable.Location.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
             Diagnostics.Add(notFoundError.ToError(_statement.Variable));
@@ -424,6 +424,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForSetter(CompiledParameterSetter _statement)
     {
+        if (_statement.IsCapturedLocal) throw null;
+
         if (!GetVariable(_statement.Variable.Identifier.Content, _statement.Variable.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
             Diagnostics.Add(notFoundError.ToError(_statement.Variable));
@@ -755,6 +757,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         if (indirectSetter.AddressValue is CompiledVariableGetter variableGetter)
         {
+            if (variableGetter.IsCapturedLocal) throw null;
+
             if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
                 Diagnostics.Add(notFoundError.ToError(variableGetter));
@@ -782,6 +786,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (indirectSetter.AddressValue is CompiledParameterGetter parameterGetter)
         {
+            if (parameterGetter.IsCapturedLocal) throw null;
+
             if (!GetVariable(parameterGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
                 Diagnostics.Add(notFoundError.ToError(parameterGetter));
@@ -1657,6 +1663,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledVariableGetter statement)
     {
+        if (statement.IsCapturedLocal) throw null;
+
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         if (!GetVariable(statement, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
@@ -1666,6 +1674,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledParameterGetter statement)
     {
+        if (statement.IsCapturedLocal) throw null;
+
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         if (!GetVariable(statement, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
@@ -2178,6 +2188,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (pointer.To is CompiledVariableGetter variableGetter)
         {
+            if (variableGetter.IsCapturedLocal) throw null;
+
             if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
                 Diagnostics.Add(notFoundError.ToError(variableGetter));
@@ -2585,9 +2597,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         for (int i = 0; i < parameters.Length; i++)
         {
             CompiledPassedArgument passed = parameters[i];
-            ParameterDefinition defined = function.Parameters[i];
+            var defined = function.Parameters[i];
 
-            GeneralType definedType = function.ParameterTypes[i];
+            GeneralType definedType = defined.Type;
             GeneralType passedType = passed.Type;
 
             if (passedType.GetSize(this, Diagnostics, passed) != definedType.GetSize(this, Diagnostics, defined))
@@ -2660,6 +2672,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (definedType.Is<PointerType>() && passed.Value is CompiledVariableGetter _variableGetter)
             {
+                if (_variableGetter.IsCapturedLocal) throw null;
+
                 if (!GetVariable(_variableGetter, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                 {
                     Diagnostics.Add(notFoundError.ToError(_variableGetter));
@@ -2899,7 +2913,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.Cleanup is not null &&
-                        variable.Type.Is<PointerType>())
+                        StatementCompiler.AllowDeallocate(variable.Type))
                     {
                         GenerateDestructor(variable);
                     }
@@ -3076,7 +3090,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.Cleanup is not null &&
-                        variable.Type.Is<PointerType>())
+                        StatementCompiler.AllowDeallocate(variable.Type))
                     {
                         GenerateDestructor(variable);
                     }
@@ -3091,7 +3105,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables.Pop();
                     if (!variable.HaveToClean) continue;
                     if (variable.Cleanup is not null &&
-                        variable.Type.Is<PointerType>())
+                        StatementCompiler.AllowDeallocate(variable.Type))
                     { }
                     Stack.Pop();
                 }
@@ -3180,7 +3194,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.Cleanup is not null &&
-                        variable.Type.Is<PointerType>())
+                        StatementCompiler.AllowDeallocate(variable.Type))
                     {
                         GenerateDestructor(variable);
                     }
@@ -3276,12 +3290,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        for (int i = 1; i < function.Parameters.Count; i++)
+        for (int i = 1; i < function.Parameters.Length; i++)
         {
             CompiledPassedArgument passed = parameters[i - 1];
-            ParameterDefinition defined = function.Parameters[i];
+            var defined = function.Parameters[i];
 
-            GeneralType definedType = function.ParameterTypes[i];
+            GeneralType definedType = defined.Type;
             GeneralType passedType = passed.Type;
 
             if (!passedType.SameAs(definedType))
@@ -3381,7 +3395,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     BrainfuckVariable variable = CompiledVariables[i];
                     if (!variable.HaveToClean) continue;
                     if (variable.Cleanup is not null &&
-                        variable.Type.Is<PointerType>())
+                        StatementCompiler.AllowDeallocate(variable.Type))
                     {
                         GenerateDestructor(variable);
                     }

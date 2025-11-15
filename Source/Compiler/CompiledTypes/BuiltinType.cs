@@ -49,11 +49,6 @@ public class BuiltinType : GeneralType,
         _ => throw new NotImplementedException($"Type conversion for \"{Type}\" is not implemented"),
     };
 
-    public BuiltinType(BuiltinType other)
-    {
-        Type = other.Type;
-    }
-
     public BuiltinType(BasicType type)
     {
         Type = type;

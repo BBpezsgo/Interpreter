@@ -1,0 +1,25 @@
+using System;
+
+int[]* map(this int[]* values, int length, temp @int(int) converter)
+{
+    int[]* result = new int[length]*;
+    for (int i = 0; i < length; i++)
+    {
+        result[i] = converter(values[i]);
+    }
+    return result;
+}
+
+void main()
+{
+    int[] values = [2,6,4,3,8,6,97,9,6,5353,53,45,4];
+    printline(&values, values.Length);
+    int k = 1;
+    temp @int(int) converter = (int v) => {
+        return v + k;
+    };
+    temp int[]* converted = values.map(values.Length, converter);
+    printline(converted, values.Length);
+}
+
+main();

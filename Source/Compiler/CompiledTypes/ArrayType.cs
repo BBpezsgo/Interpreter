@@ -11,12 +11,6 @@ public class ArrayType : GeneralType,
     public CompiledStatementWithValue? Length { get; }
     public int? ComputedLength => Length is CompiledEvaluatedValue evaluatedValue ? (int)evaluatedValue.Value : null;
 
-    public ArrayType(ArrayType other)
-    {
-        Of = other.Of;
-        Length = other.Length;
-    }
-
     public ArrayType(GeneralType of, CompiledStatementWithValue? length)
     {
         Of = of;

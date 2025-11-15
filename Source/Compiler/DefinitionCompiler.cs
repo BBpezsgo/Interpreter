@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
@@ -25,7 +26,7 @@ public partial class StatementCompiler
         { GenericParameters.Pop(); }
 
         // Oh no wtf
-        return new CompiledStruct(@struct.Fields.Select(v => new CompiledField(BuiltinType.Any, null!, v)).ToImmutableArray(), @struct);
+        return new CompiledStruct(@struct.Fields.ToImmutableArray(v => new CompiledField(BuiltinType.Any, null!, v)), @struct);
     }
 
     void CompileStructFields(CompiledStruct @struct)
@@ -253,7 +254,9 @@ public partial class StatementCompiler
 
     public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, DiagnosticsCollection diagnostics)
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition
-        => CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, definition.ParameterTypes, diagnostics);
+    {
+        CheckExternalFunctionDeclaration(runtime, definition, externalFunction, definition.Type, ((ICompiledFunctionDefinition)definition).Parameters.ToImmutableArray(v => v.Type), diagnostics);
+    }
 
     public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, DiagnosticsCollection diagnostics)
     {
@@ -287,17 +290,22 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out typeError))
+        ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
+        foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            Diagnostics.Add(typeError.ToError(function.Type));
-            return false;
+            if (!GeneralType.From(item.Type, FindType, out var parameterType, out typeError))
+            {
+                Diagnostics.Add(typeError.ToError(item.Type));
+                return false;
+            }
+            parameters.Add(new CompiledParameter(parameterType, item));
         }
 
         CompileFunctionAttributes(function);
 
         result = new(
             type,
-            parameterTypes,
+            parameters.MoveToImmutable(),
             context,
             function
         );
@@ -355,17 +363,22 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out typeError))
+        ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
+        foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            Diagnostics.Add(typeError.ToError(function.Type));
-            return false;
+            if (!GeneralType.From(item.Type, FindType, out var parameterType, out typeError))
+            {
+                Diagnostics.Add(typeError.ToError(item.Type));
+                return false;
+            }
+            parameters.Add(new CompiledParameter(parameterType, item));
         }
 
         CompileFunctionAttributes(function);
 
         result = new(
             type,
-            parameterTypes,
+            parameters.MoveToImmutable(),
             context,
             function
         );
@@ -378,15 +391,20 @@ public partial class StatementCompiler
 
         CompileFunctionAttributes(function);
 
-        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out PossibleDiagnostic? typeError))
+        ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
+        foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            Diagnostics.Add(typeError.ToError(function.Parameters, function.File));
-            return false;
+            if (!GeneralType.From(item.Type, FindType, out var parameterType, out var typeError))
+            {
+                Diagnostics.Add(typeError.ToError(item.Type));
+                return false;
+            }
+            parameters.Add(new CompiledParameter(parameterType, item));
         }
 
         result = new(
             returnType,
-            parameterTypes,
+            parameters.MoveToImmutable(),
             context,
             function
         );
@@ -410,17 +428,22 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (!GeneralType.FromArray(function.Parameters.Parameters, FindType, out ImmutableArray<GeneralType> parameterTypes, out typeError))
+        ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
+        foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            Diagnostics.Add(typeError.ToError(function.Type));
-            return false;
+            if (!GeneralType.From(item.Type, FindType, out var parameterType, out typeError))
+            {
+                Diagnostics.Add(typeError.ToError(item.Type));
+                return false;
+            }
+            parameters.Add(new CompiledParameter(parameterType, item));
         }
 
         CompileFunctionAttributes(function);
 
         result = new(
             type,
-            parameterTypes,
+            parameters.MoveToImmutable(),
             context,
             function);
 
@@ -454,7 +477,7 @@ public partial class StatementCompiler
         where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition
     {
         if (!a.Type.Equals(b.Type)) return false;
-        if (!Utils.SequenceEquals(a.ParameterTypes, b.ParameterTypes)) return false;
+        if (!Utils.SequenceEquals(((ICompiledFunctionDefinition)a).Parameters.Select(v => v.Type), ((ICompiledFunctionDefinition)b).Parameters.Select(v => v.Type))) return false;
         if (!ThingEquality(a, b)) return false;
         return true;
     }
@@ -521,7 +544,7 @@ public partial class StatementCompiler
                 { Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, @struct.File)); }
             }
 
-            IEnumerable<ParameterDefinition> parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
+            ImmutableArray<ParameterDefinition> parameters = method.Parameters.Parameters.Insert(0, new ParameterDefinition(
                 ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                 TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(@struct.Identifier.Content, method.File, @struct.Template?.Parameters), method.File),
                 Token.CreateAnonymous(StatementKeywords.This),
@@ -534,7 +557,7 @@ public partial class StatementCompiler
                 method.Modifiers,
                 method.Type,
                 method.Identifier,
-                new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
+                new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
                 method.Template,
                 method.File)
             {
@@ -593,7 +616,7 @@ public partial class StatementCompiler
 
         @struct.SetFields(ImmutableArray.Create<CompiledField>(
             stateField = new(
-                new PointerType(BuiltinType.Any),
+                PointerType.Any,
                 @struct,
                 new FieldDefinition(
                     Token.CreateAnonymous("_genstate"),
@@ -606,9 +629,10 @@ public partial class StatementCompiler
                 new FunctionType(
                     BuiltinType.U8,
                     ImmutableArray.Create<GeneralType>(
-                        new PointerType(BuiltinType.Any),
+                        PointerType.Any,
                         new PointerType(generatorType)
-                    )
+                    ),
+                    false
                 ),
                 @struct,
                 new FieldDefinition(
@@ -630,9 +654,9 @@ public partial class StatementCompiler
             Diagnostics.Add(Diagnostic.Error($"The \"next\" function should have one parameter of type \"{new PointerType(generatorType)}\"", nextFunction, nextFunction.File));
         }
 
-        if (!nextFunction.ParameterTypes[1].SameAs(new PointerType(generatorType)))
+        if (!nextFunction.Parameters[1].Type.SameAs(new PointerType(generatorType)))
         {
-            Diagnostics.Add(Diagnostic.Error($"The \"next\" function should have one parameter of type \"{new PointerType(generatorType)}\"", nextFunction.Parameters[1].Type, nextFunction.File));
+            Diagnostics.Add(Diagnostic.Error($"The \"next\" function should have one parameter of type \"{new PointerType(generatorType)}\"", ((FunctionThingDefinition)nextFunction).Parameters[1].Type, nextFunction.File));
         }
 
         if (nextFunction.Block is not null)
@@ -645,47 +669,55 @@ public partial class StatementCompiler
             Diagnostics.Add(Diagnostic.Error($"A generator struct is already defined somewhere", @struct.Identifier.Position, @struct.File));
         }
 
+        ImmutableArray<CompiledParameter> _parameters = ImmutableArray.Create<CompiledParameter>(
+            new CompiledParameter(
+                new PointerType(new StructType(@struct, @struct.File)),
+                new ParameterDefinition(
+                    ImmutableArray.Create<Token>(Token.CreateAnonymous(ModifierKeywords.This)),
+                    new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(@struct.Identifier.Content), @struct.File), Token.CreateAnonymous("*"), @struct.File),
+                    Token.CreateAnonymous("this"),
+                    null
+                )
+            ),
+            new CompiledParameter(
+                new FunctionType(BuiltinType.U8, ImmutableArray.Create<GeneralType>(
+                    PointerType.Any,
+                    new PointerType(generatorType)
+                ), false),
+                new ParameterDefinition(
+                    ImmutableArray<Token>.Empty,
+                    new TypeInstanceFunction(
+                        new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.U8, TokenType.Identifier), @struct.File),
+                        ImmutableArray.Create<TypeInstance>(
+                            new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File),
+                            new TypeInstancePointer(new TypeInstanceSimple(genericParameter, @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File)
+                        ),
+                        null,
+                        @struct.File),
+                    Token.CreateAnonymous("func"),
+                    null
+                )
+            ),
+            new CompiledParameter(
+                PointerType.Any,
+                new ParameterDefinition(
+                    ImmutableArray<Token>.Empty,
+                    new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*"), @struct.File),
+                    Token.CreateAnonymous("state"),
+                    null
+                )
+            )
+        );
+
         CompiledConstructorDefinition constructor = new(
             new StructType(@struct, @struct.File),
-            ImmutableArray.Create<GeneralType>(
-                new PointerType(new StructType(@struct, @struct.File)),
-                new FunctionType(BuiltinType.U8, ImmutableArray.Create<GeneralType>(
-                    new PointerType(BuiltinType.Any),
-                    new PointerType(generatorType)
-                )),
-                new PointerType(BuiltinType.Any)
-            ),
+            _parameters,
             @struct,
             new ConstructorDefinition(
                 new TypeInstanceSimple(@struct.Identifier, @struct.File, ImmutableArray.Create<TypeInstance>(new TypeInstanceSimple(genericParameter, @struct.File))),
                 ImmutableArray<Token>.Empty,
                 new ParameterDefinitionCollection(
-                    ImmutableArray.Create<ParameterDefinition>(
-                        new ParameterDefinition(
-                            ImmutableArray.Create<Token>(Token.CreateAnonymous(ModifierKeywords.This)),
-                            new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(@struct.Identifier.Content), @struct.File), Token.CreateAnonymous("*"), @struct.File),
-                            Token.CreateAnonymous("this"),
-                            null
-                        ),
-                        new ParameterDefinition(
-                            ImmutableArray<Token>.Empty,
-                            new TypeInstanceFunction(
-                                new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.U8, TokenType.Identifier), @struct.File),
-                                ImmutableArray.Create<TypeInstance>(
-                                    new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File),
-                                    new TypeInstancePointer(new TypeInstanceSimple(genericParameter, @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File)
-                                ),
-                                @struct.File),
-                            Token.CreateAnonymous("func"),
-                            null
-                        ),
-                        new ParameterDefinition(
-                            ImmutableArray<Token>.Empty,
-                            new TypeInstancePointer(new TypeInstanceSimple(Token.CreateAnonymous(TypeKeywords.Any), @struct.File), Token.CreateAnonymous("*"), @struct.File),
-                            Token.CreateAnonymous("state"),
-                            null
-                        )
-                    ),
+                    _parameters.As<ParameterDefinition>(),
                     TokenPair.CreateAnonymous("(", ")")
                 ),
                 @struct.File
@@ -860,7 +892,7 @@ public partial class StatementCompiler
 
                 if (method.Identifier.Content == BuiltinFunctionIdentifiers.Destructor)
                 {
-                    IEnumerable<ParameterDefinition> parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
+                    ImmutableArray<ParameterDefinition> parameters = method.Parameters.Parameters.Insert(0, new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters),
                         Token.CreateAnonymous(StatementKeywords.This),
@@ -871,7 +903,7 @@ public partial class StatementCompiler
                     GeneralFunctionDefinition copy = new(
                         method.Identifier,
                         method.Modifiers,
-                        new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
+                        new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
                         method.File)
                     {
                         Context = method.Context,
@@ -885,7 +917,7 @@ public partial class StatementCompiler
                         continue;
                     }
 
-                    parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
+                    parameters = method.Parameters.Parameters.Insert(0, new ParameterDefinition(
                         ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                         TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                         Token.CreateAnonymous(StatementKeywords.This),
@@ -896,7 +928,7 @@ public partial class StatementCompiler
                     copy = new GeneralFunctionDefinition(
                         method.Identifier,
                         method.Modifiers,
-                        new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
+                        new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
                         method.File)
                     {
                         Context = method.Context,
@@ -948,7 +980,7 @@ public partial class StatementCompiler
                     { Diagnostics.Add(Diagnostic.Critical($"Keyword \"{ModifierKeywords.This}\" is not valid in the current context", parameter.Identifier, compiledStruct.File)); }
                 }
 
-                IEnumerable<ParameterDefinition> parameters = method.Parameters.Parameters.Prepend(new ParameterDefinition(
+                ImmutableArray<ParameterDefinition> parameters = method.Parameters.Parameters.Insert(0, new ParameterDefinition(
                     ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                     TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, method.File, compiledStruct.Template?.Parameters), method.File),
                     Token.CreateAnonymous(StatementKeywords.This),
@@ -961,7 +993,7 @@ public partial class StatementCompiler
                     method.Modifiers,
                     method.Type,
                     method.Identifier,
-                    new ParameterDefinitionCollection(parameters.ToImmutableArray(), method.Parameters.Brackets),
+                    new ParameterDefinitionCollection(parameters, method.Parameters.Brackets),
                     method.Template,
                     method.File)
                 {
@@ -994,7 +1026,7 @@ public partial class StatementCompiler
                     }
                 }
 
-                IEnumerable<ParameterDefinition> parameters = constructor.Parameters.Parameters.Prepend(new ParameterDefinition(
+                ImmutableArray<ParameterDefinition> parameters = constructor.Parameters.Parameters.Insert(0, new ParameterDefinition(
                     ImmutableArray.Create(Token.CreateAnonymous(ModifierKeywords.This)),
                     TypeInstancePointer.CreateAnonymous(TypeInstanceSimple.CreateAnonymous(compiledStruct.Identifier.Content, constructor.File, compiledStruct.Template?.Parameters), constructor.File),
                     Token.CreateAnonymous(StatementKeywords.This),
@@ -1005,7 +1037,7 @@ public partial class StatementCompiler
                 ConstructorDefinition constructorWithThisParameter = new(
                     constructor.Type,
                     constructor.Modifiers,
-                    new ParameterDefinitionCollection(parameters.ToImmutableArray(), constructor.Parameters.Brackets),
+                    new ParameterDefinitionCollection(parameters, constructor.Parameters.Brackets),
                     constructor.File)
                 {
                     Block = constructor.Block,

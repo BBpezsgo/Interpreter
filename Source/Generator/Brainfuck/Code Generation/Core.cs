@@ -697,7 +697,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 }
 
                 if (variable.Cleanup is not null &&
-                    variable.Type.Is<PointerType>())
+                    StatementCompiler.AllowDeallocate(variable.Type))
                 {
                     GenerateDestructor(variable);
                 }

@@ -9,10 +9,7 @@ public class PointerType : GeneralType,
 {
     public GeneralType To { get; }
 
-    public PointerType(PointerType other)
-    {
-        To = other.To;
-    }
+    public static readonly PointerType Any = new(BuiltinType.Any);
 
     public PointerType(GeneralType to)
     {

@@ -1,4 +1,5 @@
 using LanguageCore.Compiler;
+using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
 
@@ -6,14 +7,17 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
 {
     public TypeInstance FunctionReturnType { get; }
     public ImmutableArray<TypeInstance> FunctionParameterTypes { get; }
+    public Token? ClosureModifier { get; }
+
     public override Position Position =>
         new Position(FunctionReturnType)
         .Union(FunctionParameterTypes);
 
-    public TypeInstanceFunction(TypeInstance returnType, ImmutableArray<TypeInstance> parameters, Uri file) : base(file)
+    public TypeInstanceFunction(TypeInstance returnType, ImmutableArray<TypeInstance> parameters, Token? closureModifier, Uri file) : base(file)
     {
         FunctionReturnType = returnType;
         FunctionParameterTypes = parameters;
+        ClosureModifier = closureModifier;
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceFunction other && Equals(other);
@@ -21,13 +25,14 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
     public bool Equals(TypeInstanceFunction? other)
     {
         if (other is null) return false;
-        if (!this.FunctionReturnType.Equals(other.FunctionReturnType)) return false;
-        if (this.FunctionParameterTypes.Length != other.FunctionParameterTypes.Length) return false;
-        for (int i = 0; i < this.FunctionParameterTypes.Length; i++)
+        if (!FunctionReturnType.Equals(other.FunctionReturnType)) return false;
+        if (FunctionParameterTypes.Length != other.FunctionParameterTypes.Length) return false;
+        for (int i = 0; i < FunctionParameterTypes.Length; i++)
         {
-            if (!this.FunctionParameterTypes[i].Equals(other.FunctionParameterTypes[i]))
+            if (!FunctionParameterTypes[i].Equals(other.FunctionParameterTypes[i]))
             { return false; }
         }
+        if ((ClosureModifier is null) != (other.ClosureModifier is null)) return false;
         return true;
     }
 

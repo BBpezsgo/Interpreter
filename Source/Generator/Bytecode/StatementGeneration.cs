@@ -1,7 +1,9 @@
-﻿using System.Reflection.Emit;
+﻿using System.Linq.Expressions;
+using System.Reflection.Emit;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
+using LanguageCore.Tokenizing;
 
 namespace LanguageCore.BBLang.Generator;
 
@@ -63,9 +65,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void GenerateDestructor(CompiledCleanup cleanup)
     {
-        GeneralType deallocateableType = cleanup.TrashType;
-
-        if (cleanup.TrashType.Is<PointerType>())
+        if (StatementCompiler.AllowDeallocate(cleanup.TrashType))
         {
             if (cleanup.Destructor is null)
             {
@@ -87,13 +87,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        var label = LabelForDefinition(cleanup.Destructor);
+        InstructionLabel label = LabelForDefinition(cleanup.Destructor);
         Call(label, cleanup.Location);
 
         if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, cleanup.Destructor)); }
 
-        if (deallocateableType.Is<PointerType>())
+        if (StatementCompiler.AllowDeallocate(cleanup.TrashType))
         {
             GenerateDeallocator(cleanup);
         }
@@ -239,6 +239,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         Location = newVariable.Location,
                         SaveValue = true,
                         Type = newVariable.Type,
+                        IsCapturedLocal = false,
                     },
                     Index = new CompiledEvaluatedValue()
                     {
@@ -262,6 +263,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Value = newVariable.InitialValue,
             Location = newVariable.Location,
             IsCompoundAssignment = false,
+            IsCapturedLocal = false,
         });
         AddComment("}");
     }
@@ -395,32 +397,33 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CompiledPassedArgument argument = arguments[i];
             GeneralType argumentType = argument.Value.Type;
-            ParameterDefinition parameter = compiledFunction.Parameters[i + alreadyPassed];
-            GeneralType parameterType = compiledFunction.ParameterTypes[i + alreadyPassed];
+            CompiledParameter parameter = compiledFunction.Parameters[i + alreadyPassed];
 
-            if (argumentType.GetSize(this, Diagnostics, argument.Value) != parameterType.GetSize(this, Diagnostics, parameter))
-            { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameterType}\" passed \"{argumentType}\"", argument.Value)); }
+            if (argumentType.GetSize(this, Diagnostics, argument.Value) != parameter.Type.GetSize(this, Diagnostics, parameter))
+            { Diagnostics.Add(Diagnostic.Internal($"Bad argument type passed: expected \"{parameter.Type}\" passed \"{argumentType}\"", argument.Value)); }
 
             AddComment($" Pass {parameter}:");
 
-            GenerateCodeForStatement(argument.Value, parameterType);
+            GenerateCodeForStatement(argument.Value, parameter.Type);
 
             argumentCleanup.Push(argument.Cleanup);
         }
 
         return argumentCleanup;
     }
-    Stack<CompiledCleanup> GenerateCodeForParameterPassing(IReadOnlyList<CompiledPassedArgument> parameters, FunctionType function)
+    void GenerateCodeForParameterPassing(IReadOnlyList<CompiledPassedArgument> parameters, FunctionType function, Stack<CompiledCleanup> parameterCleanup)
     {
-        Stack<CompiledCleanup> parameterCleanup = new();
-
         for (int i = 0; i < parameters.Count; i++)
         {
             AddComment($" Param {i}:");
             GenerateCodeForStatement(parameters[i].Value, function.Parameters[i]);
             parameterCleanup.Push(parameters[i].Cleanup);
         }
-
+    }
+    Stack<CompiledCleanup> GenerateCodeForParameterPassing(IReadOnlyList<CompiledPassedArgument> parameters, FunctionType function)
+    {
+        Stack<CompiledCleanup> parameterCleanup = new();
+        GenerateCodeForParameterPassing(parameters, function, parameterCleanup);
         return parameterCleanup;
     }
     void GenerateCodeForParameterCleanup(Stack<CompiledCleanup> parameterCleanup)
@@ -528,7 +531,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     if (existing == -1)
                     {
                         int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
-                        int parametersSize = f.Function.ParameterTypes.Aggregate(0, (a, b) => a + b.GetSize(this));
+                        int parametersSize = f.Function.Parameters.Aggregate(0, (a, b) => a + b.Type.GetSize(this));
                         int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
 
 #if UNITY_BURST
@@ -666,7 +669,17 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment($"}}");
         }
 
-        Stack<CompiledCleanup> parameterCleanup = GenerateCodeForParameterPassing(anyCall.Arguments, functionType);
+        Stack<CompiledCleanup> parameterCleanup = new();
+        if (functionType.HasClosure)
+        {
+            GenerateCodeForStatement(anyCall.Function);
+            parameterCleanup.Push(new CompiledCleanup()
+            {
+                Location = anyCall.Function.Location,
+                TrashType = anyCall.Function.Type,
+            });
+        }
+        GenerateCodeForParameterPassing(anyCall.Arguments, functionType, parameterCleanup);
 
         AddComment(" .:");
 
@@ -1040,12 +1053,45 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledLambda compiledLambda)
     {
-        var label = LabelForDefinition(compiledLambda);
+        InstructionLabel label = LabelForDefinition(compiledLambda);
 
         if (compiledLambda.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, compiledLambda, compiledLambda)); }
 
-        Push(label.Absolute());
+        if (compiledLambda.CapturedLocals.IsDefaultOrEmpty)
+        {
+            Push(label.Absolute());
+        }
+        else
+        {
+            if (compiledLambda.Allocator is null) throw new UnreachableException();
+            GenerateCodeForStatement(compiledLambda.Allocator);
+
+            using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
+            {
+                Code.Emit(Opcode.Move, reg.Register, (InstructionOperand)StackTop);
+
+                AddComment("Save function pointer:");
+                Code.Emit(Opcode.Move, reg.Register.ToPtr(0, PointerBitWidth), label.Absolute());
+
+                int offset = PointerSize;
+                foreach (CapturedLocal capturedLocal in compiledLambda.CapturedLocals)
+                {
+                    int size = capturedLocal.Variable.Type.GetSize(this);
+                    AddComment($"Capture variable `{capturedLocal.Variable.Identifier}`:");
+                    GenerateCodeForStatement(new CompiledVariableGetter()
+                    {
+                        Variable = capturedLocal.Variable,
+                        Location = compiledLambda.Location,
+                        SaveValue = true,
+                        Type = capturedLocal.Variable.Type,
+                        IsCapturedLocal = false,
+                    });
+                    PopTo(new AddressOffset(new AddressRegisterPointer(reg.Register), offset), size);
+                    offset += size;
+                }
+            }
+        }
     }
     void GenerateCodeForStatement(CompilerVariableGetter compilerVariableGetter)
     {
@@ -1057,6 +1103,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledParameterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
+        if (variable.IsCapturedLocal) throw null;
+
         Address address = GetParameterAddress(variable.Variable);
 
         if (variable.Variable.IsRef && resolveReference)
@@ -1066,6 +1114,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
+        if (variable.IsCapturedLocal)
+        {
+            if (CurrentContext is CompiledLambda compiledLambda)
+            {
+                int offset = PointerSize;
+                foreach (CapturedLocal capturedLocal in compiledLambda.CapturedLocals)
+                {
+                    if (capturedLocal.Variable == variable.Variable)
+                    {
+                        PushFrom(new AddressOffset(new AddressPointer(GetParameterAddress(0)), offset), variable.Variable.Type.GetSize(this));
+                        return;
+                    }
+                    offset += capturedLocal.Variable.Type.GetSize(this);
+                }
+            }
+            throw null;
+        }
+
         if (variable.Variable.IsGlobal)
         {
             PushFrom(GetGlobalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
@@ -1262,9 +1328,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledConstructorCall constructorCall)
     {
-        GeneralType instanceType = constructorCall.Type;
-        ImmutableArray<GeneralType> parameters = constructorCall.Arguments.Select(v => v.Type).ToImmutableArray();
-
         CompiledConstructorDefinition? compiledFunction = constructorCall.Function;
 
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
@@ -1809,7 +1872,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
 
             GenerateCodeForStatement(Left);
-                
+
             InstructionOperand rightOperand;
             RegisterUsage.Auto? regRight;
 
@@ -1976,6 +2039,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(CompiledVariableSetter localVariableSetter)
     {
+        if (localVariableSetter.IsCapturedLocal) throw null;
+
         if (localVariableSetter.Variable.IsGlobal)
         {
             GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
@@ -1993,6 +2058,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(CompiledParameterSetter parameterSetter)
     {
+        if (parameterSetter.IsCapturedLocal) throw null;
+
         GenerateCodeForStatement(parameterSetter.Value, parameterSetter.Variable.Type);
 
         Address address = GetParameterAddress(parameterSetter.Variable);
@@ -2261,7 +2328,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             UndefinedFunctionOffsets.RemoveAt(i);
         }
 
-        CurrentContext = function as IDefinition;
+        CurrentContext = function;
         InFunction = true;
 
         CompiledParameters.Clear();
@@ -2270,7 +2337,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ScopeSizes.Push(0);
         int savedInstructionLabelCount = CompiledInstructionLabels.Count;
 
-        CompiledParameters.AddRange(function.Parameters.Select((v, i) => new CompiledParameter(i, function.ParameterTypes[i], v)));
+        CompiledParameters.AddRange(function.Parameters);
 
         int instructionStart = Code.Offset;
 
@@ -2620,8 +2687,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             int returnValueSize = f.ReturnSomething ? f.Type.GetSize(this, Diagnostics, f.TypeToken) : 0;
             int argumentsSize = 0;
-            foreach (GeneralType p in f.ParameterTypes)
-            { argumentsSize += p.GetSize(this, Diagnostics, ((FunctionDefinition)f).Type); }
+            foreach (CompiledParameter p in f.Parameters)
+            { argumentsSize += p.Type.GetSize(this, Diagnostics, ((FunctionDefinition)f).Type); }
 
             exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize);
         }
@@ -2636,8 +2703,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             CompiledGeneralFunctions = compilerResult.GeneralFunctionDefinitions,
             CompiledConstructors = compilerResult.ConstructorDefinitions,
             ExposedFunctions = exposedFunctions.ToFrozenDictionary(),
-            GeneratedUnmanagedFunctions = GeneratedUnmanagedFunctions.Select(v => v.Function).ToImmutableArray(),
-            GeneratedUnmanagedFunctionReferences = GeneratedUnmanagedFunctions.Select(v => v.Reference).ToImmutableArray(),
+            GeneratedUnmanagedFunctions = GeneratedUnmanagedFunctions.ToImmutableArray(v => v.Function),
+            GeneratedUnmanagedFunctionReferences = GeneratedUnmanagedFunctions.ToImmutableArray(v => v.Reference),
             ILGeneratorBuilders = ILGenerator?.Builders?.ToImmutableArray() ?? ImmutableArray<string>.Empty,
         };
     }

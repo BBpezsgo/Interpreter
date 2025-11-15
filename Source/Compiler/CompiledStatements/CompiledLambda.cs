@@ -10,21 +10,22 @@ public class CompiledLambda : CompiledStatementWithValue,
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
     public bool IsMsilCompatible { get; set; } = true;
 
-    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public ImmutableArray<CompiledParameter> Parameters { get; }
+    public ParameterDefinitionCollection ParameterDefinitions { get; }
     public CompiledBlock Block { get; }
-    public ParameterDefinitionCollection Parameters { get; }
+    public ImmutableArray<CapturedLocal> CapturedLocals { get; }
+    public CompiledStatementWithValue? Allocator { get; init; }
     public Uri File { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
-    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
-    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
 
-    public CompiledLambda(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledBlock block, ParameterDefinitionCollection parameters, Uri file)
+    public CompiledLambda(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledBlock block, ParameterDefinitionCollection parameterDefinitions, ImmutableArray<CapturedLocal> capturedLocals, Uri file)
     {
         Type = type;
-        ParameterTypes = parameterTypes;
-        Block = block;
         Parameters = parameters;
+        Block = block;
+        ParameterDefinitions = parameterDefinitions;
+        CapturedLocals = capturedLocals;
         File = file;
     }
 
@@ -34,5 +35,5 @@ public class CompiledLambda : CompiledStatementWithValue,
     }
 
     public string ToReadable() => Type.ToString();
-    public override string Stringify(int depth = 0) => $"({string.Join(", ", Parameters.Parameters.Select(v => $"{v.Type} {v.Identifier}"))}) => {Block.Stringify(depth)}";
+    public override string Stringify(int depth = 0) => $"({string.Join(", ", Parameters.Select(v => $"{v.Type} {v.Identifier}"))}) => {Block.Stringify(depth)}";
 }

@@ -43,18 +43,6 @@ public abstract class GeneralType :
     public abstract bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error);
     public abstract bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error);
 
-    public static GeneralType From(GeneralType other) => other switch
-    {
-        BuiltinType v => new BuiltinType(v),
-        StructType v => new StructType(v),
-        GenericType v => new GenericType(v),
-        FunctionType v => new FunctionType(v),
-        ArrayType v => new ArrayType(v),
-        PointerType v => new PointerType(v),
-        AliasType v => new AliasType(v),
-        _ => throw new UnreachableException()
-    };
-
     public static bool From(
         TypeInstance type,
         FindType typeFinder,
@@ -126,7 +114,7 @@ public abstract class GeneralType :
         if (!GeneralType.From(type.FunctionReturnType, typeFinder, out GeneralType? returnType, out error, constComputer)) return false;
         if (!GeneralType.FromArray(type.FunctionParameterTypes, typeFinder, out ImmutableArray<GeneralType> parameters, out error, constComputer)) return false;
 
-        result = new FunctionType(returnType, parameters);
+        result = new FunctionType(returnType, parameters, type.ClosureModifier is not null);
         type.SetAnalyzedType(result);
         return true;
     }
@@ -195,6 +183,13 @@ public abstract class GeneralType :
 
         type.SetAnalyzedType(result);
         return true;
+    }
+
+    public static ImmutableArray<GeneralType> FromArray<T>(ImmutableArray<T> types) where T : IHaveCompiledType
+    {
+        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
+        foreach (IHaveCompiledType item in types) result.Add(item.Type);
+        return result.MoveToImmutable();
     }
 
     public static bool FromArray(
@@ -465,7 +460,7 @@ public abstract class GeneralType :
             {
                 GeneralType returnType = InsertTypeParameters(functionType.ReturnType, typeArguments);
                 ImmutableArray<GeneralType> parameters = InsertTypeParameters(functionType.Parameters, typeArguments);
-                return new FunctionType(returnType, parameters);
+                return new FunctionType(returnType, parameters, functionType.HasClosure);
             }
 
             default:

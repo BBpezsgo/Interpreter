@@ -184,7 +184,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly HashSet<ICompiledFunctionDefinition> GeneratedFunctions = new();
 
     readonly Stack<CompiledScope> CleanupStack2;
-    IDefinition? CurrentContext;
+    ICompiledFunctionDefinition? CurrentContext;
 
     readonly Stack<ControlFlowFrame> ReturnInstructions;
     readonly Stack<ControlFlowFrame> BreakInstructions;

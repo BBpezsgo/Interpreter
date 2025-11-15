@@ -19,13 +19,6 @@ public class GenericType : GeneralType,
         set => throw new InvalidOperationException();
     }
 
-    public GenericType(GenericType other)
-    {
-        Identifier = other.Identifier;
-        Definition = other.Definition;
-        File = other.File;
-    }
-
     public GenericType(string identifier, Uri originalFile)
     {
         Identifier = identifier;

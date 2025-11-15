@@ -2141,6 +2141,13 @@ public sealed class Parser
         if (possibleType.Equals(StatementKeywords.Return))
         { return false; }
 
+        Token? closureModifier = null;
+        if (possibleType.Content.StartsWith('@'))
+        {
+            closureModifier = possibleType[..1];
+            possibleType = possibleType[1..];
+        }
+
         type = new TypeInstanceSimple(possibleType, File);
 
         if (possibleType.Content.Equals(TypeKeywords.Any))
@@ -2163,7 +2170,7 @@ public sealed class Parser
                 }
             }
 
-            return true;
+            goto end;
         }
 
         int afterIdentifier = CurrentTokenIndex;
@@ -2187,7 +2194,7 @@ public sealed class Parser
                     if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? typeParameter))
                     {
                         CurrentTokenIndex = afterIdentifier;
-                        goto End;
+                        goto end;
                     }
 
                     genericTypes.Add(typeParameter);
@@ -2217,7 +2224,7 @@ public sealed class Parser
                 if (!flags.HasFlag(AllowedType.FunctionPointer))
                 {
                     CurrentTokenIndex--;
-                    goto End;
+                    goto end;
                 }
 
                 List<TypeInstance> parameterTypes = new();
@@ -2226,7 +2233,7 @@ public sealed class Parser
                     if (!ExpectType(AllowedType.FunctionPointer, out TypeInstance? subtype))
                     {
                         CurrentTokenIndex = afterIdentifier;
-                        goto End;
+                        goto end;
                     }
 
                     parameterTypes.Add(subtype);
@@ -2238,7 +2245,7 @@ public sealed class Parser
                     { continue; }
                 }
 
-                type = new TypeInstanceFunction(type, parameterTypes.ToImmutableArray(), File);
+                type = new TypeInstanceFunction(type, parameterTypes.ToImmutableArray(), closureModifier, File);
             }
             else if (ExpectOperator("[", out _))
             {
@@ -2262,7 +2269,13 @@ public sealed class Parser
             { break; }
         }
 
-    End:
+    end:
+        if (type is not TypeInstanceFunction && closureModifier is not null)
+        {
+            error = Diagnostic.Error($"This type modifier is bruh", closureModifier, File);
+            return false;
+        }
+
         return true;
     }
 

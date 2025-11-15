@@ -1,4 +1,3 @@
-using System.IO.Pipelines;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
@@ -205,6 +204,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         GeneratorStates.Add((function, result));
         return result;
     }
+
+    public static bool AllowDeallocate(GeneralType type) => type.Is<PointerType>() || (type.Is<FunctionType>(out var functionType) && functionType.HasClosure);
 
     #region AddCompilable()
 
@@ -1012,9 +1013,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         File,
     }
 
-    bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetVariable(variableName, Frames.Last, out compiledVariable, out error);
+
+    static bool GetVariable(string variableName, CompiledFrame frame, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (Scope scope in Frames.Last.Scopes)
+        foreach (Scope scope in frame.Scopes)
         {
             foreach (CompiledVariableDeclaration compiledVariable_ in scope.Variables)
             {
@@ -1105,9 +1108,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
 
-    bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetParameter(string parameterName, [NotNullWhen(true)] out CompiledParameter? parameter, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetParameter(parameterName, Frames.Last, out parameter, out error);
+
+    static bool GetParameter(string parameterName, CompiledFrame frame, [NotNullWhen(true)] out CompiledParameter? parameter, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (CompiledParameter compiledParameter in Frames.Last.CompiledParameters)
+        foreach (CompiledParameter compiledParameter in frame.CompiledParameters)
         {
             if (compiledParameter.Identifier.Content == parameterName)
             {
@@ -1231,6 +1236,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     { return true; }
                 }
             }
+        }
+
+        {
+            if (destination.Is(out PointerType? dstPointer) &&
+                source.Is(out FunctionType? srcFunction)
+                && dstPointer.To.SameAs(BasicType.Any)
+                && srcFunction.HasClosure)
+            { return true; }
         }
 
         error = new($"Can't cast \"{source}\" to \"{destination}\" implicitly");
@@ -1862,7 +1875,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (GetInstructionLabel(identifier.Content, out _, out PossibleDiagnostic? instructionLabelNotFound))
         {
-            return OnGotStatementType(identifier, new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty));
+            return OnGotStatementType(identifier, new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty, false));
+        }
+
+        if (Frames.Count > 1 && GetVariable(identifier.Content, Frames[^2], out variable, out _))
+        {
+            return OnGotStatementType(identifier, variable.Type);
         }
 
         if (FindType(identifier.Token, identifier.File, out GeneralType? result))
@@ -2175,7 +2193,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         TypeInstanceFunction v => new TypeInstanceFunction(
             InlineMacro(v.FunctionReturnType, parameters),
-            v.FunctionParameterTypes.Select(p => InlineMacro(p, parameters)).ToImmutableArray(),
+            v.FunctionParameterTypes.ToImmutableArray(p => InlineMacro(p, parameters)),
+            v.ClosureModifier,
             v.File
         ),
         TypeInstancePointer v => new TypeInstancePointer(
@@ -2730,12 +2749,19 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
 
+        if (statement.IsCapturedLocal)
+        {
+            // FIXME
+            return false;
+        }
+
         inlined = new CompiledVariableGetter()
         {
             Variable = replacedVariable,
             Type = statement.Type,
             Location = statement.Location,
             SaveValue = statement.SaveValue,
+            IsCapturedLocal = false,
         };
         return true;
     }
@@ -3061,11 +3087,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
 
+        if (statement.IsCapturedLocal)
+        {
+            // FIXME
+            return false;
+        }
+
         inlined = new CompiledVariableSetter()
         {
             Value = inlinedValue,
             Variable = replacedVariable,
             IsCompoundAssignment = statement.IsCompoundAssignment,
+            IsCapturedLocal = false,
             Location = statement.Location,
         };
         return true;
@@ -3974,6 +4007,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledIndexGetter v => TryCompute(v, context, out value),
             CompiledPassedArgument v => TryCompute(v.Value, context, out value),
             FunctionAddressGetter v => TryCompute(v, context, out value),
+            CompiledLambda v => false, // TODO
 
             CompiledStringInstance => false,
             CompiledStackStringInstance => false,
@@ -4033,24 +4067,24 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         runtimeStatements = default;
 
         {
-            CompiledValue[] castedParameterValues = new CompiledValue[parameterValues.Length];
+            ImmutableArray<CompiledValue>.Builder castedParameterValues = ImmutableArray.CreateBuilder<CompiledValue>(parameterValues.Length);
             for (int i = 0; i < parameterValues.Length; i++)
             {
-                if (!parameterValues[i].TryCast(function.Function.ParameterTypes[i], out CompiledValue castedValue))
+                if (!parameterValues[i].TryCast(function.Function.Parameters[i].Type, out CompiledValue castedValue))
                 {
                     // Debugger.Break();
                     return false;
                 }
 
-                if (!function.Function.ParameterTypes[i].SameAs(castedValue.Type))
+                if (!function.Function.Parameters[i].Type.SameAs(castedValue.Type))
                 {
                     // Debugger.Break();
                     return false;
                 }
 
-                castedParameterValues[i] = castedValue;
+                castedParameterValues.Add(castedValue);
             }
-            parameterValues = castedParameterValues.ToImmutableArray();
+            parameterValues = castedParameterValues.MoveToImmutable();
         }
 
         if (function.Function.ReturnSomething)

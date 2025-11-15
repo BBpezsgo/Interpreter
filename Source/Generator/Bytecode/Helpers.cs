@@ -162,11 +162,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void CallRuntime(CompiledStatementWithValue address)
     {
-        GeneralType addressType = address.Type;
-
-        if (!addressType.Is<FunctionType>())
+        if (!address.Type.Is(out FunctionType? addressType))
         {
-            Diagnostics.Add(Diagnostic.Critical($"This should be a function pointer and not \"{addressType}\"", address));
+            Diagnostics.Add(Diagnostic.Critical($"This should be a function pointer and not \"{address.Type}\"", address));
             return;
         }
 
@@ -177,6 +175,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Push(Register.BasePointer);
 
         GenerateCodeForStatement(address);
+
+        if (addressType.HasClosure)
+        {
+            using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
+            {
+                PopTo(reg.Register);
+                PushFrom(reg.Register, 0, PointerSize);
+            }
+        }
 
         using (RegisterUsage.Auto reg = Registers.GetFree(addressType.GetBitWidth(this, Diagnostics, address)))
         {
@@ -268,11 +275,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public AddressOffset GetParameterAddress(CompiledParameter parameter, int offset = 0)
     {
+        return GetParameterAddress(GetParameterIndex(parameter), offset);
+    }
+
+    int ParametersSizeBefore(int beforeThis)
+    {
+        int sum = 0;
+
+        for (int i = 0; i < CompiledParameters.Count; i++)
+        {
+            if (i <= beforeThis) continue;
+            CompiledParameter parameter = CompiledParameters[i];
+            sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this, Diagnostics, parameter);
+        }
+
+        return sum;
+    }
+
+    public AddressOffset GetParameterAddress(int index, int offset = 0)
+    {
         return new(
             Register.BasePointer,
             0 // We start at the saved base pointer
             - ((
-                ParametersSizeBefore(parameter.Index) // ???
+                ParametersSizeBefore(index) // ???
                 + StackFrameTags // Offset by the stack frame stuff
             ) * ProcessorState.StackDirection)
             + offset
@@ -614,7 +640,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         //using (RegisterUsage.Auto reg = Registers.GetFree())
         //{
-            Code.Emit(Opcode.Crash, 0);
+        Code.Emit(Opcode.Crash, 0);
         //}
 
         Code.MarkLabel(skipLabel);
@@ -668,6 +694,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GetAddress(CompiledVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        if (value.IsCapturedLocal) throw null;
+
         if (value.Variable.IsGlobal)
         {
             address = GetGlobalVariableAddress(value.Variable);
@@ -682,6 +710,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GetAddress(CompiledParameterGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
+        if (value.IsCapturedLocal) throw null;
+
         address = GetParameterAddress(value.Variable);
         error = null;
         return true;
@@ -848,19 +878,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             return sum;
         }
-    }
-
-    int ParametersSizeBefore(int beforeThis)
-    {
-        int sum = 0;
-
-        foreach (CompiledParameter parameter in CompiledParameters)
-        {
-            if (parameter.Index <= beforeThis) continue;
-            sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this, Diagnostics, parameter);
-        }
-
-        return sum;
     }
 
     #endregion

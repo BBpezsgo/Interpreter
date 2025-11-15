@@ -243,17 +243,6 @@ public partial class StatementCompiler
     {
         if (expectedType is not null)
         {
-            // if (expectedType.Is<PointerType>() &&
-            //     parameterDefinition.Modifiers.Any(v => v.Content == ModifierKeywords.This) &&
-            //     !FindStatementType(argument).Is<PointerType>())
-            // {
-            //     argument = new AddressGetter(
-            //         Tokenizing.Token.CreateAnonymous("&", Tokenizing.TokenType.Operator, argument.Position.Before()),
-            //         argument,
-            //         argument.File
-            //     );
-            // }
-
             if (!expectedType.AllGenericsDefined())
             {
                 expectedType = null;
@@ -333,7 +322,7 @@ public partial class StatementCompiler
 
             if (!best.IsParameterCountMatches)
             {
-                error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", new PossibleDiagnostic($"Wrong number of arguments passed: expected {best.Function.ParameterTypes.Length} but got {query.ArgumentCount}"));
+                error = new PossibleDiagnostic($"{kindNameCapital} \"{readableName}\" not found", new PossibleDiagnostic($"Wrong number of arguments passed: expected {best.Function.Parameters.Length} but got {query.ArgumentCount}"));
                 return false;
             }
 
@@ -463,17 +452,17 @@ public partial class StatementCompiler
         {
             if (query.ArgumentCount.Value < partial)
             {
-                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.ParameterTypes.Length} but passed {query.ArgumentCount.Value}"));
+                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.Parameters.Length} but passed {query.ArgumentCount.Value}"));
                 return result;
             }
 
-            if (query.ArgumentCount.Value > function.ParameterTypes.Length)
+            if (query.ArgumentCount.Value > function.Parameters.Length)
             {
-                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.ParameterTypes.Length} but passed {query.ArgumentCount.Value}"));
+                result.Errors.Add(new($"Wrong number of arguments passed: expected {function.Parameters.Length} but passed {query.ArgumentCount.Value}"));
                 return result;
             }
 
-            result.UsedUpDefaultParameterValues = function.ParameterTypes.Length - query.ArgumentCount.Value;
+            result.UsedUpDefaultParameterValues = function.Parameters.Length - query.ArgumentCount.Value;
         }
 
         result.IsParameterCountMatches = true;
@@ -489,8 +478,7 @@ public partial class StatementCompiler
             if (passed is not StatementWithValue _v) return false;
             if (!definition.Modifiers.Contains(ModifierKeywords.This)) return false;
 
-            if (!definedType.Is(out PointerType? definedPointerType)) return false;
-            if (!passedType.SameAs(definedPointerType.To)) return false;
+            if (!CanCastImplicitly(new PointerType(passedType), definedType, _v, out _)) return false;
 
             argument ??= new AddressGetter(
                 Tokenizing.Token.CreateAnonymous("&", Tokenizing.TokenType.Operator),
@@ -603,13 +591,13 @@ public partial class StatementCompiler
             }
             else
             {
-                int checkCount = Math.Min(function.ParameterTypes.Length, query.Arguments.Value.Length);
+                int checkCount = Math.Min(function.Parameters.Length, query.Arguments.Value.Length);
 
                 StatementWithValue?[] argumentValues = new StatementWithValue?[checkCount];
 
                 for (int i = 0; i < checkCount; i++)
                 {
-                    GeneralType defined = function.ParameterTypes[i];
+                    GeneralType defined = function.Parameters[i].Type;
                     if (!query.Converter.Invoke(query.Arguments.Value[i], function.Parameters[i], defined, out GeneralType? passed))
                     {
                         result.Errors.Add(new PossibleDiagnostic($"Could not resolve the template types"));
@@ -633,14 +621,14 @@ public partial class StatementCompiler
 
                 for (int i = 0; i < checkCount; i++)
                 {
-                    GeneralType defined = GeneralType.InsertTypeParameters(function.ParameterTypes[i], _typeArguments) ?? function.ParameterTypes[i];
+                    GeneralType defined = GeneralType.InsertTypeParameters(function.Parameters[i].Type, _typeArguments) ?? function.Parameters[i].Type;
                     TArgument passed = query.Arguments.Value[i];
                     TypeMatch v = result.ParameterTypeMatch.Value;
                     GetArgumentMatch(ref v, ref argumentValues[i], defined, function.Parameters[i], passed, result.Errors);
                     if (v < result.ParameterTypeMatch) result.ParameterTypeMatch = v;
                 }
 
-                result.Arguments = argumentValues.ToImmutableArray();
+                result.Arguments = argumentValues.AsImmutableUnsafe();
             }
 
             if (query.ReturnType is not null)
@@ -662,17 +650,17 @@ public partial class StatementCompiler
             {
                 result.ParameterTypeMatch = TypeMatch.Equals;
 
-                int checkCount = Math.Min(function.ParameterTypes.Length, query.Arguments.Value.Length);
+                int checkCount = Math.Min(function.Parameters.Length, query.Arguments.Value.Length);
                 StatementWithValue?[] arguments = new StatementWithValue?[checkCount];
                 for (int i = 0; i < checkCount; i++)
                 {
-                    GeneralType defined = function.ParameterTypes[i];
+                    GeneralType defined = function.Parameters[i].Type;
                     TArgument passed = query.Arguments.Value[i];
                     TypeMatch v = result.ParameterTypeMatch.Value;
                     GetArgumentMatch(ref v, ref arguments[i], defined, function.Parameters[i], passed, result.Errors);
                     if (v < result.ParameterTypeMatch) result.ParameterTypeMatch = v;
                 }
-                result.Arguments = arguments.ToImmutableArray();
+                result.Arguments = arguments.AsImmutableUnsafe();
             }
 
             if (query.ReturnType is not null)

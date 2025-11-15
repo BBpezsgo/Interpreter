@@ -219,7 +219,7 @@ public static class BuiltinFunctions
     {
         {
             Allocate, new BuiltinFunction(
-                v => v.SameAs(new PointerType(BuiltinType.Any)),
+                v => v.SameAs(PointerType.Any),
                 v => v.SameAs(BasicType.U8)
                   || v.SameAs(BasicType.I8)
                   || v.SameAs(BasicType.U16)
@@ -233,7 +233,7 @@ public static class BuiltinFunctions
         {
             Free, new BuiltinFunction(
                 v => v.SameAs(BuiltinType.Void),
-                v => v.SameAs(new PointerType(BuiltinType.Any))
+                v => v.SameAs(PointerType.Any)
             )
         },
     }.ToImmutableDictionary();

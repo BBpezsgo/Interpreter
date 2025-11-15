@@ -44,7 +44,7 @@ public readonly struct CompilerResult
             for (int i = 0; i < function.Parameters.Length; i++)
             {
                 if (i > 0) res.Append(", ");
-                res.Append(function.ParameterTypes[i].ToString());
+                res.Append(function.Parameters[i].Type.ToString());
                 res.Append(' ');
                 res.Append(function.Parameters[i].Identifier.Content);
             }

@@ -192,6 +192,20 @@ public static class GeneralExtensions
 
     public static ImmutableArray<T> AsImmutableUnsafe<T>(this T[] array) => ImmutableCollectionsMarshal.AsImmutableArray(array);
 
+    public static ImmutableArray<T> ToImmutableArray<S, T>(this IReadOnlyCollection<S> source, Func<S, T> converter)
+    {
+        ImmutableArray<T>.Builder result = ImmutableArray.CreateBuilder<T>(source.Count);
+        foreach (S item in source) result.Add(converter.Invoke(item));
+        return result.MoveToImmutable();
+    }
+
+    public static ImmutableArray<T> ToImmutableArray<S, T>(this ImmutableArray<S> source, Func<S, T> converter)
+    {
+        ImmutableArray<T>.Builder result = ImmutableArray.CreateBuilder<T>(source.Length);
+        for (int i = 0; i < source.Length; i++) result.Add(converter.Invoke(source[i]));
+        return result.MoveToImmutable();
+    }
+
     public static void RemoveSwapBack<T>(this List<T> list, int index)
     {
         list[index] = list[^1];

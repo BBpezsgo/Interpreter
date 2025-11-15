@@ -49,16 +49,17 @@ public class BytecodeEmitter
 
             return;
         }
+        int indent = 0;
 
         for (int i = 0; i < Code.Count; i++)
         {
             FunctionInformation f = DebugInfo.FunctionInformation.FirstOrDefault(v => v.Instructions.Contains(i));
 
-            int indent = 0;
+            int subindent = 0;
 
             if (f.IsValid)
             {
-                indent += 2;
+                subindent += 2;
                 if (f.Instructions.Start == i)
                 {
                     writer.WriteLine(f.Function?.ToReadable() ?? f.ReadableIdentifier);
@@ -70,18 +71,26 @@ public class BytecodeEmitter
             {
                 foreach (string comment in _comments)
                 {
-                    writer.Write(new string(' ', indent));
+                    foreach (char item in comment)
+                    {
+                        if (item == '{') indent++;
+                    }
+                    writer.Write(new string(' ', indent + subindent));
                     writer.WriteLine(comment);
+                    foreach (char item in comment)
+                    {
+                        if (item == '}' && indent > 0) indent--;
+                    }
                 }
             }
 
             foreach (InstructionLabel label in Labels)
             {
                 if (label.Index != i) continue;
-                writer.Write(new string(' ', indent));
+                writer.Write(new string(' ', indent + subindent));
                 writer.WriteLine($"{label}:");
             }
-            writer.Write(new string(' ', indent));
+            writer.Write(new string(' ', indent + subindent));
             writer.Write("  ");
             writer.WriteLine(Code[i].ToString());
 

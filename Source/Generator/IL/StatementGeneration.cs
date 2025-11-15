@@ -61,9 +61,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     void GenerateDestructor(CompiledCleanup cleanup, ILProxy il, ref bool successful)
     {
-        GeneralType deallocateableType = cleanup.TrashType;
-
-        if (cleanup.TrashType.Is<PointerType>())
+        if (StatementCompiler.AllowDeallocate(cleanup.TrashType))
         {
             if (cleanup.Destructor is null)
             {
@@ -94,7 +92,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         il.Emit(OpCodes.Dup);
         il.Emit(OpCodes.Call, function);
 
-        if (deallocateableType.Is<PointerType>())
+        if (StatementCompiler.AllowDeallocate(cleanup.TrashType))
         {
             GenerateDeallocator(cleanup, il, ref successful);
         }
@@ -474,6 +472,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableGetter statement, ILProxy il, ref bool successful)
     {
+        if (statement.IsCapturedLocal) throw null;
+
         if (statement.Variable.IsGlobal)
         {
             //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
@@ -501,7 +501,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledParameterGetter statement, ILProxy il, ref bool successful)
     {
-        LoadArgument(il, statement.Variable.Index);
+        if (statement.IsCapturedLocal) throw null;
+
+        LoadArgument(il, GetParameterIndex(statement.Variable));
     }
     void EmitStatement(CompiledFieldGetter statement, ILProxy il, ref bool successful)
     {
@@ -635,6 +637,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableSetter statement, ILProxy il, ref bool successful)
     {
+        if (statement.IsCapturedLocal) throw null;
+
         if (statement.Variable.IsGlobal)
         {
             //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
@@ -675,8 +679,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledParameterSetter statement, ILProxy il, ref bool successful)
     {
+        if (statement.IsCapturedLocal) throw null;
+
         EmitStatement(statement.Value, il, ref successful);
-        il.Emit(OpCodes.Starg, statement.Variable.Index);
+        il.Emit(OpCodes.Starg, GetParameterIndex(statement.Variable));
     }
     void EmitStatement(CompiledFieldSetter statement, ILProxy il, ref bool successful)
     {
@@ -943,7 +949,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 il.Emit(OpCodes.Ldloca_S, local);
                 break;
             case CompiledParameterGetter v:
-                il.Emit(OpCodes.Ldarga_S, v.Variable.Index);
+                il.Emit(OpCodes.Ldarga_S, GetParameterIndex(v.Variable));
                 break;
             case CompiledFieldGetter v:
                 CompiledStatementWithValue _object = v.Object;
@@ -1752,7 +1758,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     void EmitStatement(CompiledLiteralList statement, ILProxy il, ref bool successful)
     {
         successful = false;
-        Diagnostics.Add(Diagnostic.Critical($"Arrays on stack aren't supported in MSIL", statement));
+        Diagnostics.Add(Diagnostic.Critical($"Arrays on stack aren't supported in MSIL", statement, false));
     }
     void EmitStatement(CompilerVariableGetter statement, ILProxy il, ref bool successful)
     {
@@ -1764,6 +1770,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             EmitValue(0, il);
         }
+    }
+    void EmitStatement(CompiledLambda statement, ILProxy il, ref bool successful)
+    {
+        successful = false;
+        Diagnostics.Add(Diagnostic.Critical($"bleh", statement, false));
     }
     void EmitStatement(CompiledStatement statement, ILProxy il, ref bool successful)
     {
@@ -1811,6 +1822,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case RegisterSetter v: EmitStatement(v, il, ref successful); break;
             case CompiledLiteralList v: EmitStatement(v, il, ref successful); break;
             case CompilerVariableGetter v: EmitStatement(v, il, ref successful); break;
+            case CompiledLambda v: EmitStatement(v, il, ref successful); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }
@@ -1862,6 +1874,19 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
+    bool ToType<T>(ImmutableArray<T> types, [NotNullWhen(true)] out Type[]? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+        where T : IHaveCompiledType
+    {
+        result = new Type[types.Length];
+        error = null;
+
+        for (int i = 0; i < types.Length; i++)
+        {
+            if (!ToType(types[i].Type, out result[i]!, out error)) return false;
+        }
+
+        return true;
+    }
     bool ToType(ImmutableArray<GeneralType> types, [NotNullWhen(true)] out Type[]? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         result = new Type[types.Length];
@@ -2206,12 +2231,17 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (EmittedFunctions.Contains(function)) return true;
 
+        ImmutableArray<CompiledParameter> savedCompiledParameters = CompiledParameters.ToImmutableArray();
+        CompiledParameters.Set(function.Parameters);
+
         ILProxy il = new(dynamicMethod.GetILGenerator(), Builders is not null);
 
         bool successful = true;
         EmitFunctionBody(body.Statements, function is CompiledConstructorDefinition ? BuiltinType.Void : function.Type, il, ref successful);
 
         successful = successful && CheckCode(dynamicMethod);
+
+        CompiledParameters.Set(savedCompiledParameters);
 
         if (!successful)
         {
@@ -2241,7 +2271,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             Diagnostics.Add(DiagnosticWithoutContext.Critical(returnTypeError.Message));
             return false;
         }
-        if (!ToType(function.ParameterTypes, out Type[]? parameterTypes, out PossibleDiagnostic? parameterTypesError))
+        if (!ToType(function.Parameters, out Type[]? parameterTypes, out PossibleDiagnostic? parameterTypesError))
         {
             Diagnostics.Add(DiagnosticWithoutContext.Critical(parameterTypesError.Message));
             return false;
@@ -2354,7 +2384,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         for (int i = 0; i < function.Function.Parameters.Length; i++)
         {
-            if (!CheckMarshalSafety(function.Function.ParameterTypes[i], out PossibleDiagnostic? safetyError1))
+            if (!CheckMarshalSafety(function.Function.Parameters[i].Type, out PossibleDiagnostic? safetyError1))
             {
                 Diagnostics.Add(safetyError1.ToWarning(((FunctionThingDefinition)function.Function).Parameters[i].Type));
                 return false;

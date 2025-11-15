@@ -209,4 +209,14 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     protected virtual bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => FindSize(type.Value, out size, out error);
 
     #endregion
+
+    public int GetParameterIndex(CompiledParameter parameter)
+    {
+        for (int i = 0; i < CompiledParameters.Count; i++)
+        {
+            if (CompiledParameters[i] != parameter) continue;
+            return i;
+        }
+        throw null;
+    }
 }

@@ -33,7 +33,7 @@ class OrderedDiagnosticCollection : IEnumerable<OrderedDiagnostic>
         diagnostic.Diagnostic.Position,
         diagnostic.Diagnostic.File,
         false,
-        diagnostic.SubDiagnostics.Select(Compile).ToImmutableArray()
+        diagnostic.SubDiagnostics.ToImmutableArray(Compile)
     );
 
     public ImmutableArray<Diagnostic> Compile()

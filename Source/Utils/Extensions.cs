@@ -18,7 +18,7 @@ public static class Extensions
     {
         if (!a.Type.Equals(b.Type)) return false;
         if (!a.Identifier.Content.Equals(b.Identifier.Content)) return false;
-        if (!Utils.SequenceEquals(a.ParameterTypes, b.ParameterTypes)) return false;
+        if (!Utils.SequenceEquals(((ICompiledFunctionDefinition)a).Parameters.Select(v => v.Type), ((ICompiledFunctionDefinition)b).Parameters.Select(v => v.Type))) return false;
         return true;
     }
 

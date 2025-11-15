@@ -18,28 +18,26 @@ public class CompiledFunctionDefinition : FunctionDefinition,
     public bool IsMsilCompatible { get; set; } = true;
 
     public new GeneralType Type { get; }
-    public ImmutableArray<GeneralType> ParameterTypes { get; }
+    public new ImmutableArray<CompiledParameter> Parameters { get; }
     public new CompiledStruct? Context { get; }
     public List<Reference<StatementWithValue?>> References { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
     public TypeInstance TypeToken => base.Type;
-    ImmutableArray<ParameterDefinition> ICompiledFunctionDefinition.Parameters => Parameters.Parameters;
-    ImmutableArray<GeneralType> ICompiledFunctionDefinition.ParameterTypes => ParameterTypes;
 
-    public CompiledFunctionDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
+    public CompiledFunctionDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledStruct? context, FunctionDefinition functionDefinition) : base(functionDefinition)
     {
         Type = type;
-        ParameterTypes = parameterTypes;
+        Parameters = parameters;
 
         Context = context;
         References = new List<Reference<StatementWithValue?>>();
     }
 
-    public CompiledFunctionDefinition(GeneralType type, ImmutableArray<GeneralType> parameterTypes, CompiledFunctionDefinition other) : base(other)
+    public CompiledFunctionDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledFunctionDefinition other) : base(other)
     {
         Type = type;
-        ParameterTypes = parameterTypes;
+        Parameters = parameters;
 
         Context = other.Context;
         References = new List<Reference<StatementWithValue?>>(other.References);
@@ -49,9 +47,9 @@ public class CompiledFunctionDefinition : FunctionDefinition,
     {
         if (!Type.Equals(other.Type)) return false;
         if (Identifier.Content != other.Identifier.Content) return false;
-        if (ParameterTypes.Length != other.ParameterTypes.Length) return false;
-        for (int i = 0; i < ParameterTypes.Length; i++)
-        { if (!ParameterTypes[i].Equals(other.ParameterTypes[i])) return false; }
+        if (Parameters.Length != other.Parameters.Length) return false;
+        for (int i = 0; i < Parameters.Length; i++)
+        { if (!Parameters[i].Type.Equals(other.Parameters[i].Type)) return false; }
 
         return true;
     }
@@ -68,12 +66,12 @@ public class CompiledFunctionDefinition : FunctionDefinition,
         result.Append(Identifier.Content);
 
         result.Append('(');
-        if (ParameterTypes.Length > 0)
+        if (Parameters.Length > 0)
         {
-            for (int i = 0; i < ParameterTypes.Length; i++)
+            for (int i = 0; i < Parameters.Length; i++)
             {
                 if (i > 0) result.Append(", ");
-                result.Append(ParameterTypes[i].ToString());
+                result.Append(Parameters[i].Type.ToString());
             }
         }
         result.Append(')');
@@ -91,9 +89,17 @@ public class CompiledFunctionDefinition : FunctionDefinition,
 
     public CompiledFunctionDefinition InstantiateTemplate(IReadOnlyDictionary<string, GeneralType> parameters)
     {
-        ImmutableArray<GeneralType> newParameters = GeneralType.InsertTypeParameters(ParameterTypes, parameters);
         GeneralType newType = GeneralType.InsertTypeParameters(Type, parameters) ?? Type;
-        return new CompiledFunctionDefinition(newType, newParameters, this);
+        ImmutableArray<CompiledParameter>.Builder newParameters = ImmutableArray.CreateBuilder<CompiledParameter>(Parameters.Length);
+        foreach (CompiledParameter parameter in Parameters)
+        {
+            newParameters.Add(new CompiledParameter(GeneralType.InsertTypeParameters(parameter.Type, parameters), parameter));
+        }
+        return new CompiledFunctionDefinition(
+            newType,
+            newParameters.MoveToImmutable(),
+            this
+        );
     }
 
     public static string ToReadable(string identifier, IEnumerable<string?>? parameters, string? returnType)

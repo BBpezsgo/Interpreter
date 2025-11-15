@@ -415,10 +415,6 @@ public class SourceCodeManager
         };
     }
 
-#if UNITY
-    static readonly Unity.Profiling.ProfilerMarker _marker = new("LanguageCore.SourceCodeManager.Collect");
-    static readonly Unity.Profiling.ProfilerMarker _markerWait = new("LanguageCore.SourceCodeManager.WaitForFiles");
-#endif
     SourceCodeManagerResult Entry(ReadOnlySpan<string> files, ImmutableArray<string> additionalImports)
     {
 #if UNITY

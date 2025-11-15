@@ -5,30 +5,25 @@ namespace LanguageCore.Compiler;
 
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class FunctionType : GeneralType,
-    IEquatable<FunctionType>,
-    IEquatable<ICompiledFunctionDefinition>
+    IEquatable<FunctionType>
 {
     public GeneralType ReturnType { get; }
     public ImmutableArray<GeneralType> Parameters { get; }
+    public bool HasClosure { get; }
 
     public bool ReturnSomething => !ReturnType.SameAs(BasicType.Void);
 
     public FunctionType(ICompiledFunctionDefinition function)
     {
         ReturnType = function.Type;
-        Parameters = function.ParameterTypes;
+        Parameters = FromArray(function.Parameters);
     }
 
-    public FunctionType(FunctionType other)
-    {
-        ReturnType = other.ReturnType;
-        Parameters = other.Parameters;
-    }
-
-    public FunctionType(GeneralType returnType, ImmutableArray<GeneralType> parameters)
+    public FunctionType(GeneralType returnType, ImmutableArray<GeneralType> parameters, bool hasClosure)
     {
         ReturnType = returnType;
         Parameters = parameters;
+        HasClosure = hasClosure;
     }
 
     public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -52,13 +47,7 @@ public class FunctionType : GeneralType,
         if (other is null) return false;
         if (!other.ReturnType.Equals(ReturnType)) return false;
         if (!Utils.SequenceEquals(Parameters, other.Parameters)) return false;
-        return true;
-    }
-    public bool Equals(ICompiledFunctionDefinition? other)
-    {
-        if (other is null) return false;
-        if (!other.Type.Equals(ReturnType)) return false;
-        if (!Utils.SequenceEquals(Parameters, other.ParameterTypes)) return false;
+        if (HasClosure != other.HasClosure) return false;
         return true;
     }
     public override bool Equals(TypeInstance? other)
@@ -67,6 +56,7 @@ public class FunctionType : GeneralType,
         if (other is not TypeInstanceFunction otherFunction) return false;
         if (!ReturnType.Equals(otherFunction.FunctionReturnType)) return false;
         if (!Utils.SequenceEquals(Parameters, otherFunction.FunctionParameterTypes)) return false;
+        if (HasClosure != (otherFunction.ClosureModifier is not null)) return false;
         return true;
     }
     public override int GetHashCode() => HashCode.Combine(ReturnType, Parameters, ReturnSomething);
@@ -74,6 +64,7 @@ public class FunctionType : GeneralType,
     public override string ToString()
     {
         StringBuilder result = new();
+        if (HasClosure) result.Append('@');
         result.Append(ReturnType.ToString());
         result.Append('(');
         for (int i = 0; i < Parameters.Length; i++)

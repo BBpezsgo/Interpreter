@@ -501,7 +501,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
         result.Append("...");
@@ -509,7 +509,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
         for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) { result.Append(", "); }
-            result.Append(typeSearch.Invoke(Arguments[i]).ToString());
+            result.Append(typeSearch.Invoke(Arguments[i], out GeneralType? type, new()) ? type.ToString() : '?');
         }
         result.Append(')');
         return result.ToString();
@@ -601,12 +601,12 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
         if (PrevStatement != null)
         {
-            result.Append(typeSearch.Invoke(PrevStatement).ToString());
+            result.Append(typeSearch.Invoke(PrevStatement, out GeneralType? type, new()) ? type.ToString() : '?');
             result.Append('.');
         }
         result.Append(Identifier.ToString());
@@ -614,7 +614,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         for (int i = 0; i < Arguments.Length; i++)
         {
             if (i > 0) result.Append(", ");
-            result.Append(typeSearch.Invoke(Arguments[i]).ToString());
+            result.Append(typeSearch.Invoke(Arguments[i], out GeneralType? type, new()) ? type.ToString() : '?');
         }
         result.Append(')');
         return result.ToString();
@@ -682,7 +682,7 @@ public class KeywordCall : Statement, IReadable
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
         result.Append(IdentifierToken.Content);
@@ -691,7 +691,7 @@ public class KeywordCall : Statement, IReadable
         {
             if (i > 0) result.Append(", ");
 
-            result.Append(typeSearch.Invoke(Arguments[i]));
+            result.Append(typeSearch.Invoke(Arguments[i], out GeneralType? type, new()) ? type.ToString() : '?');
         }
         result.Append(')');
 
@@ -783,15 +783,15 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
 
         result.Append(Operator.Content);
         result.Append('(');
-        result.Append(typeSearch.Invoke(Left));
+        result.Append(typeSearch.Invoke(Left, out GeneralType? type1, new()) ? type1.ToString() : '?');
         result.Append(", ");
-        result.Append(typeSearch.Invoke(Right));
+        result.Append(typeSearch.Invoke(Right, out GeneralType? type2, new()) ? type2.ToString() : '?');
         result.Append(')');
 
         return result.ToString();
@@ -861,13 +861,13 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
 
         result.Append(Operator.Content);
         result.Append('(');
-        result.Append(typeSearch.Invoke(Left));
+        result.Append(typeSearch.Invoke(Left, out GeneralType? type, new()) ? type.ToString() : '?');
         result.Append(')');
 
         return result.ToString();
@@ -931,13 +931,13 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
 
         result.Append(Operator.Content);
         result.Append('(');
-        result.Append(typeSearch.Invoke(Left));
+        result.Append(typeSearch.Invoke(Left, out GeneralType? type, new()) ? type.ToString() : '?');
         result.Append(')');
 
         return result.ToString();
@@ -1675,7 +1675,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         return result.ToString();
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
         result.Append(Type.ToString());
@@ -1686,7 +1686,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         {
             if (i > 0) result.Append(", ");
 
-            result.Append(typeSearch.Invoke(Arguments[i]));
+            result.Append(typeSearch.Invoke(Arguments[i], out GeneralType? type, new()) ? type.ToString() : '?');
         }
         result.Append(Brackets.End);
 
@@ -1732,17 +1732,17 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<Compile
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{PrevStatement}{Brackets.Start}{Index}{Brackets.End}{SurroundingBracelet?.End}{Semicolon}";
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch)
+    public string ToReadable(FindStatementType typeSearch)
     {
         StringBuilder result = new();
 
         if (PrevStatement != null)
-        { result.Append(typeSearch.Invoke(PrevStatement)); }
+        { result.Append(typeSearch.Invoke(PrevStatement, out GeneralType? type1, new()) ? type1.ToString() : '?'); }
         else
         { result.Append('?'); }
 
         result.Append(Brackets.Start);
-        result.Append(typeSearch.Invoke(Index));
+        result.Append(typeSearch.Invoke(Index, out GeneralType? type2, new()) ? type2.ToString() : '?');
         result.Append(Brackets.End);
 
         return result.ToString();

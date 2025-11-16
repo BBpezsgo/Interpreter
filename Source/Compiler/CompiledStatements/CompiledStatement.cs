@@ -614,6 +614,7 @@ public class CompiledDesctructorCall : CompiledStatementWithValue
 
 public class CompiledTypeCast : CompiledStatementWithValue
 {
+    public required CompiledStatementWithValue? Allocator { get; init; }
     public required CompiledStatementWithValue Value { get; init; }
 
     public override string Stringify(int depth = 0) => $"({Type}){Value.Stringify(depth + 1)}";
@@ -624,6 +625,7 @@ public class CompiledTypeCast : CompiledStatementWithValue
     {
         Value = value,
         Type = type,
+        Allocator = null,
         Location = value.Location,
         SaveValue = value.SaveValue,
     };
@@ -651,7 +653,6 @@ public class CompiledVariableSetter : CompiledStatement
     public required CompiledVariableDeclaration Variable { get; init; }
     public required CompiledStatementWithValue Value { get; init; }
     public required bool IsCompoundAssignment { get; init; }
-    public required bool IsCapturedLocal { get; init; }
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier} = {Value.Stringify(depth + 1)}";
     public override string ToString() => $"{Variable.Identifier} = {Value}";
@@ -662,7 +663,6 @@ public class CompiledParameterSetter : CompiledStatement
     public required CompiledParameter Variable { get; init; }
     public required CompiledStatementWithValue Value { get; init; }
     public required bool IsCompoundAssignment { get; init; }
-    public required bool IsCapturedLocal { get; init; }
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier} = {Value.Stringify(depth + 1)}";
     public override string ToString() => $"{Variable.Identifier} = {Value}";
@@ -732,7 +732,6 @@ public class RegisterSetter : CompiledStatement
 public class CompiledVariableGetter : CompiledStatementWithValue
 {
     public required CompiledVariableDeclaration Variable { get; init; }
-    public required bool IsCapturedLocal { get; init; }
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier}";
     public override string ToString() => $"{Variable.Identifier}";
@@ -741,7 +740,6 @@ public class CompiledVariableGetter : CompiledStatementWithValue
 public class CompiledParameterGetter : CompiledStatementWithValue
 {
     public required CompiledParameter Variable { get; init; }
-    public required bool IsCapturedLocal { get; init; }
 
     public override string Stringify(int depth = 0) => $"{Variable.Identifier}";
     public override string ToString() => $"{Variable.Identifier}";

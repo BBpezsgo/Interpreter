@@ -19,7 +19,7 @@ public class CompiledFunction : ISimpleReadable
         body = Body;
     }
 
-    public string ToReadable(Func<StatementWithValue, GeneralType> typeSearch) => Function.ToReadable(typeSearch);
+    public string ToReadable(FindStatementType typeSearch) => Function.ToReadable(typeSearch);
     public string ToReadable() => Function.ToReadable();
     public override string? ToString() => Function.ToString() ?? base.ToString();
 }

@@ -1,9 +1,7 @@
-﻿using System.Linq.Expressions;
-using System.Reflection.Emit;
+﻿using System.Reflection.Emit;
 using LanguageCore.Compiler;
 using LanguageCore.Parser;
 using LanguageCore.Runtime;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore.BBLang.Generator;
 
@@ -239,7 +237,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         Location = newVariable.Location,
                         SaveValue = true,
                         Type = newVariable.Type,
-                        IsCapturedLocal = false,
                     },
                     Index = new CompiledEvaluatedValue()
                     {
@@ -263,7 +260,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Value = newVariable.InitialValue,
             Location = newVariable.Location,
             IsCompoundAssignment = false,
-            IsCapturedLocal = false,
         });
         AddComment("}");
     }
@@ -590,7 +586,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        var label = LabelForDefinition(caller.Function);
+        InstructionLabel label = LabelForDefinition(caller.Function);
         Call(label, caller);
 
         if (caller.Function.InstructionOffset == InvalidFunctionAddress)
@@ -1077,18 +1073,38 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 int offset = PointerSize;
                 foreach (CapturedLocal capturedLocal in compiledLambda.CapturedLocals)
                 {
-                    int size = capturedLocal.Variable.Type.GetSize(this);
-                    AddComment($"Capture variable `{capturedLocal.Variable.Identifier}`:");
-                    GenerateCodeForStatement(new CompiledVariableGetter()
+                    if (capturedLocal.Variable is not null)
                     {
-                        Variable = capturedLocal.Variable,
-                        Location = compiledLambda.Location,
-                        SaveValue = true,
-                        Type = capturedLocal.Variable.Type,
-                        IsCapturedLocal = false,
-                    });
-                    PopTo(new AddressOffset(new AddressRegisterPointer(reg.Register), offset), size);
-                    offset += size;
+                        int size = capturedLocal.Variable.Type.GetSize(this);
+                        AddComment($"Capture variable `{capturedLocal.Variable.Identifier}`:");
+                        GenerateCodeForStatement(new CompiledVariableGetter()
+                        {
+                            Variable = capturedLocal.Variable,
+                            Location = compiledLambda.Location,
+                            SaveValue = true,
+                            Type = capturedLocal.Variable.Type,
+                        });
+                        PopTo(new AddressOffset(new AddressRegisterPointer(reg.Register), offset), size);
+                        offset += size;
+                    }
+                    else if (capturedLocal.Parameter is not null)
+                    {
+                        int size = capturedLocal.Parameter.Type.GetSize(this);
+                        AddComment($"Capture variable `{capturedLocal.Parameter.Identifier}`:");
+                        GenerateCodeForStatement(new CompiledParameterGetter()
+                        {
+                            Variable = capturedLocal.Parameter,
+                            Location = compiledLambda.Location,
+                            SaveValue = true,
+                            Type = capturedLocal.Parameter.Type,
+                        });
+                        PopTo(new AddressOffset(new AddressRegisterPointer(reg.Register), offset), size);
+                        offset += size;
+                    }
+                    else
+                    {
+                        throw new UnreachableException();
+                    }
                 }
             }
         }
@@ -1103,8 +1119,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledParameterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (variable.IsCapturedLocal) throw null;
-
         Address address = GetParameterAddress(variable.Variable);
 
         if (variable.Variable.IsRef && resolveReference)
@@ -1114,37 +1128,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        if (variable.IsCapturedLocal)
-        {
-            if (CurrentContext is CompiledLambda compiledLambda)
-            {
-                int offset = PointerSize;
-                foreach (CapturedLocal capturedLocal in compiledLambda.CapturedLocals)
-                {
-                    if (capturedLocal.Variable == variable.Variable)
-                    {
-                        PushFrom(new AddressOffset(new AddressPointer(GetParameterAddress(0)), offset), variable.Variable.Type.GetSize(this));
-                        return;
-                    }
-                    offset += capturedLocal.Variable.Type.GetSize(this);
-                }
-            }
-            throw null;
-        }
-
-        if (variable.Variable.IsGlobal)
-        {
-            PushFrom(GetGlobalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
-        }
-        else
-        {
-            PushFrom(GetLocalVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
-        }
+        PushFrom(GetVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
     }
     void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         IHaveInstructionOffset compiledFunction = variable.Function;
-        var label = LabelForDefinition(compiledFunction);
+        InstructionLabel label = LabelForDefinition(compiledFunction);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, variable, compiledFunction)); }
@@ -1611,6 +1600,36 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
+        if (statementType.Is(out FunctionType? functionTypeFrom)
+            && targetType.Is(out FunctionType? functionTypeTo))
+        {
+            if (functionTypeFrom.HasClosure == functionTypeTo.HasClosure)
+            {
+                GenerateCodeForStatement(typeCast.Value);
+                return;
+            }
+
+            if (!functionTypeFrom.HasClosure && functionTypeTo.HasClosure)
+            {
+                if (typeCast.Allocator is null) throw new NotImplementedException();
+                GenerateCodeForStatement(typeCast.Allocator);
+                PushFrom(StackTop, PointerSize);
+                using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
+                {
+                    PopTo(reg.Register);
+                    CheckPointerNull(reg.Register);
+                    GenerateCodeForStatement(typeCast.Value);
+                    PopTo(new AddressRegisterPointer(reg.Register), PointerSize);
+                }
+                return;
+            }
+
+            if (functionTypeFrom.HasClosure && !functionTypeTo.HasClosure)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
         int statementSize = statementType.GetSize(this, Diagnostics, typeCast.Value);
         int targetSize = targetType.GetSize(this, Diagnostics, typeCast);
 
@@ -2039,27 +2058,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForValueSetter(CompiledVariableSetter localVariableSetter)
     {
-        if (localVariableSetter.IsCapturedLocal) throw null;
-
-        if (localVariableSetter.Variable.IsGlobal)
-        {
-            GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
-            PopTo(GetGlobalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter.Variable));
-            // localVariableSetter.Variable.Variable.IsInitialized = true;
-            return;
-        }
-        else
-        {
-            GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
-            PopTo(GetLocalVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter));
-            // localVariableSetter.Variable.Variable.IsInitialized = true;
-            return;
-        }
+        GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
+        PopTo(GetVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter.Variable));
+        // localVariableSetter.Variable.Variable.IsInitialized = true;
     }
     void GenerateCodeForValueSetter(CompiledParameterSetter parameterSetter)
     {
-        if (parameterSetter.IsCapturedLocal) throw null;
-
         GenerateCodeForStatement(parameterSetter.Value, parameterSetter.Variable.Type);
 
         Address address = GetParameterAddress(parameterSetter.Variable);

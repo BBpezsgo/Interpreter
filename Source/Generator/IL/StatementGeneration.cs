@@ -472,8 +472,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableGetter statement, ILProxy il, ref bool successful)
     {
-        if (statement.IsCapturedLocal) throw null;
-
         if (statement.Variable.IsGlobal)
         {
             //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
@@ -501,8 +499,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledParameterGetter statement, ILProxy il, ref bool successful)
     {
-        if (statement.IsCapturedLocal) throw null;
-
         LoadArgument(il, GetParameterIndex(statement.Variable));
     }
     void EmitStatement(CompiledFieldGetter statement, ILProxy il, ref bool successful)
@@ -637,8 +633,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledVariableSetter statement, ILProxy il, ref bool successful)
     {
-        if (statement.IsCapturedLocal) throw null;
-
         if (statement.Variable.IsGlobal)
         {
             //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
@@ -679,8 +673,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledParameterSetter statement, ILProxy il, ref bool successful)
     {
-        if (statement.IsCapturedLocal) throw null;
-
         EmitStatement(statement.Value, il, ref successful);
         il.Emit(OpCodes.Starg, GetParameterIndex(statement.Variable));
     }

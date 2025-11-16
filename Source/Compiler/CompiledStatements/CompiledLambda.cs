@@ -31,7 +31,7 @@ public class CompiledLambda : CompiledStatementWithValue,
 
     public override string ToString()
     {
-        return "nig";
+        return $"({string.Join(", ", Parameters.Select(v => $"{v.Type} {v.Identifier}"))}) => {Block}";
     }
 
     public string ToReadable() => Type.ToString();

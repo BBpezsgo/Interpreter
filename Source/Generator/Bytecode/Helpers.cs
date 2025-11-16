@@ -181,6 +181,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
             {
                 PopTo(reg.Register);
+                CheckPointerNull(reg.Register);
                 PushFrom(reg.Register, 0, PointerSize);
             }
         }
@@ -225,34 +226,46 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    AddressOffset GetGlobalVariableAddress(CompiledVariableDeclaration variable)
+    AddressOffset GetVariableAddress(CompiledVariableDeclaration variable)
     {
-        if (!variable.IsGlobal)
-        { Diagnostics.Add(Diagnostic.Internal($"Trying to get the address of global variable \"{variable.Identifier}\" but it was compiled as a local variable.", variable)); }
+        GeneratedVariable? generatedVariable;
 
-        if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
-        { throw new NotImplementedException(); }
-
-        return new(
-            new AddressPointer(AbsoluteGlobalAddress),
-            0
-            + generatedVariable.MemoryAddress
-        //  + ((
-        //      AbsGlobalAddressSize
-        //      + BasePointerSize
-        //  ) * BytecodeProcessor.StackDirection)
-        );
-    }
-
-    AddressOffset GetLocalVariableAddress(CompiledVariableDeclaration variable)
-    {
         if (variable.IsGlobal)
-        { Diagnostics.Add(Diagnostic.Internal($"Trying to get the address of local variable \"{variable.Identifier}\" but it was compiled as a global variable.", variable)); }
+        {
+            if (!GeneratedVariables.TryGetValue(variable, out generatedVariable))
+            { throw new LanguageException($"Variable {variable} was not compiled", variable.Location.Position, variable.Location.File); }
 
-        if (!GeneratedVariables.TryGetValue(variable, out GeneratedVariable? generatedVariable))
+            return new AddressOffset(
+                new AddressPointer(AbsoluteGlobalAddress),
+                0
+                + generatedVariable.MemoryAddress
+            //  + ((
+            //      AbsGlobalAddressSize
+            //      + BasePointerSize
+            //  ) * BytecodeProcessor.StackDirection)
+            );
+        }
+
+        if (CurrentContext is CompiledLambda compiledLambda)
+        {
+            int offset = PointerSize;
+            foreach (CapturedLocal capturedLocal in compiledLambda.CapturedLocals)
+            {
+                if (capturedLocal.Variable is not null)
+                {
+                    if (capturedLocal.Variable == variable)
+                    {
+                        return new AddressOffset(new AddressPointer(GetParameterAddress(0)), offset);
+                    }
+                }
+                offset += (capturedLocal.Variable?.Type ?? capturedLocal.Parameter?.Type)!.GetSize(this);
+            }
+        }
+
+        if (!GeneratedVariables.TryGetValue(variable, out generatedVariable))
         { throw new LanguageException($"Variable {variable} was not compiled", variable.Location.Position, variable.Location.File); }
 
-        return new(
+        return new AddressOffset(
             Register.BasePointer,
             generatedVariable.MemoryAddress
         );
@@ -275,6 +288,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public AddressOffset GetParameterAddress(CompiledParameter parameter, int offset = 0)
     {
+        if (CurrentContext is CompiledLambda compiledLambda)
+        {
+            int _offset = PointerSize;
+            foreach (CapturedLocal capturedLocal in compiledLambda.CapturedLocals)
+            {
+                if (capturedLocal.Parameter is not null)
+                {
+                    if (capturedLocal.Parameter == parameter)
+                    {
+                        return new AddressOffset(new AddressPointer(GetParameterAddress(0)), _offset + offset);
+                    }
+                }
+                _offset += (capturedLocal.Variable?.Type ?? capturedLocal.Parameter?.Type)!.GetSize(this);
+            }
+        }
+
         return GetParameterAddress(GetParameterIndex(parameter), offset);
     }
 
@@ -648,6 +677,22 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment($"}}");
     }
 
+    void CheckPointerNull(Register register)
+    {
+        if (!Settings.CheckNullPointers) return;
+
+        AddComment($"Check for pointer zero (in {register}) {{");
+
+        Code.Emit(Opcode.Compare, register, 0);
+
+        InstructionLabel skipLabel = Code.DefineLabel();
+        Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
+        Code.Emit(Opcode.Crash, 0);
+        Code.MarkLabel(skipLabel);
+
+        AddComment($"}}");
+    }
+
     void PushFromChecked(Address address, int size)
     {
         GenerateAddressResolver(address);
@@ -694,24 +739,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GetAddress(CompiledVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        if (value.IsCapturedLocal) throw null;
-
-        if (value.Variable.IsGlobal)
-        {
-            address = GetGlobalVariableAddress(value.Variable);
-        }
-        else
-        {
-            address = GetLocalVariableAddress(value.Variable);
-        }
+        address = GetVariableAddress(value.Variable);
         error = null;
         return true;
     }
 
     bool GetAddress(CompiledParameterGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        if (value.IsCapturedLocal) throw null;
-
         address = GetParameterAddress(value.Variable);
         error = null;
         return true;

@@ -249,7 +249,11 @@ public partial class StatementCompiler
             }
         }
 
-        result = FindStatementType(argument, expectedType);
+        if (!FindStatementType(argument, expectedType, out result, Diagnostics))
+        {
+            return false;
+        }
+
         return true;
     }
 
@@ -530,7 +534,7 @@ public partial class StatementCompiler
                     return;
                 }
 
-                if (typeMatch >= TypeMatch.ImplicitCast && CanCastImplicitly(a, definedType, null, out error))
+                if (typeMatch >= TypeMatch.ImplicitCast && CanCastImplicitly(a, definedType, out error))
                 {
                     typeMatch = TypeMatch.ImplicitCast;
                     return;
@@ -570,7 +574,7 @@ public partial class StatementCompiler
             {
                 return TypeMatch.Same;
             }
-            else if (StatementCompiler.CanCastImplicitly(current, target, null, out PossibleDiagnostic? error))
+            else if (CanCastImplicitly(current, target, out PossibleDiagnostic? error))
             {
                 return TypeMatch.ImplicitCast;
             }

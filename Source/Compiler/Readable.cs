@@ -3,16 +3,18 @@ using LanguageCore.Parser.Statements;
 
 namespace LanguageCore;
 
+public delegate bool FindStatementType(StatementWithValue statement, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics);
+
 public interface IReadable
 {
-    string ToReadable(Func<StatementWithValue, GeneralType> typeSearch);
+    string ToReadable(FindStatementType typeSearch);
 }
 
 public interface ISimpleReadable : IReadable
 {
     string ToReadable();
 
-    string IReadable.ToReadable(Func<StatementWithValue, GeneralType> typeSearch) => ToReadable();
+    string IReadable.ToReadable(FindStatementType typeSearch) => ToReadable();
 }
 
 [Flags]

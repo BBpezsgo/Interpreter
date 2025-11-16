@@ -86,3 +86,6 @@ dotnet_diagnostic.CA2009.severity = warning
 
 # Default severity for analyzer diagnostics with category 'Reliability'
 dotnet_analyzer_diagnostic.category-Reliability.severity = warning
+
+# Default severity for analyzer diagnostics with category 'Style'
+dotnet_analyzer_diagnostic.category-Style.severity = warning

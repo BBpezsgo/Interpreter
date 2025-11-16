@@ -61,20 +61,20 @@ public class PossibleDiagnostic
         return new(Message, location, SubErrors);
     }
 
-    public Diagnostic ToError(IPositioned position, Uri file) =>
+    public Diagnostic ToError(IPositioned position, Uri file, bool? shouldBreak = null) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Error, Message, Position, File!, ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file))) :
-        new(DiagnosticsLevel.Error, Message, position.Position, file, ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file)));
+        new(DiagnosticsLevel.Error, Message, Position, File!, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file, shouldBreak))) :
+        new(DiagnosticsLevel.Error, Message, position.Position, file, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file, shouldBreak)));
 
     public Diagnostic ToWarning(IPositioned position, Uri file) =>
         IsPopulated ?
         new(DiagnosticsLevel.Warning, Message, Position, File!, false, SubErrors.ToImmutableArray(v => v.ToWarning(position, file))) :
         new(DiagnosticsLevel.Warning, Message, position.Position, file, false, SubErrors.ToImmutableArray(v => v.ToWarning(position, file)));
 
-    public Diagnostic ToError(ILocated location) =>
+    public Diagnostic ToError(ILocated location, bool? shouldBreak = null) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Error, Message, Position, File!, ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location))) :
-        new(DiagnosticsLevel.Error, Message, location.Location.Position, location.Location.File, ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location)));
+        new(DiagnosticsLevel.Error, Message, Position, File!, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location, shouldBreak))) :
+        new(DiagnosticsLevel.Error, Message, location.Location.Position, location.Location.File, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location, shouldBreak)));
 
     public Diagnostic ToWarning(ILocated location) =>
         IsPopulated ?

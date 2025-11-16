@@ -54,7 +54,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 Location = variable.Declaration.Location,
                 SaveValue = true,
                 Type = variable.Type,
-                IsCapturedLocal = false,
             },
             variable.Cleanup
         );
@@ -412,8 +411,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForSetter(CompiledVariableSetter _statement)
     {
-        if (_statement.IsCapturedLocal) throw null;
-
         if (!GetVariable(_statement.Variable.Identifier, _statement.Variable.Location.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
             Diagnostics.Add(notFoundError.ToError(_statement.Variable));
@@ -424,8 +421,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForSetter(CompiledParameterSetter _statement)
     {
-        if (_statement.IsCapturedLocal) throw null;
-
         if (!GetVariable(_statement.Variable.Identifier.Content, _statement.Variable.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
             Diagnostics.Add(notFoundError.ToError(_statement.Variable));
@@ -757,8 +752,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         if (indirectSetter.AddressValue is CompiledVariableGetter variableGetter)
         {
-            if (variableGetter.IsCapturedLocal) throw null;
-
             if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
                 Diagnostics.Add(notFoundError.ToError(variableGetter));
@@ -786,8 +779,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (indirectSetter.AddressValue is CompiledParameterGetter parameterGetter)
         {
-            if (parameterGetter.IsCapturedLocal) throw null;
-
             if (!GetVariable(parameterGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
                 Diagnostics.Add(notFoundError.ToError(parameterGetter));
@@ -1663,8 +1654,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledVariableGetter statement)
     {
-        if (statement.IsCapturedLocal) throw null;
-
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         if (!GetVariable(statement, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
@@ -1674,8 +1663,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledParameterGetter statement)
     {
-        if (statement.IsCapturedLocal) throw null;
-
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         if (!GetVariable(statement, out BrainfuckVariable? variable, out PossibleDiagnostic? variableNotFoundError))
@@ -2188,8 +2175,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (pointer.To is CompiledVariableGetter variableGetter)
         {
-            if (variableGetter.IsCapturedLocal) throw null;
-
             if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
                 Diagnostics.Add(notFoundError.ToError(variableGetter));
@@ -2672,8 +2657,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (definedType.Is<PointerType>() && passed.Value is CompiledVariableGetter _variableGetter)
             {
-                if (_variableGetter.IsCapturedLocal) throw null;
-
                 if (!GetVariable(_variableGetter, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                 {
                     Diagnostics.Add(notFoundError.ToError(_variableGetter));

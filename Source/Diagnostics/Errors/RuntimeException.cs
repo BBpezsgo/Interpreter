@@ -264,6 +264,55 @@ public class RuntimeException : LanguageExceptionWithoutContext
                 }
                 result.Append('}');
             }
+            else if (type.Is(out ArrayType? arrayType))
+            {
+                result.Append('[');
+                if (arrayType.ComputedLength.HasValue)
+                {
+                    int elementSize = arrayType.Of.GetSize(runtimeInfoProvider);
+                    for (int i = 0; i < arrayType.ComputedLength.Value; i++)
+                    {
+                        if (i > 0) result.Append(',');
+                        result.Append(' ');
+                        int offset = range.Start + (i * elementSize);
+                        AppendValue(new Range<int>(offset, offset + elementSize), arrayType.Of, depth);
+                    }
+                }
+                else
+                {
+                    result.Append(" ...");
+                }
+                result.Append(' ');
+                result.Append(']');
+            }
+            else if (type.Is(out FunctionType? functionType))
+            {
+                if (functionType.HasClosure)
+                {
+                    result.Append(" => ");
+                    if (value.To<int>() == 0)
+                    {
+                        result.Append("NULL");
+                    }
+                    else
+                    {
+                        Range<int> pointerTo = new(value.To<int>(), value.To<int>() + PointerType.Any.GetSize(runtimeInfoProvider));
+                        AppendValue(pointerTo, new FunctionType(functionType.ReturnType, functionType.Parameters, false), depth);
+                    }
+                }
+                else
+                {
+                    result.Append('#');
+                    if (value.To<int>() < 0)
+                    {
+                        result.Append("INVALID");
+                    }
+                    else
+                    {
+                        result.Append(value.To<int>());
+                    }
+                }
+            }
             else
             { result.AppendJoin(' ', value.ToArray()); }
         }

@@ -388,7 +388,7 @@ public partial class StatementCompiler
             CompileCleanup(type, newVariable.Location, out compiledCleanup);
         }
 
-        bool isGlobal = Frames.Last.Scopes.Count == 0;
+        bool isGlobal = Frames.Last.IsTopLevel && Frames.Last.Scopes.Count <= 1;
 
         CompiledVariableDeclaration compiledVariable = new()
         {
@@ -1872,6 +1872,7 @@ public partial class StatementCompiler
             Scopes = new(),
             CurrentReturnType = functionType?.ReturnType,
             CompiledGeneratorContext = null,
+            IsTopLevel = false,
         });
 
         try
@@ -4088,6 +4089,7 @@ public partial class StatementCompiler
             Scopes = new(),
             CurrentReturnType = returnType,
             CompiledGeneratorContext = compiledGeneratorContext,
+            IsTopLevel = false,
         });
 
         try
@@ -4119,7 +4121,7 @@ public partial class StatementCompiler
 
             function.IsMsilCompatible = function.IsMsilCompatible && frame.IsMsilCompatible;
 
-            GeneratedFunctions.Add(new(function, (CompiledBlock)body));
+            GeneratedFunctions.Add(new(function, (CompiledBlock)body, frame.CapturesGlobalVariables));
 
             return true;
         }
@@ -4183,37 +4185,19 @@ public partial class StatementCompiler
         using var _1 = _m1.Auto();
 #endif
 
-        CompiledFrame frame = Frames.Push(new CompiledFrame()
-        {
-            TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
-            CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
-            Scopes = new(),
-            CurrentReturnType = ExitCodeType,
-            CompiledGeneratorContext = null,
-        });
-
         ImmutableArray<CompiledStatement>.Builder res = ImmutableArray.CreateBuilder<CompiledStatement>(statements.Length);
 
-        try
+        foreach (Statement statement in statements)
         {
-            foreach (Statement statement in statements)
+            if (!CompileStatement(statement, out CompiledStatement? compiledStatement))
             {
-                if (!CompileStatement(statement, out CompiledStatement? compiledStatement))
-                {
-                    compiledStatements = ImmutableArray<CompiledStatement>.Empty;
-                    return false;
-                }
-                if (compiledStatement is EmptyStatement) continue;
-
-                ImmutableArray<CompiledStatement> reduced = ReduceStatements(compiledStatement, true);
-                res.AddRange(reduced);
+                compiledStatements = ImmutableArray<CompiledStatement>.Empty;
+                return false;
             }
+            if (compiledStatement is EmptyStatement) continue;
 
-            if (frame.CapturedParameters.Count > 0 || frame.CapturedVariables.Count > 0) throw new UnreachableException();
-        }
-        finally
-        {
-            if (Frames.Pop() != frame) throw new InternalExceptionWithoutContext("Bruh");
+            ImmutableArray<CompiledStatement> reduced = ReduceStatements(compiledStatement, true);
+            res.AddRange(reduced);
         }
 
         compiledStatements = res.ToImmutable();
@@ -4246,6 +4230,17 @@ public partial class StatementCompiler
             }
         }
 
+        CompiledFrame frame = Frames.Push(new CompiledFrame()
+        {
+            TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
+            CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
+            Scopes = new(),
+            CurrentReturnType = ExitCodeType,
+            CompiledGeneratorContext = null,
+            IsTopLevel = true,
+        });
+        Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty, ImmutableArray<CompiledInstructionLabelDeclaration>.Empty));
+
         foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
         {
             if (!CompileTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
@@ -4268,6 +4263,10 @@ public partial class StatementCompiler
 
             if (!compiledAnything) break;
         }
+
+        if (Frames.Last.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
+        if (frame.CapturedParameters.Count > 0 || frame.CapturedVariables.Count > 0) throw new UnreachableException();
+        if (Frames.Pop() != frame) throw new InternalExceptionWithoutContext("Bruh");
 
         /*
         var allStatements =

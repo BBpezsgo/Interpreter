@@ -1186,6 +1186,9 @@ public class Literal : StatementWithValue
     public static Literal CreateAnonymous(CompiledValue value, IPositioned position, Uri file)
         => Literal.CreateAnonymous(value, position.Position, file);
 
+    public static Literal CreateAnonymous(CompiledValue value, ILocated location)
+        => Literal.CreateAnonymous(value, location.Location.Position, location.Location.File);
+
     public static Literal CreateAnonymous(CompiledValue value, Position position, Uri file)
     {
         TokenType tokenType = value.Type switch

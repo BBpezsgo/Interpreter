@@ -7,8 +7,10 @@ class CompiledFrame
     public required Stack<Scope> Scopes { get; init; }
     public required CompiledGeneratorContext? CompiledGeneratorContext { get; init; }
     public required GeneralType? CurrentReturnType { get; set; }
+    public required bool IsTopLevel { get; set; }
     public HashSet<CompiledVariableDeclaration> CapturedVariables { get; } = new();
     public HashSet<CompiledParameter> CapturedParameters { get; } = new();
+    public bool CapturesGlobalVariables { get; set; } = false;
     public bool IsMsilCompatible { get; set; } = true;
 
     public static CompiledFrame Empty => new()
@@ -18,5 +20,6 @@ class CompiledFrame
         Scopes = new(),
         CompiledGeneratorContext = null,
         CurrentReturnType = BuiltinType.Void,
+        IsTopLevel = false,
     };
 }

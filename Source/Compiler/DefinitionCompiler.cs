@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using LanguageCore.Parser;
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;

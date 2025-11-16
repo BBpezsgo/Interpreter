@@ -1,16 +1,16 @@
-using LanguageCore.Parser.Statements;
-
 namespace LanguageCore.Compiler;
 
 public class CompiledFunction : ISimpleReadable
 {
     public ICompiledFunctionDefinition Function;
     public CompiledBlock Body;
+    public bool CapturesGlobalVariables;
 
-    public CompiledFunction(ICompiledFunctionDefinition function, CompiledBlock body)
+    public CompiledFunction(ICompiledFunctionDefinition function, CompiledBlock body, bool capturesGlobalVariables)
     {
         Function = function;
         Body = body;
+        CapturesGlobalVariables = capturesGlobalVariables;
     }
 
     public void Deconstruct(out ICompiledFunctionDefinition function, out CompiledBlock body)

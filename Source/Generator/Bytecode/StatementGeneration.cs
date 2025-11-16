@@ -1317,7 +1317,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledConstructorCall constructorCall)
     {
-        CompiledConstructorDefinition? compiledFunction = constructorCall.Function;
+        CompiledConstructorDefinition compiledFunction = constructorCall.Function;
 
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
 

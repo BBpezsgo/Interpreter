@@ -4055,9 +4055,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (TryEvaluate(found, parameters, context, out CompiledValue? returnValue, out ImmutableArray<RuntimeStatement2> runtimeStatements) &&
-            returnValue.HasValue &&
-            runtimeStatements.Length == 0)
+        if (TryEvaluate(found, parameters, context, out CompiledValue? returnValue, out ImmutableArray<RuntimeStatement2> runtimeStatements)
+            && returnValue.HasValue
+            && runtimeStatements.Length == 0)
         {
             value = returnValue.Value;
             return true;
@@ -4237,8 +4237,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (found is null)
         { return false; }
 
-        if (TryCompute(parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate(found, parameterValues, context, out value, out runtimeStatements))
+        if (TryCompute(parameters, context, out ImmutableArray<CompiledValue> parameterValues)
+            && TryEvaluate(found, parameterValues, context, out value, out runtimeStatements))
         { return true; }
 
         return false;
@@ -4255,8 +4255,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (TryCompute(parameters, context, out ImmutableArray<CompiledValue> parameterValues) &&
-            TryEvaluate(found, parameterValues, context, out value, out runtimeStatements))
+        if (TryCompute(parameters, context, out ImmutableArray<CompiledValue> parameterValues)
+            && TryEvaluate(found, parameterValues, context, out value, out runtimeStatements))
         { return true; }
 
         return false;

@@ -378,6 +378,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case AddressRegisterPointer v: PopTo(v, size); break;
             case AddressRuntimePointer v: PopTo(v, size); break;
             case AddressRuntimeIndex v: PopTo(v, size); break;
+            case AddressAbsolute v: PopTo(v, size); break;
             default: throw new NotImplementedException();
         }
     }
@@ -506,6 +507,54 @@ public partial class CodeGeneratorForMain : CodeGenerator
             PopTo(reg.Register);
             PopTo(new AddressRegisterPointer(reg.Register), size);
         }
+    }
+
+    void PopTo(AddressAbsolute address, int size)
+    {
+        int currentOffset = 0;
+        while (currentOffset < size)
+        {
+            foreach (BitWidth checkBitWidth in
+#if NET_STANDARD
+                CompatibilityUtils.GetEnumValues<BitWidth>().Reverse()
+#else
+                Enum.GetValues<BitWidth>().Reverse()
+#endif
+            )
+            {
+                if (PointerBitWidth == BitWidth._64 &&
+                    checkBitWidth == BitWidth._32)
+                { continue; }
+
+                int checkSize = (int)checkBitWidth;
+                if (size - currentOffset < checkSize) continue;
+                if (PointerSize < checkSize) continue;
+
+                PopTo(new AddressAbsolute(address.Value + currentOffset), checkBitWidth);
+                currentOffset += checkSize;
+                break;
+            }
+        }
+    }
+
+    void PopTo(AddressAbsolute address, BitWidth size)
+    {
+        Code.Emit(size switch
+        {
+            BitWidth._8 => Opcode.PopTo8,
+            BitWidth._16 => Opcode.PopTo16,
+            BitWidth._32 => Opcode.PopTo32,
+            BitWidth._64 => Opcode.PopTo64,
+            _ => throw new UnreachableException(),
+        }, new InstructionOperand(address.Value, size switch
+        {
+            BitWidth._8 => InstructionOperandType.Pointer8,
+            BitWidth._16 => InstructionOperandType.Pointer16,
+            BitWidth._32 => InstructionOperandType.Pointer32,
+            BitWidth._64 => throw new NotImplementedException(),
+            _ => throw new UnreachableException(),
+        }));
+        ScopeSizes.LastRef -= (int)size;
     }
 
     void PushFrom(Address address, int size)

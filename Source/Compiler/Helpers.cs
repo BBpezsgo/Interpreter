@@ -18,7 +18,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     readonly List<CompiledAlias> CompiledAliases = new();
 
     readonly Stack<CompiledVariableConstant> CompiledGlobalConstants = new();
-    readonly Stack<CompiledInstructionLabelDeclaration> CompiledGlobalInstructionLabels = new();
     readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables = new();
 
     readonly DiagnosticsCollection Diagnostics;
@@ -1129,18 +1128,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetInstructionLabel(string identifier, [NotNullWhen(true)] out CompiledInstructionLabelDeclaration? instructionLabel, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (Scope scope in Frames.Last.Scopes)
+        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in Frames[^1].InstructionLabels)
         {
-            foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in scope.InstructionLabels)
-            {
-                if (compiledInstructionLabel.Identifier != identifier) continue;
-                instructionLabel = compiledInstructionLabel;
-                error = null;
-                return true;
-            }
+            if (compiledInstructionLabel.Identifier != identifier) continue;
+            instructionLabel = compiledInstructionLabel;
+            error = null;
+            return true;
         }
 
-        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in CompiledGlobalInstructionLabels)
+        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in Frames[0].InstructionLabels)
         {
             if (compiledInstructionLabel.Identifier != identifier) continue;
             instructionLabel = compiledInstructionLabel;

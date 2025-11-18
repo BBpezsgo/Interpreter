@@ -1853,7 +1853,7 @@ public partial class StatementCompiler
 
         ImmutableArray<CompiledInstructionLabelDeclaration>.Builder localInstructionLabels = ImmutableArray.CreateBuilder<CompiledInstructionLabelDeclaration>();
 
-        foreach (Statement item in lambdaStatement.Body.GetStatementsRecursively(true))
+        foreach (Statement item in lambdaStatement.Body.GetStatementsRecursively(StatementWalkFlags.IncludeThis | StatementWalkFlags.FrameOnly))
         {
             if (item is InstructionLabel instructionLabel)
             {
@@ -1869,6 +1869,7 @@ public partial class StatementCompiler
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
+            InstructionLabels = localInstructionLabels.ToImmutable(),
             Scopes = new(),
             CurrentReturnType = functionType?.ReturnType,
             CompiledGeneratorContext = null,
@@ -1877,7 +1878,7 @@ public partial class StatementCompiler
 
         try
         {
-            Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty, localInstructionLabels.ToImmutable()));
+            Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty));
 
             if (!CompileStatement(lambdaStatement.Body, out CompiledStatement? _body)) return false;
 
@@ -2581,7 +2582,7 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (GetInstructionLabel(variable.Content, out CompiledInstructionLabelDeclaration? instructionLabel, out _))
+        if (GetInstructionLabel(variable.Content, out CompiledInstructionLabelDeclaration? instructionLabel, out PossibleDiagnostic? instructionLabelError))
         {
             variable.Reference = instructionLabel;
             OnGotStatementType(variable, CompiledInstructionLabelDeclaration.Type);
@@ -2654,7 +2655,8 @@ public partial class StatementCompiler
                 parameterNotFoundError.ToError(variable),
                 variableNotFoundError.ToError(variable),
                 globalVariableNotFoundError.ToError(variable),
-                functionNotFoundError.ToError(variable)
+                functionNotFoundError.ToError(variable),
+                instructionLabelError.ToError(variable)
             ));
         return false;
     }
@@ -2817,28 +2819,37 @@ public partial class StatementCompiler
             return false;
         }
 
-        if (condition is CompiledEvaluatedValue evaluatedCondition)
+        if (condition is CompiledEvaluatedValue evaluatedCondition && Settings.Optimizations.HasFlag(OptimizationSettings.TrimUnreachable))
         {
             if (evaluatedCondition.Value)
             {
-                return CompileStatement(@if.Block, out compiledStatement);
-            }
-            else if (@if.NextLink is not null)
-            {
-                if (!CompileStatement(@if.NextLink, out compiledStatement)) return false;
-                if (compiledStatement is CompiledElse nextElse)
+                if (@if.NextLink is null || !@if.NextLink.GetStatementsRecursively(StatementWalkFlags.FrameOnly).OfType<InstructionLabel>().Any())
                 {
-                    compiledStatement = nextElse.Body;
+                    return CompileStatement(@if.Block, out compiledStatement);
                 }
-                return true;
             }
             else
             {
-                compiledStatement = new EmptyStatement()
+                if (!@if.GetStatementsRecursively(StatementWalkFlags.FrameOnly).OfType<InstructionLabel>().Any())
                 {
-                    Location = @if.Location,
-                };
-                return true;
+                    if (@if.NextLink is not null)
+                    {
+                        if (!CompileStatement(@if.NextLink, out compiledStatement)) return false;
+                        if (compiledStatement is CompiledElse nextElse)
+                        {
+                            compiledStatement = nextElse.Body;
+                        }
+                        return true;
+                    }
+                    else
+                    {
+                        compiledStatement = new EmptyStatement()
+                        {
+                            Location = @if.Location,
+                        };
+                        return true;
+                    }
+                }
             }
         }
 
@@ -3760,7 +3771,7 @@ public partial class StatementCompiler
             }
         }
 
-        return new Scope(localConstants.ToImmutable(), ImmutableArray<CompiledInstructionLabelDeclaration>.Empty);
+        return new Scope(localConstants.ToImmutable());
     }
 
     #region CompileType
@@ -4070,7 +4081,7 @@ public partial class StatementCompiler
 
         ImmutableArray<CompiledInstructionLabelDeclaration>.Builder localInstructionLabels = ImmutableArray.CreateBuilder<CompiledInstructionLabelDeclaration>();
 
-        foreach (Statement item in function.Block.GetStatementsRecursively(true))
+        foreach (Statement item in function.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis | StatementWalkFlags.FrameOnly))
         {
             if (item is InstructionLabel instructionLabel)
             {
@@ -4086,6 +4097,7 @@ public partial class StatementCompiler
         {
             TypeArguments = typeArguments ?? ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
+            InstructionLabels = localInstructionLabels.ToImmutable(),
             Scopes = new(),
             CurrentReturnType = returnType,
             CompiledGeneratorContext = compiledGeneratorContext,
@@ -4094,7 +4106,7 @@ public partial class StatementCompiler
 
         try
         {
-            Scope scope = frame.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty, localInstructionLabels.ToImmutable()));
+            Scope scope = frame.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty));
 
             if (!CompileStatement(function.Block, out CompiledStatement? body)) return false;
 
@@ -4208,38 +4220,44 @@ public partial class StatementCompiler
 
     void GenerateCode(ImmutableArray<ParsedFile> parsedFiles, Uri file)
     {
-        foreach (Statement? item in TopLevelStatements.SelectMany(v => v.Statements))
+        ImmutableArray<CompiledInstructionLabelDeclaration>.Builder globalInstructionLabels = ImmutableArray.CreateBuilder<CompiledInstructionLabelDeclaration>();
+
+        foreach (VariableDeclaration variableDeclaration in TopLevelStatements
+            .SelectMany(v => v.Statements)
+            .OfType<VariableDeclaration>())
         {
-            if (item is VariableDeclaration variableDeclaration)
+            if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
             {
-                if (variableDeclaration.Modifiers.Contains(ModifierKeywords.Const))
+                if (CompileConstant(variableDeclaration, out CompiledVariableConstant? result))
                 {
-                    if (CompileConstant(variableDeclaration, out CompiledVariableConstant? result))
-                    {
-                        CompiledGlobalConstants.Add(result);
-                    }
+                    CompiledGlobalConstants.Add(result);
                 }
             }
-            else if (item is InstructionLabel instructionLabel)
+        }
+
+        foreach (InstructionLabel instructionLabel in TopLevelStatements
+            .SelectMany(v => v.Statements)
+            .SelectMany(v => v.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
+            .OfType<InstructionLabel>())
+        {
+            globalInstructionLabels.Add(new CompiledInstructionLabelDeclaration()
             {
-                CompiledGlobalInstructionLabels.Add(new CompiledInstructionLabelDeclaration()
-                {
-                    Identifier = instructionLabel.Identifier.Content,
-                    Location = instructionLabel.Location,
-                });
-            }
+                Identifier = instructionLabel.Identifier.Content,
+                Location = instructionLabel.Location,
+            });
         }
 
         CompiledFrame frame = Frames.Push(new CompiledFrame()
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
+            InstructionLabels = globalInstructionLabels.ToImmutable(),
             Scopes = new(),
             CurrentReturnType = ExitCodeType,
             CompiledGeneratorContext = null,
             IsTopLevel = true,
         });
-        Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty, ImmutableArray<CompiledInstructionLabelDeclaration>.Empty));
+        Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty));
 
         foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
         {

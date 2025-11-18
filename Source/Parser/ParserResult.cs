@@ -55,7 +55,7 @@ public readonly struct ParserResult
     {
         foreach (Statement v in TopLevelStatements.IsDefault ? ImmutableArray<Statement>.Empty : TopLevelStatements)
         {
-            foreach (Statement statement in v.GetStatementsRecursively(true))
+            foreach (Statement statement in v.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
 
@@ -64,7 +64,7 @@ public readonly struct ParserResult
             if (function.Block == null)
             { continue; }
 
-            foreach (Statement statement in function.Block.GetStatementsRecursively(true))
+            foreach (Statement statement in function.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
 
@@ -73,7 +73,7 @@ public readonly struct ParserResult
             if (@operator.Block == null)
             { continue; }
 
-            foreach (Statement statement in @operator.Block.GetStatementsRecursively(true))
+            foreach (Statement statement in @operator.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
 
@@ -84,7 +84,7 @@ public readonly struct ParserResult
                 if (method.Block == null)
                 { continue; }
 
-                foreach (Statement statement in method.Block.GetStatementsRecursively(true))
+                foreach (Statement statement in method.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
                 { yield return statement; }
             }
 
@@ -93,7 +93,7 @@ public readonly struct ParserResult
                 if (method.Block == null)
                 { continue; }
 
-                foreach (Statement statement in method.Block.GetStatementsRecursively(true))
+                foreach (Statement statement in method.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
                 { yield return statement; }
             }
 
@@ -102,7 +102,7 @@ public readonly struct ParserResult
                 if (method.Block == null)
                 { continue; }
 
-                foreach (Statement statement in method.Block.GetStatementsRecursively(true))
+                foreach (Statement statement in method.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
                 { yield return statement; }
             }
 
@@ -111,7 +111,7 @@ public readonly struct ParserResult
                 if (constructor.Block == null)
                 { continue; }
 
-                foreach (Statement statement in constructor.Block.GetStatementsRecursively(true))
+                foreach (Statement statement in constructor.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
                 { yield return statement; }
             }
         }

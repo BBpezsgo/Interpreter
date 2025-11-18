@@ -7,9 +7,10 @@ public enum OptimizationSettings : uint
 {
     None = 0,
     All = uint.MaxValue,
-    FunctionEvaluating = 1,
-    StatementEvaluating = 2,
-    FunctionInlining = 4,
+    FunctionEvaluating = 0x1,
+    StatementEvaluating = 0x2,
+    FunctionInlining = 0x4,
+    TrimUnreachable = 0x8,
 }
 
 public struct CompilerSettings

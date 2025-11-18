@@ -4,6 +4,7 @@ class CompiledFrame
 {
     public required ImmutableDictionary<string, GeneralType> TypeArguments { get; init; }
     public required ImmutableArray<CompiledParameter> CompiledParameters { get; init; }
+    public required ImmutableArray<CompiledInstructionLabelDeclaration> InstructionLabels { get; init; }
     public required Stack<Scope> Scopes { get; init; }
     public required CompiledGeneratorContext? CompiledGeneratorContext { get; init; }
     public required GeneralType? CurrentReturnType { get; set; }
@@ -17,6 +18,7 @@ class CompiledFrame
     {
         TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
         CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
+        InstructionLabels = ImmutableArray<CompiledInstructionLabelDeclaration>.Empty,
         Scopes = new(),
         CompiledGeneratorContext = null,
         CurrentReturnType = BuiltinType.Void,

@@ -45,7 +45,7 @@ public static class StatementExtensions
         .LastOrDefault(condition);
 
     public static T? GetStatement<T>(this Statement statement, Func<T, bool> condition)
-        => statement.GetStatementsRecursively(true)
+        => statement.GetStatementsRecursively(StatementWalkFlags.IncludeThis)
         .OfType<T>()
         .LastOrDefault(condition);
 
@@ -54,6 +54,13 @@ public static class StatementExtensions
 
     public static bool GetStatement<T>(this Statement statement, [NotNullWhen(true)] out T? result, Func<T, bool> condition)
         => (result = GetStatement(statement, condition)) is not null;
+}
+
+[Flags]
+public enum StatementWalkFlags
+{
+    IncludeThis = 1,
+    FrameOnly = 2,
 }
 
 public abstract class Statement : IPositioned, IInFile, ILocated
@@ -82,7 +89,7 @@ public abstract class Statement : IPositioned, IInFile, ILocated
     public override string ToString()
         => $"{GetType().Name}{Semicolon}";
 
-    public abstract IEnumerable<Statement> GetStatementsRecursively(bool includeThis);
+    public abstract IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags);
 }
 
 public abstract class AnyAssignment : Statement
@@ -180,13 +187,13 @@ public class Block : Statement
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         for (int i = 0; i < Statements.Length; i++)
         {
-            foreach (Statement statement in Statements[i].GetStatementsRecursively(true))
+            foreach (Statement statement in Statements[i].GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -229,19 +236,19 @@ public class LinkedIf : LinkedIfThing
     public override string ToString()
         => $"{KeywordToken} ({Condition}) {Block}{(NextLink != null ? " ..." : string.Empty)}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
         if (NextLink != null)
         {
-            foreach (Statement statement in NextLink.GetStatementsRecursively(true))
+            foreach (Statement statement in NextLink.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -254,11 +261,11 @@ public class LinkedElse : LinkedIfThing
     public LinkedElse(Token keyword, Statement block, Uri file) : base(keyword, block, file)
     { }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -276,13 +283,13 @@ public class LiteralList : StatementWithValue
         Values = values;
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         for (int i = 0; i < Values.Length; i++)
         {
-            foreach (Statement statement in Values[i].GetStatementsRecursively(true))
+            foreach (Statement statement in Values[i].GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -371,13 +378,13 @@ public class VariableDeclaration : Statement,
     public override string ToString()
         => $"{string.Join(' ', Modifiers)} {Type} {Identifier}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         if (InitialValue != null)
         {
-            foreach (Statement statement in InitialValue.GetStatementsRecursively(true))
+            foreach (Statement statement in InitialValue.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -409,9 +416,9 @@ public class TypeStatement : StatementWithValue
 
         return result.ToString();
     }
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
     }
 }
 
@@ -441,9 +448,9 @@ public class CompiledTypeStatement : StatementWithValue
 
         return result.ToString();
     }
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
     }
 }
 
@@ -515,16 +522,16 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
         foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in argument.GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -620,19 +627,19 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         if (PrevStatement != null)
         {
-            foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+            foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
 
         foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in argument.GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -698,13 +705,13 @@ public class KeywordCall : Statement, IReadable
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in argument.GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -797,14 +804,14 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        foreach (Statement statement in Left.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Right.GetStatementsRecursively(true))
+        foreach (Statement statement in Right.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -873,11 +880,11 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        foreach (Statement statement in Left.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -950,11 +957,11 @@ public class ShortOperatorCall : AnyAssignment, IReadable, IReferenceableTo<Comp
         return new Assignment(assignmentToken, Left, operatorCall, File);
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        foreach (Statement statement in Left.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 
@@ -1026,14 +1033,14 @@ public class Assignment : AnyAssignment
     }
     public override Assignment ToAssignment() => this;
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        foreach (Statement statement in Left.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Right.GetStatementsRecursively(true))
+        foreach (Statement statement in Right.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1101,14 +1108,14 @@ public class CompoundAssignment : AnyAssignment, IReferenceableTo<CompiledOperat
         Right,
         File);
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Left.GetStatementsRecursively(true))
+        foreach (Statement statement in Left.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Right.GetStatementsRecursively(true))
+        foreach (Statement statement in Right.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1257,9 +1264,9 @@ public class Literal : StatementWithValue
         return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
     }
 }
 
@@ -1289,9 +1296,9 @@ public class Identifier : StatementWithValue, IReferenceableTo
 
     public override string ToString() => Token.Content;
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
     }
 }
 
@@ -1322,9 +1329,9 @@ public class InstructionLabel : Statement
 
     public override string ToString() => $"{Identifier}{Colon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
     }
 }
 
@@ -1347,11 +1354,11 @@ public class AddressGetter : StatementWithValue
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{Operator}{PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1375,11 +1382,11 @@ public class Pointer : StatementWithValue
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{Operator}{PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1405,14 +1412,14 @@ public class WhileLoop : StatementWithAnyBlock
     public override string ToString()
         => $"{KeywordToken} ({Condition}) {Block}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1445,23 +1452,23 @@ public class ForLoop : StatementWithBlock
     public override string ToString()
         => $"{KeywordToken} (...) {Block}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         if (VariableDeclaration is not null)
         {
-            foreach (Statement statement in VariableDeclaration.GetStatementsRecursively(true))
+            foreach (Statement statement in VariableDeclaration.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
 
-        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Expression.GetStatementsRecursively(true))
+        foreach (Statement statement in Expression.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1479,13 +1486,13 @@ public class IfContainer : Statement
         Branches = parts;
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         foreach (BaseBranch branch in Branches)
         {
-            foreach (Statement statement in branch.GetStatementsRecursively(true))
+            foreach (Statement statement in branch.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -1540,14 +1547,14 @@ public class IfBranch : BaseBranch
         Condition = condition;
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1566,14 +1573,14 @@ public class ElseIfBranch : BaseBranch
         Condition = condition;
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Condition.GetStatementsRecursively(true))
+        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1587,11 +1594,11 @@ public class ElseBranch : BaseBranch
         : base(keyword, IfPart.Else, block, file)
     { }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Block.GetStatementsRecursively(true))
+        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1616,9 +1623,9 @@ public class NewInstance : StatementWithValue, IHaveType, IInFile
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{KeywordToken} {Type}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
     }
 }
 
@@ -1696,13 +1703,13 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
         foreach (StatementWithValue argument in Arguments)
         {
-            foreach (Statement statement in argument.GetStatementsRecursively(true))
+            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
             { yield return statement; }
         }
     }
@@ -1751,14 +1758,14 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<Compile
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
 
-        foreach (Statement statement in Index.GetStatementsRecursively(true))
+        foreach (Statement statement in Index.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1787,11 +1794,11 @@ public class Field : StatementWithValue, IReferenceableTo
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{PrevStatement}.{Identifier}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1818,11 +1825,11 @@ public class BasicTypeCast : StatementWithValue, IHaveType
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{PrevStatement} {Keyword} {Type}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1849,11 +1856,11 @@ public class ManagedTypeCast : StatementWithValue, IHaveType
     public override string ToString()
         => $"{SurroundingBracelet?.Start}({Type}){PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(true))
+        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1878,11 +1885,11 @@ public class ModifiedStatement : StatementWithValue
     public override string ToString()
         => $"{SurroundingBracelet?.Start}{Modifier} {Statement}{SurroundingBracelet?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
 
-        foreach (Statement statement in Statement.GetStatementsRecursively(true))
+        foreach (Statement statement in Statement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }
     }
 }
@@ -1913,9 +1920,12 @@ public class LambdaStatement : StatementWithValue
     public override string ToString()
         => $"{Parameters} {Arrow} {Body}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(bool includeThis)
+    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
-        if (includeThis) yield return this;
-        foreach (var v in Body.GetStatementsRecursively(true)) yield return v;
+        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
+        if (!flags.HasFlag(StatementWalkFlags.FrameOnly))
+        {
+            foreach (Statement v in Body.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis)) yield return v;
+        }
     }
 }

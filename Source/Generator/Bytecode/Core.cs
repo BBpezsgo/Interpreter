@@ -285,6 +285,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                             BuiltinFunctionIdentifiers.IndexerSet => "Index setter",
                             _ => "???",
                         },
+                        GeneratedInstructionLabel v => $"Label",
                         _ => "???",
                     };
 

@@ -23,6 +23,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
         CompiledFunctionDefinition? deallocator = cleanup.Deallocator;
+        var f = Functions.First(v => v.Function == deallocator);
 
         if (deallocator.ExternalFunctionName is not null)
         {
@@ -44,7 +45,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(deallocator);
-        Call(label, cleanup.Location);
+        Call(label, cleanup.Location, f.CapturesGlobalVariables);
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, deallocator)); }
@@ -81,12 +82,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
+        var f = Functions.First(v => v.Function == cleanup.Destructor);
+
         AddComment(" Param0 should be already there");
 
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(cleanup.Destructor);
-        Call(label, cleanup.Location);
+        Call(label, cleanup.Location, f.CapturesGlobalVariables);
 
         if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, cleanup.Destructor)); }
@@ -436,6 +439,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall_MSIL(CompiledExternalFunctionCall caller)
     {
+        var f = Functions.First(v => v.Function == caller.Declaration);
+
         AddComment($"Call \"{caller.Declaration.ToReadable()}\" {{");
 
         if (caller.Function.ReturnValueSize > 0 && caller.SaveValue)
@@ -459,7 +464,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         InstructionLabel label = LabelForDefinition(caller.Declaration);
-        Call(label, caller);
+        Call(label, caller, f.CapturesGlobalVariables);
 
         if (caller.Declaration.InstructionOffset == InvalidFunctionAddress)
         {
@@ -507,70 +512,67 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall(CompiledFunctionCall caller)
     {
+        var f = Functions.First(v => v.Function == caller.Function);
         if (ILGenerator is not null)
         {
-            CompiledFunction? f = Functions.FirstOrDefault(v => v.Function == caller.Function);
-            if (f is not null)
+            ILGenerator.Diagnostics.Clear();
+            if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method, out DynamicMethod? raw))
             {
-                ILGenerator.Diagnostics.Clear();
-                if (ILGenerator.GenerateImplMarshaled(f, out ExternalFunctionScopedSyncCallback? method, out DynamicMethod? raw))
+                if (ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
                 {
-                    if (ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
-                    {
-                        ILGenerator.Diagnostics.Throw();
-                        goto anyway;
-                    }
+                    ILGenerator.Diagnostics.Throw();
+                    goto anyway;
+                }
 
-                    int existing = GeneratedUnmanagedFunctions.FindIndex(v => v.Reference == method);
-                    ExternalFunctionScopedSync externFunc;
+                int existing = GeneratedUnmanagedFunctions.FindIndex(v => v.Reference == method);
+                ExternalFunctionScopedSync externFunc;
 
-                    if (existing == -1)
-                    {
-                        int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
-                        int parametersSize = f.Function.Parameters.Aggregate(0, (a, b) => a + b.Type.GetSize(this));
-                        int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
+                if (existing == -1)
+                {
+                    int returnValueSize = f.Function.ReturnSomething ? f.Function.Type.GetSize(this) : 0;
+                    int parametersSize = f.Function.Parameters.Aggregate(0, (a, b) => a + b.Type.GetSize(this));
+                    int id = ExternalFunctions.Concat(GeneratedUnmanagedFunctions.Select(v => (IExternalFunction)v.Function).AsEnumerable()).GenerateId();
 
 #if UNITY_BURST
                         IntPtr ptr = System.Runtime.InteropServices.Marshal.GetFunctionPointerForDelegate(method);
                         unsafe { externFunc = new((delegate* unmanaged[Cdecl]<nint, nint, nint, void>)ptr, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal); }
                         //UnityEngine.Debug.LogWarning($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
 #else
-                        externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
-                        Debug.WriteLine($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
+                    externFunc = new(method, id, parametersSize, returnValueSize, 0, ExternalFunctionScopedSyncFlags.MSILPointerMarshal);
+                    Debug.WriteLine($"MSIL {f.ToReadable()} --> {raw ?? method.Method} ({externFunc})");
 #endif
-                        GeneratedUnmanagedFunctions.Add((externFunc, method));
-                    }
-                    else
-                    {
-                        externFunc = GeneratedUnmanagedFunctions[existing].Function;
-                    }
-
-                    GenerateCodeForFunctionCall_MSIL(new()
-                    {
-                        Declaration = f.Function,
-                        Function = externFunc,
-
-                        Arguments = caller.Arguments,
-                        Location = caller.Location,
-                        SaveValue = caller.SaveValue,
-                        Type = caller.Type,
-                    });
-
-                    Diagnostics.Add(Diagnostic.OptimizationNotice($"Function {f.Function.ToReadable()} compiled into MSIL", caller));
-
-                    Diagnostics.AddRange(ILGenerator.Diagnostics);
-
-                    ILGenerator.Diagnostics.Clear();
-                    return;
-                anyway:;
+                    GeneratedUnmanagedFunctions.Add((externFunc, method));
                 }
-                //if (!ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
-                //{
-                //    ILGenerator.GenerateImplMarshaled(f, out _);
-                //}
-                Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to generate MSIL for function {f.Function}", caller).WithSuberrors(ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error)));
+                else
+                {
+                    externFunc = GeneratedUnmanagedFunctions[existing].Function;
+                }
+
+                GenerateCodeForFunctionCall_MSIL(new()
+                {
+                    Declaration = f.Function,
+                    Function = externFunc,
+
+                    Arguments = caller.Arguments,
+                    Location = caller.Location,
+                    SaveValue = caller.SaveValue,
+                    Type = caller.Type,
+                });
+
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Function {f.Function.ToReadable()} compiled into MSIL", caller));
+
+                Diagnostics.AddRange(ILGenerator.Diagnostics);
+
                 ILGenerator.Diagnostics.Clear();
+                return;
+            anyway:;
             }
+            //if (!ILGenerator.Diagnostics.Has(DiagnosticsLevel.Error))
+            //{
+            //    ILGenerator.GenerateImplMarshaled(f, out _);
+            //}
+            Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to generate MSIL for function {f.Function}", caller).WithSuberrors(ILGenerator.Diagnostics.Diagnostics.Where(v => v.Level == DiagnosticsLevel.Error)));
+            ILGenerator.Diagnostics.Clear();
         }
 
         AddComment($"Call {caller.Function.ToReadable()} {{");
@@ -587,7 +589,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(caller.Function);
-        Call(label, caller);
+        Call(label, caller, f.CapturesGlobalVariables);
 
         if (caller.Function.InstructionOffset == InvalidFunctionAddress)
         {
@@ -1318,6 +1320,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(CompiledConstructorCall constructorCall)
     {
         CompiledConstructorDefinition compiledFunction = constructorCall.Function;
+        var f = Functions.First(v => v.Function == compiledFunction);
 
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
 
@@ -1358,7 +1361,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(compiledFunction);
-        Call(label, constructorCall);
+        Call(label, constructorCall, f.CapturesGlobalVariables);
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, constructorCall, compiledFunction)); }
@@ -2334,11 +2337,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentContext = function;
         InFunction = true;
+        CompiledFunction f = Functions.First(v => v.Function == function);
 
         CompiledParameters.Clear();
         CompiledLocalVariables.Clear();
         ReturnInstructions.Clear();
         ScopeSizes.Push(0);
+        HasCapturedGlobalVariables = f.CapturesGlobalVariables;
         int savedInstructionLabelCount = CompiledInstructionLabels.Count;
 
         CompiledParameters.AddRange(function.Parameters);
@@ -2455,6 +2460,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledParameters.Clear();
         CompiledLocalVariables.Clear();
         ReturnInstructions.Clear();
+        HasCapturedGlobalVariables = false;
         if (ScopeSizes.Pop() != 0) { } // throw new InternalException("Bruh", function.Block!, function.File);
 
         CurrentContext = null;
@@ -2527,6 +2533,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
         ScopeSizes.Push(0);
+        HasCapturedGlobalVariables = true;
 
         CurrentScopeDebug.Push(new ScopeInformation()
         {
@@ -2623,6 +2630,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         Code.Emit(Opcode.Exit);
+
+        HasCapturedGlobalVariables = false;
 
         // 4 -> exit code
         if (ScopeSizes.Pop() != 4) { } // throw new InternalException("Bruh");

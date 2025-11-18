@@ -11,7 +11,7 @@ class CompiledFrame
     public required bool IsTopLevel { get; set; }
     public HashSet<CompiledVariableDeclaration> CapturedVariables { get; } = new();
     public HashSet<CompiledParameter> CapturedParameters { get; } = new();
-    public bool CapturesGlobalVariables { get; set; } = false;
+    public bool? CapturesGlobalVariables { get; set; } = false;
     public bool IsMsilCompatible { get; set; } = true;
 
     public static CompiledFrame Empty => new()

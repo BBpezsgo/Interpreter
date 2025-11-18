@@ -199,12 +199,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Code.MarkLabel(returnLabel);
     }
 
-    void Call(InstructionLabel label, ILocated callerLocation)
+    void Call(InstructionLabel label, ILocated callerLocation, bool captureGlobalVariables)
     {
         InstructionLabel returnLabel = Code.DefineLabel();
         Code.Emit(Opcode.Push, returnLabel.Absolute());
 
-        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
+        if (captureGlobalVariables)
+        {
+            PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
+        }
         Push(Register.BasePointer);
 
         Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
@@ -217,7 +220,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void Return(ILocated location)
     {
         PopTo(Register.BasePointer);
-        Pop(AbsGlobalAddressType.GetSize(this, Diagnostics, location)); // Pop AbsoluteGlobalOffset
+        if (HasCapturedGlobalVariables)
+        {
+            Pop(AbsGlobalAddressType.GetSize(this, Diagnostics, location)); // Pop AbsoluteGlobalOffset
+        }
         Code.Emit(Opcode.Return);
         ScopeSizes.LastRef -= PointerSize;
     }
@@ -233,7 +239,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (variable.IsGlobal)
         {
             if (!GeneratedVariables.TryGetValue(variable, out generatedVariable))
-            { throw new LanguageException($"Variable {variable} was not compiled", variable.Location.Position, variable.Location.File); }
+            { throw new LanguageException($"Variable `{variable}` was not compiled", variable.Location.Position, variable.Location.File); }
+
+            if (!HasCapturedGlobalVariables)
+            { throw new LanguageException($"Unexpected global variable `{variable}`", variable.Location.Position, variable.Location.File); }
 
             return new AddressOffset(
                 new AddressPointer(AbsoluteGlobalAddress),
@@ -922,6 +931,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly PointerType CodePointerType = new(BuiltinType.I32);
     readonly PointerType BasePointerType = new(BuiltinType.I32);
 
+    bool HasCapturedGlobalVariables { get; set; }
     int AbsGlobalAddressSize => PointerSize;
     // int StackPointerSize => PointerSize;
     int CodePointerSize => PointerSize;
@@ -930,7 +940,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     /// <summary>
     /// <c>Saved BP</c> + <c>Abs global address</c> + <c>Saved CP</c>
     /// </summary>
-    int StackFrameTags => BasePointerSize + AbsGlobalAddressSize + CodePointerSize;
+    int StackFrameTags => BasePointerSize + (HasCapturedGlobalVariables ? AbsGlobalAddressSize : 0) + CodePointerSize;
 
     public Address AbsoluteGlobalAddress => new AddressOffset(
         new AddressRegisterPointer(Register.BasePointer),
@@ -944,7 +954,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     public int SavedBasePointerOffset => 0 * ProcessorState.StackDirection;
     public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -ProcessorState.StackDirection;
-    public int SavedCodePointerOffset => (AbsGlobalAddressSize + CodePointerSize) * -ProcessorState.StackDirection;
+    public int SavedCodePointerOffset => ((HasCapturedGlobalVariables ? AbsGlobalAddressSize : 0) + CodePointerSize) * -ProcessorState.StackDirection;
 
     public const int InvalidFunctionAddress = int.MinValue;
 

@@ -285,6 +285,9 @@ public class CompiledExternalFunctionCall : CompiledStatementWithValue
     public required ICompiledFunctionDefinition Declaration { get; init; }
     public required ImmutableArray<CompiledPassedArgument> Arguments { get; init; }
 
+#if UNITY_BURST
+    unsafe
+#endif
     string FunctionToString() => Function switch
     {
         CompiledFunctionDefinition v => v.Identifier.Content,

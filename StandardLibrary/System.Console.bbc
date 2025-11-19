@@ -10,6 +10,92 @@ export void clear()
     print("\e[H");
 }
 
+export inline void printline<T1>(temp string format, temp T1 arg1)
+{
+    int arg = 0;
+    for (int i = 0; format[i]; i++)
+    {
+        char c = format[i];
+        if (c == '%')
+        {
+            if (arg == 0) print(arg1);
+            else crash "Invalid format";
+            arg++;
+        }
+        else
+        {
+            print(c);
+        }
+    }
+    printline();
+}
+
+export inline void printline<T1, T2>(temp string format, temp T1 arg1, temp T2 arg2)
+{
+    int arg = 0;
+    for (int i = 0; format[i]; i++)
+    {
+        char c = format[i];
+        if (c == '%')
+        {
+            if (arg == 0) print(arg1);
+            elseif (arg == 1) print(arg2);
+            else crash "Invalid format";
+            arg++;
+        }
+        else
+        {
+            print(c);
+        }
+    }
+    printline();
+}
+
+export inline void printline<T1, T2, T3>(temp string format, temp T1 arg1, temp T2 arg2, temp T3 arg3)
+{
+    int arg = 0;
+    for (int i = 0; format[i]; i++)
+    {
+        char c = format[i];
+        if (c == '%')
+        {
+            if (arg == 0) print(arg1);
+            elseif (arg == 1) print(arg2);
+            elseif (arg == 2) print(arg3);
+            else crash "Invalid format";
+            arg++;
+        }
+        else
+        {
+            print(c);
+        }
+    }
+    printline();
+}
+
+export inline void printline<T1, T2, T3, T4>(temp string format, temp T1 arg1, temp T2 arg2, temp T3 arg3, temp T4 arg4)
+{
+    int arg = 0;
+    for (int i = 0; format[i]; i++)
+    {
+        char c = format[i];
+        if (c == '%')
+        {
+            if (arg == 0) print(arg1);
+            elseif (arg == 1) print(arg2);
+            elseif (arg == 2) print(arg3);
+            elseif (arg == 3) print(arg4);
+            else crash "Invalid format";
+            arg++;
+        }
+        else
+        {
+            print(c);
+        }
+    }
+    printline();
+}
+
 [External("stdout")]
 export void print(char message);
 

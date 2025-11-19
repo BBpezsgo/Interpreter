@@ -91,7 +91,12 @@ public ref partial struct ProcessorState
     );
 
     void Step() => Registers.CodePointer++;
-    void Step(int num) => Registers.CodePointer += num;
+    void Step(int num)
+    {
+        if (Registers.CodePointer + num < 0 || Registers.CodePointer + num > Code.Length)
+        { throw new RuntimeException($"Invalid jump"); }
+        Registers.CodePointer += num;
+    }
 
     public void Tick()
     {
@@ -501,6 +506,8 @@ public ref partial struct ProcessorState
                 switch ((Register)operand.Int)
                 {
                     case Register.CodePointer:
+                        if (value.I32() < 0 || value.I32() > Code.Length)
+                        { throw new RuntimeException($"Invalid jump"); }
                         Registers.CodePointer = value.I32();
                         break;
                     case Register.StackPointer:

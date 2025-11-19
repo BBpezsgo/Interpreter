@@ -292,7 +292,7 @@ public partial class StatementCompiler
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out var parameterType, out typeError))
+            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out typeError))
             {
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
@@ -365,7 +365,7 @@ public partial class StatementCompiler
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out var parameterType, out typeError))
+            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out typeError))
             {
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
@@ -393,7 +393,7 @@ public partial class StatementCompiler
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out var parameterType, out var typeError))
+            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out PossibleDiagnostic? typeError))
             {
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
@@ -430,7 +430,7 @@ public partial class StatementCompiler
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out var parameterType, out typeError))
+            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out typeError))
             {
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;

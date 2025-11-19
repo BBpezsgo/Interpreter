@@ -143,14 +143,14 @@ public class BytecodeProcessor
     unsafe void FinishUserCall(ref ProcessorState state, UserCall userCall)
     {
         state.Pop(userCall.Arguments.Length);
-        Span<byte> returnValue = state.Pop(userCall.ReturnValueSize);
+        Span<byte> returnValue = state.Pop(userCall.Function.ReturnValueSize);
         userCall.Result = returnValue.IsEmpty ? Array.Empty<byte>() : returnValue.ToArray();
     }
 
     unsafe void FinishUserCall(ref ProcessorState state, ref UserCallSync userCall)
     {
         state.Pop(userCall.Arguments.Length);
-        Span<byte> returnValue = state.Pop(userCall.ReturnValueSize);
+        Span<byte> returnValue = state.Pop(userCall.Function.ReturnValueSize);
         userCall.Result = returnValue.IsEmpty ? Array.Empty<byte>() : returnValue.ToArray();
     }
 
@@ -161,20 +161,23 @@ public class BytecodeProcessor
         // this is pointing to the last global variable's address
         int globalVariablesAddress = state.Registers.StackPointer;
 
-        state.Registers.StackPointer -= userCall.ReturnValueSize;
+        state.Registers.StackPointer -= userCall.Function.ReturnValueSize;
 
         state.Push(userCall.Arguments.AsSpan());
 
         // Push the return instruction address
         state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
 
-        // Push the absolute global address
-        state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
+        if (userCall.Function.Flags.HasFlag(Compiler.FunctionFlags.CapturesGlobalVariables))
+        {
+            // Push the absolute global address
+            state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
+        }
         // Push the previous base pointer
         state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
 
         state.Registers.BasePointer = state.Registers.StackPointer;
-        state.Registers.CodePointer = userCall.InstructionOffset;
+        state.Registers.CodePointer = userCall.Function.InstructionOffset;
     }
 
     unsafe void BeginUserCall(ref ProcessorState state, ref UserCallSync userCall)
@@ -184,20 +187,23 @@ public class BytecodeProcessor
         // this is pointing to the last global variable's address
         int globalVariablesAddress = state.Registers.StackPointer;
 
-        state.Registers.StackPointer -= userCall.ReturnValueSize;
+        state.Registers.StackPointer -= userCall.Function.ReturnValueSize;
 
         state.Push(userCall.Arguments);
 
         // Push the return instruction address
         state.Push(state.Registers.CodePointer, Register.CodePointer.BitWidth());
 
-        // Push the absolute global address
-        state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
+        if (userCall.Function.Flags.HasFlag(Compiler.FunctionFlags.CapturesGlobalVariables))
+        {
+            // Push the absolute global address
+            state.Push(globalVariablesAddress, Register.StackPointer.BitWidth());
+        }
         // Push the previous base pointer
         state.Push(state.Registers.BasePointer, Register.BasePointer.BitWidth());
 
         state.Registers.BasePointer = state.Registers.StackPointer;
-        state.Registers.CodePointer = userCall.InstructionOffset;
+        state.Registers.CodePointer = userCall.Function.InstructionOffset;
     }
 
     static List<IExternalFunction> GenerateExternalFunctions()
@@ -429,7 +435,7 @@ public class BytecodeProcessor
     public UserCall CallUnsafe(in ExposedFunction function, byte[] arguments)
     {
         if (function.ArgumentsSize != arguments.Length) throw new ArgumentException($"Invalid number of bytes passed to exposed function \"{function.Identifier}\": expected {function.ArgumentsSize} passed {arguments.Length}");
-        UserCall userCall = new(function.InstructionOffset, arguments, function.ReturnValueSize);
+        UserCall userCall = new(function, arguments);
         UserCalls.Enqueue(userCall);
         return userCall;
     }
@@ -441,7 +447,7 @@ public class BytecodeProcessor
         ProcessorState state = GetState();
         RunUntilCompletion(ref state);
 
-        UserCallSync userCall = new(function.InstructionOffset, arguments, function.ReturnValueSize);
+        UserCallSync userCall = new(function, arguments);
         BeginUserCall(ref state, ref userCall);
         CurrentlySyncUserCalling = true;
 
@@ -460,12 +466,5 @@ public class BytecodeProcessor
         }
 
         return userCall.Result;
-    }
-
-    public UserCall CallUnsafe(int instructionOffset, byte[] arguments, int returnValueSize)
-    {
-        UserCall userCall = new(instructionOffset, arguments, returnValueSize);
-        UserCalls.Enqueue(userCall);
-        return userCall;
     }
 }

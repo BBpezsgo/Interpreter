@@ -1,16 +1,24 @@
 namespace LanguageCore.Compiler;
 
+[Flags]
+public enum FunctionFlags
+{
+    CapturesGlobalVariables = 0x1,
+}
+
 public class CompiledFunction : ISimpleReadable
 {
     public ICompiledFunctionDefinition Function;
     public CompiledBlock Body;
-    public bool CapturesGlobalVariables;
+    public FunctionFlags Flags;
+    public ImmutableArray<CapturedLocal> CapturedLocals;
 
-    public CompiledFunction(ICompiledFunctionDefinition function, CompiledBlock body, bool capturesGlobalVariables)
+    public CompiledFunction(ICompiledFunctionDefinition function, CompiledBlock body, ImmutableArray<CapturedLocal> capturedLocals)
     {
         Function = function;
         Body = body;
-        CapturesGlobalVariables = capturesGlobalVariables;
+        CapturedLocals = capturedLocals;
+        Flags = FunctionFlags.CapturesGlobalVariables;
     }
 
     public void Deconstruct(out ICompiledFunctionDefinition function, out CompiledBlock body)

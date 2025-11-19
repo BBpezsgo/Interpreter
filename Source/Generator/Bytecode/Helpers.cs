@@ -171,7 +171,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         InstructionLabel returnLabel = Code.DefineLabel();
         Push(returnLabel.Absolute());
 
-        PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, address));
+        //PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, address));
         Push(Register.BasePointer);
 
         GenerateCodeForStatement(address);

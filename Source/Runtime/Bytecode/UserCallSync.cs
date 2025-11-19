@@ -3,16 +3,14 @@ namespace LanguageCore.Runtime;
 
 public ref struct UserCallSync
 {
-    public readonly int InstructionOffset;
+    public readonly ExposedFunction Function;
     public readonly ReadOnlySpan<byte> Arguments;
-    public readonly int ReturnValueSize;
     public byte[]? Result;
 
-    public UserCallSync(int instructionOffset, ReadOnlySpan<byte> arguments, int returnValueSize)
+    public UserCallSync(ExposedFunction function, ReadOnlySpan<byte> arguments)
     {
-        InstructionOffset = instructionOffset;
+        Function = function;
         Arguments = arguments;
-        ReturnValueSize = returnValueSize;
         Result = null;
     }
 }

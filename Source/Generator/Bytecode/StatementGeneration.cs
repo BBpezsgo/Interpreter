@@ -23,7 +23,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
         CompiledFunctionDefinition? deallocator = cleanup.Deallocator;
-        var f = Functions.First(v => v.Function == deallocator);
+        CompiledFunction f = Functions.First(v => v.Function == deallocator);
 
         if (deallocator.ExternalFunctionName is not null)
         {
@@ -45,7 +45,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(deallocator);
-        Call(label, cleanup.Location, f.CapturesGlobalVariables);
+        Call(label, cleanup.Location, f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables));
 
         if (deallocator.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, deallocator)); }
@@ -82,14 +82,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        var f = Functions.First(v => v.Function == cleanup.Destructor);
+        CompiledFunction f = Functions.First(v => v.Function == cleanup.Destructor);
 
         AddComment(" Param0 should be already there");
 
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(cleanup.Destructor);
-        Call(label, cleanup.Location, f.CapturesGlobalVariables);
+        Call(label, cleanup.Location, f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables));
 
         if (cleanup.Destructor.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, cleanup.Location, cleanup.Destructor)); }
@@ -439,7 +439,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall_MSIL(CompiledExternalFunctionCall caller)
     {
-        var f = Functions.First(v => v.Function == caller.Declaration);
+        CompiledFunction f = Functions.First(v => v.Function == caller.Declaration);
 
         AddComment($"Call \"{caller.Declaration.ToReadable()}\" {{");
 
@@ -464,7 +464,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
 
         InstructionLabel label = LabelForDefinition(caller.Declaration);
-        Call(label, caller, f.CapturesGlobalVariables);
+        Call(label, caller, f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables));
 
         if (caller.Declaration.InstructionOffset == InvalidFunctionAddress)
         {
@@ -512,7 +512,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForFunctionCall(CompiledFunctionCall caller)
     {
-        var f = Functions.First(v => v.Function == caller.Function);
+        CompiledFunction f = Functions.First(v => v.Function == caller.Function);
         if (ILGenerator is not null)
         {
             ILGenerator.Diagnostics.Clear();
@@ -589,7 +589,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(caller.Function);
-        Call(label, caller, f.CapturesGlobalVariables);
+        Call(label, caller, f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables));
 
         if (caller.Function.InstructionOffset == InvalidFunctionAddress)
         {
@@ -1320,7 +1320,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     void GenerateCodeForStatement(CompiledConstructorCall constructorCall)
     {
         CompiledConstructorDefinition compiledFunction = constructorCall.Function;
-        var f = Functions.First(v => v.Function == compiledFunction);
+        CompiledFunction f = Functions.First(v => v.Function == compiledFunction);
 
         AddComment($"Call \"{compiledFunction.ToReadable()}\" {{");
 
@@ -1361,7 +1361,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         AddComment(" .:");
 
         InstructionLabel label = LabelForDefinition(compiledFunction);
-        Call(label, constructorCall, f.CapturesGlobalVariables);
+        Call(label, constructorCall, f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables));
 
         if (compiledFunction.InstructionOffset == InvalidFunctionAddress)
         { UndefinedFunctionOffsets.Add(new UndefinedOffset(label, constructorCall, compiledFunction)); }
@@ -2337,13 +2337,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentContext = function;
         InFunction = true;
-        CompiledFunction f = Functions.First(v => v.Function == function);
+        FunctionFlags f = function is CompiledLambda l ? l.Flags : Functions.First(v => v.Function == function).Flags;
 
         CompiledParameters.Clear();
         CompiledLocalVariables.Clear();
         ReturnInstructions.Clear();
         ScopeSizes.Push(0);
-        HasCapturedGlobalVariables = f.CapturesGlobalVariables;
+        HasCapturedGlobalVariables = f.HasFlag(FunctionFlags.CapturesGlobalVariables);
         int savedInstructionLabelCount = CompiledInstructionLabels.Count;
 
         CompiledParameters.AddRange(function.Parameters);
@@ -2697,13 +2697,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Diagnostics.Add(Diagnostic.Internal($"Exposed function \"{f.ToReadable()}\" was not compiled", f.Identifier, f.File));
                 continue;
             }
+            CompiledFunction e = Functions.First(v => v.Function == f);
 
             int returnValueSize = f.ReturnSomething ? f.Type.GetSize(this, Diagnostics, f.TypeToken) : 0;
             int argumentsSize = 0;
             foreach (CompiledParameter p in f.Parameters)
             { argumentsSize += p.Type.GetSize(this, Diagnostics, ((FunctionDefinition)f).Type); }
 
-            exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize);
+            exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize, e.Flags);
         }
 
         return new BBLangGeneratorResult()

@@ -72,6 +72,9 @@ public ref partial struct ProcessorState
 
         int codePointer = Pop(BitWidth._32);
 
+        if (codePointer < 0 || codePointer > Code.Length)
+        { throw new RuntimeException($"Invalid jump"); }
+
         Registers.CodePointer = codePointer;
     }
 

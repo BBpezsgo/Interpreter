@@ -9,6 +9,7 @@ public class CompiledLambda : CompiledStatementWithValue,
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
     public bool IsMsilCompatible { get; set; } = true;
+    public FunctionFlags Flags { get; set; }
 
     public ImmutableArray<CompiledParameter> Parameters { get; }
     public ParameterDefinitionCollection ParameterDefinitions { get; }

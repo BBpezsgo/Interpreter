@@ -94,7 +94,7 @@ export any* alloc(int sizeNeed)
 #if IL
     crash "Nope";
 #else
-    if (sizeNeed <= 0) { crash "Bruh"; }
+    if (sizeNeed <= 0) { crash "Invalid size"; }
 
     BlockHeader* headerPointer = 0 as BlockHeader*;
     while (true)
@@ -137,6 +137,70 @@ export any* alloc(int sizeNeed)
         headerPointer += blockSize + HeaderSize;
     }
     return 0 as any*;
+#endif
+}
+
+[Expose("resize")]
+[Builtin("resize")]
+[MSILIncompatible]
+export bool resize(any* ptr, int size)
+{
+#if IL
+    crash "Nope";
+#else
+    if (size <= 0) { crash "Invalid size"; }
+
+    BlockHeader* headerPointer = (ptr - HeaderSize) as BlockHeader*;
+
+    int blockSize;
+    bool blockUsed;
+    get_header(headerPointer, &blockSize, &blockUsed);
+
+    if (!blockUsed) { return false; }
+
+    if (size > blockSize)
+    {
+        BlockHeader* nextHeader = (headerPointer + blockSize + HeaderSize) as BlockHeader*;
+        if (headerPointer >= HeapSize) { return false; }
+
+        int blockSizeNext;
+        bool blockUsedNext;
+        get_header(nextHeader, &blockSizeNext, &blockUsedNext);
+
+        if (blockUsedNext) { return false; }
+
+        int combinedSize = blockSizeNext + HeaderSize + blockSize;
+        if (combinedSize < size) { return false; }
+
+        int _remainingSize = combinedSize - size - HeaderSize;
+        if (_remainingSize > 0)
+        {
+            set_header_free((ptr + size) as BlockHeader*, _remainingSize);
+        }
+
+        set_header_used(headerPointer, size);
+
+        return true;
+    }
+    elseif (size < blockSize)
+    {
+        int _remainingSize = blockSize - size - HeaderSize;
+
+        if (_remainingSize > 0)
+        {
+            set_header_free((ptr + size) as BlockHeader*, _remainingSize);
+        }
+
+        set_header_used(headerPointer, size);
+
+        return true;
+    }
+    else
+    {
+        return true;
+    }
+
+    return false;
 #endif
 }
 

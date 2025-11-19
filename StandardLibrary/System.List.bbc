@@ -114,19 +114,22 @@ struct List<T>
     {
         if (this._capacity < capacity)
         {
-            var old = this._ptr;
-            this._ptr = new T[capacity]*;
-            this._capacity = capacity;
-
-            if (old)
+            if (!resize(this._ptr, sizeof(T) * capacity))
             {
-                int length = this._length;
-                for (int i = 0; i < length; i++)
-                {
-                    this._ptr[i] = old[i];
-                }
+                T[]* old = this._ptr;
+                this._ptr = new T[capacity]*;
+                this._capacity = capacity;
 
-                delete old;
+                if (old)
+                {
+                    int length = this._length;
+                    for (int i = 0; i < length; i++)
+                    {
+                        this._ptr[i] = old[i];
+                    }
+
+                    delete old;
+                }
             }
         }
     }

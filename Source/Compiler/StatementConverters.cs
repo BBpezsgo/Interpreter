@@ -18,7 +18,7 @@ public static class StatementConverters
             {
                 Semicolon = anyCall.Semicolon,
                 SaveValue = anyCall.SaveValue,
-                SurroundingBracelet = anyCall.SurroundingBracelet,
+                SurroundingBrackets = anyCall.SurroundingBrackets,
                 CompiledType = anyCall.CompiledType,
                 PredictedValue = anyCall.PredictedValue,
                 Reference = anyCall.Reference,
@@ -32,7 +32,7 @@ public static class StatementConverters
             {
                 Semicolon = anyCall.Semicolon,
                 SaveValue = anyCall.SaveValue,
-                SurroundingBracelet = anyCall.SurroundingBracelet,
+                SurroundingBrackets = anyCall.SurroundingBrackets,
                 CompiledType = anyCall.CompiledType,
                 PredictedValue = anyCall.PredictedValue,
                 Reference = anyCall.Reference,

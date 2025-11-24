@@ -204,7 +204,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return result;
     }
 
-    public static bool AllowDeallocate(GeneralType type) => type.Is<PointerType>() || (type.Is<FunctionType>(out FunctionType? functionType) && functionType.HasClosure);
+    public static bool AllowDeallocate(GeneralType type) => type.Is<PointerType>() || (type.Is(out FunctionType? functionType) && functionType.HasClosure);
 
     #region AddCompilable()
 
@@ -2335,7 +2335,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             right: InlineMacro(operatorCall.Right, parameters),
             file: operatorCall.File)
         {
-            SurroundingBracelet = operatorCall.SurroundingBracelet,
+            SurroundingBrackets = operatorCall.SurroundingBrackets,
             SaveValue = operatorCall.SaveValue,
             Semicolon = operatorCall.Semicolon,
         };
@@ -2345,7 +2345,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             left: InlineMacro(operatorCall.Left, parameters),
             file: operatorCall.File)
         {
-            SurroundingBracelet = operatorCall.SurroundingBracelet,
+            SurroundingBrackets = operatorCall.SurroundingBrackets,
             SaveValue = operatorCall.SaveValue,
             Semicolon = operatorCall.Semicolon,
         };
@@ -2397,7 +2397,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             SaveValue = literalList.SaveValue,
             Semicolon = literalList.Semicolon,
-            SurroundingBracelet = literalList.SurroundingBracelet,
+            SurroundingBrackets = literalList.SurroundingBrackets,
         };
     static TypeInstance InlineMacro(TypeInstance type, Dictionary<string, StatementWithValue> parameters) => type switch
     {
@@ -2405,7 +2405,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             InlineMacro(v.FunctionReturnType, parameters),
             v.FunctionParameterTypes.ToImmutableArray(p => InlineMacro(p, parameters)),
             v.ClosureModifier,
-            v.File
+            v.File,
+            v.Brackets
         ),
         TypeInstancePointer v => new TypeInstancePointer(
             InlineMacro(v.To, parameters),
@@ -2803,7 +2804,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             Semicolon = statement.Semicolon,
 
             CompiledType = statement.CompiledType,
-            SurroundingBracelet = statement.SurroundingBracelet,
+            SurroundingBrackets = statement.SurroundingBrackets,
         };
     static ModifiedStatement InlineMacro(ModifiedStatement modifiedStatement, Dictionary<string, StatementWithValue> parameters)
         => new(
@@ -4292,7 +4293,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (context.Frames.Count > 8)
         { return false; }
 
-        using (StackAuto<EvaluationFrame> _ = context.Frames.PushAuto(new EvaluationFrame(function)))
+        using (context.Frames.PushAuto(new EvaluationFrame(function)))
         {
             for (int i = 0; i < parameterValues.Length; i++)
             {

@@ -149,6 +149,7 @@ export bool resize(any* ptr, int size)
     crash "Nope";
 #else
     if (size <= 0) { crash "Invalid size"; }
+    if (!ptr) { return false; }
 
     BlockHeader* headerPointer = (ptr - HeaderSize) as BlockHeader*;
 

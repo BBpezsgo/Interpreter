@@ -96,7 +96,7 @@ public class BytecodeEmitter
 
             if (f.IsValid)
             {
-                if (f.Instructions.End == i)
+                if (f.Instructions.End == i + 1)
                 {
                     writer.WriteLine('}');
                 }

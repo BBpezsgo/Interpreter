@@ -27,13 +27,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (deallocator.ExternalFunctionName is not null)
         {
-            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out _, out PossibleDiagnostic? exception))
-            {
-                Diagnostics.Add(exception.ToError(deallocator));
-                AddComment("}");
-                return;
-            }
-
             throw new NotImplementedException();
         }
 

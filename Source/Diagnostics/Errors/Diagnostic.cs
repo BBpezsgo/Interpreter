@@ -40,7 +40,17 @@ public class Diagnostic :
     public Diagnostic WithSuberrors(Diagnostic? suberror) => suberror is null ? this : new(Level, Message, Position, File, false, ImmutableArray.Create(suberror));
     public Diagnostic WithSuberrors(params Diagnostic?[] suberrors) => WithSuberrors(suberrors.Where(v => v is not null).ToImmutableArray()!);
     public Diagnostic WithSuberrors(IEnumerable<Diagnostic?> suberrors) => WithSuberrors(suberrors.Where(v => v is not null).ToImmutableArray()!);
-    public Diagnostic WithSuberrors(ImmutableArray<Diagnostic> suberrors) => suberrors.IsDefaultOrEmpty ? this : new(Level, Message, Position, File, false, suberrors);
+    public Diagnostic WithSuberrors(ImmutableArray<Diagnostic> suberrors)
+    {
+        if (SubErrors.IsDefaultOrEmpty)
+        {
+            return suberrors.IsDefaultOrEmpty ? this : new(Level, Message, Position, File, false, suberrors);
+        }
+        else
+        {
+            return suberrors.IsDefaultOrEmpty ? this : new(Level, Message, Position, File, false, SubErrors.AddRange(suberrors));
+        }
+    }
 
     [DoesNotReturn]
     public void Throw() => throw ToException();

@@ -667,7 +667,7 @@ public partial class Tokenizer
             if (CurrentToken.Content.Length == 1 && Operators.Contains(CurrentToken.Content[0]))
             {
                 CurrentToken.Content.Append(currChar);
-                EndToken(offsetTotal);
+                EndToken(offsetTotal, true);
             }
             else
             {
@@ -679,7 +679,7 @@ public partial class Tokenizer
         else if (CurrentToken.Content.Length == 1 && DoubleOperators.Any(v => v[0] == CurrentToken.Content[0] && v[1] == currChar))
         {
             CurrentToken.Content.Append(currChar);
-            EndToken(offsetTotal);
+            EndToken(offsetTotal, true);
         }
         else if (currChar == '*' && CurrentToken.TokenType == PreparationTokenType.POTENTIAL_COMMENT)
         {

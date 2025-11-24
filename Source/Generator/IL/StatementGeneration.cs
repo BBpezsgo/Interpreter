@@ -559,7 +559,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (!EmitFunction(statement.Function, out DynamicMethod? function))
         {
-            Diagnostics.Add(Diagnostic.Internal($"Failed to emit function \"{statement.Function}\"", statement, successful));
+            Diagnostics.Add(Diagnostic.Internal($"Failed to emit function \"{statement.Function}\"", statement, false));
             successful = false;
             return;
         }
@@ -2352,7 +2352,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         return true;
     }
 
-    public unsafe bool GenerateImplMarshaled(CompiledFunction function, [NotNullWhen(true)] out ExternalFunctionScopedSyncCallback? marshaled, out DynamicMethod? raw)
+    public bool GenerateImplMarshaled(CompiledFunction function, [NotNullWhen(true)] out ExternalFunctionScopedSyncCallback? marshaled, out DynamicMethod? raw)
     {
         marshaled = null;
         raw = null;

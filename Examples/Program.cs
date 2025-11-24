@@ -12,27 +12,27 @@ static class Program
         Console.WriteLine($" --- {nameof(HelloWorld)} ---");
         Console.WriteLine();
         HelloWorld.Run();
-        
+
         Console.WriteLine();
         Console.WriteLine($" --- {nameof(Strings)} ---");
         Console.WriteLine();
         Strings.Run();
-        
+
         Console.WriteLine();
         Console.WriteLine($" --- {nameof(ExternalFunctions)} ---");
         Console.WriteLine();
         ExternalFunctions.Run();
-        
+
         Console.WriteLine();
         Console.WriteLine($" --- {nameof(ExternalConstants)} ---");
         Console.WriteLine();
         ExternalConstants.Run();
-        
+
         Console.WriteLine();
         Console.WriteLine($" --- {nameof(ExposedFunctions)} ---");
         Console.WriteLine();
         ExposedFunctions.Run();
-        
+
         Console.WriteLine();
         Console.WriteLine($" --- {nameof(ExecutionManager)} ---");
         Console.WriteLine();

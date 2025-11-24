@@ -35,6 +35,8 @@ public readonly struct StackAuto<T> : IDisposable
     readonly List<T> _list;
     readonly T _item;
 
+    public T Value => _item;
+
     public StackAuto(List<T> list, T item)
     {
         _list = list;
@@ -44,7 +46,7 @@ public readonly struct StackAuto<T> : IDisposable
     public void Dispose()
     {
         T popped = _list.Pop();
-        if (!popped.Equals(_item)) Debugger.Break();
+        if (!popped.Equals(_item)) throw new UnreachableException();
     }
 }
 

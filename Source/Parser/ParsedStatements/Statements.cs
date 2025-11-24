@@ -120,14 +120,14 @@ public abstract class StatementWithValue : Statement
     /// <summary>
     /// Set by the compiler
     /// </summary>
-    public TokenPair? SurroundingBracelet { get; internal set; }
+    public TokenPair? SurroundingBrackets { get; internal set; }
 
     protected StatementWithValue(Uri file) : base(file)
     {
         SaveValue = true;
         CompiledType = null;
         PredictedValue = null;
-        SurroundingBracelet = null;
+        SurroundingBrackets = null;
     }
 }
 
@@ -298,7 +298,7 @@ public class LiteralList : StatementWithValue
     {
         StringBuilder result = new();
 
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
         result.Append(Brackets.Start);
 
         if (Values.Length == 0)
@@ -318,7 +318,7 @@ public class LiteralList : StatementWithValue
             }
         }
         result.Append(Brackets.End);
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
 
         if (Semicolon != null) result.Append(Semicolon);
 
@@ -407,11 +407,11 @@ public class TypeStatement : StatementWithValue
     {
         StringBuilder result = new();
 
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         result.Append(Type);
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
 
         return result.ToString();
@@ -439,11 +439,11 @@ public class CompiledTypeStatement : StatementWithValue
     {
         StringBuilder result = new();
 
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         result.Append(Type);
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
 
         return result.ToString();
@@ -485,7 +485,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
     {
         StringBuilder result = new();
 
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         result.Append(PrevStatement);
         result.Append(Brackets.Start);
@@ -502,7 +502,7 @@ public class AnyCall : StatementWithValue, IReadable, IReferenceableTo<CompiledF
         }
         result.Append(Brackets.End);
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
 
         return result.ToString();
@@ -579,7 +579,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
     {
         StringBuilder result = new();
 
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         if (PrevStatement != null)
         {
@@ -602,7 +602,7 @@ public class FunctionCall : StatementWithValue, IReadable, IReferenceableTo<Comp
         }
         result.Append(Brackets.End);
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
 
         return result.ToString();
@@ -769,7 +769,7 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         if (Left.ToString().Length < Stringify.CozyLength)
         { result.Append(Left); }
@@ -785,7 +785,7 @@ public class BinaryOperatorCall : StatementWithValue, IReadable, IReferenceableT
         else
         { result.Append("..."); }
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
         return result.ToString();
     }
@@ -852,7 +852,7 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         if (Left.ToString().Length < Stringify.CozyLength)
         { result.Append(Left); }
@@ -863,7 +863,7 @@ public class UnaryOperatorCall : StatementWithValue, IReadable, IReferenceableTo
 
         result.Append(Operator);
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
         return result.ToString();
     }
@@ -1224,7 +1224,7 @@ public class Literal : StatementWithValue
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         result.Append(Type switch
         {
@@ -1233,7 +1233,7 @@ public class Literal : StatementWithValue
             _ => Value,
         });
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
         return result.ToString();
     }
@@ -1352,7 +1352,7 @@ public class AddressGetter : StatementWithValue
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{Operator}{PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{Operator}{PrevStatement}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
@@ -1380,7 +1380,7 @@ public class Pointer : StatementWithValue
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{Operator}{PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{Operator}{PrevStatement}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
@@ -1621,7 +1621,7 @@ public class NewInstance : StatementWithValue, IHaveType, IInFile
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{KeywordToken} {Type}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{KeywordToken} {Type}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
@@ -1661,7 +1661,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     public override string ToString()
     {
         StringBuilder result = new();
-        result.Append(SurroundingBracelet?.Start);
+        result.Append(SurroundingBrackets?.Start);
 
         result.Append(Keyword);
         result.Append(' ');
@@ -1680,7 +1680,7 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
 
         result.Append(Brackets.End);
 
-        result.Append(SurroundingBracelet?.End);
+        result.Append(SurroundingBrackets?.End);
         result.Append(Semicolon);
         return result.ToString();
     }
@@ -1740,7 +1740,7 @@ public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<Compile
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{PrevStatement}{Brackets.Start}{Index}{Brackets.End}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{PrevStatement}{Brackets.Start}{Index}{Brackets.End}{SurroundingBrackets?.End}{Semicolon}";
 
     public string ToReadable(FindStatementType typeSearch)
     {
@@ -1792,7 +1792,7 @@ public class Field : StatementWithValue, IReferenceableTo
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{PrevStatement}.{Identifier}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{PrevStatement}.{Identifier}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
@@ -1823,7 +1823,7 @@ public class BasicTypeCast : StatementWithValue, IHaveType
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{PrevStatement} {Keyword} {Type}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{PrevStatement} {Keyword} {Type}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
@@ -1854,7 +1854,7 @@ public class ManagedTypeCast : StatementWithValue, IHaveType
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}({Type}){PrevStatement}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}({Type}){PrevStatement}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {
@@ -1883,7 +1883,7 @@ public class ModifiedStatement : StatementWithValue
     }
 
     public override string ToString()
-        => $"{SurroundingBracelet?.Start}{Modifier} {Statement}{SurroundingBracelet?.End}{Semicolon}";
+        => $"{SurroundingBrackets?.Start}{Modifier} {Statement}{SurroundingBrackets?.End}{Semicolon}";
 
     public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
     {

@@ -1,4 +1,5 @@
 using LanguageCore.Compiler;
+using LanguageCore.Parser.Statements;
 using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
@@ -8,16 +9,18 @@ public class TypeInstanceFunction : TypeInstance, IEquatable<TypeInstanceFunctio
     public TypeInstance FunctionReturnType { get; }
     public ImmutableArray<TypeInstance> FunctionParameterTypes { get; }
     public Token? ClosureModifier { get; }
+    public TokenPair Brackets { get; }
 
     public override Position Position =>
         new Position(FunctionReturnType)
         .Union(FunctionParameterTypes);
 
-    public TypeInstanceFunction(TypeInstance returnType, ImmutableArray<TypeInstance> parameters, Token? closureModifier, Uri file) : base(file)
+    public TypeInstanceFunction(TypeInstance returnType, ImmutableArray<TypeInstance> parameters, Token? closureModifier, Uri file, TokenPair brackets) : base(file)
     {
         FunctionReturnType = returnType;
         FunctionParameterTypes = parameters;
         ClosureModifier = closureModifier;
+        Brackets = brackets;
     }
 
     public override bool Equals(object? obj) => obj is TypeInstanceFunction other && Equals(other);

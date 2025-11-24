@@ -2592,6 +2592,7 @@ public partial class StatementCompiler
         if (GetInstructionLabel(variable.Content, out CompiledInstructionLabelDeclaration? instructionLabel, out PossibleDiagnostic? instructionLabelError))
         {
             variable.Reference = instructionLabel;
+            variable.AnalyzedType = TokenAnalyzedType.InstructionLabel;
             OnGotStatementType(variable, CompiledInstructionLabelDeclaration.Type);
 
             compiledStatement = new InstructionLabelAddressGetter()
@@ -3084,17 +3085,15 @@ public partial class StatementCompiler
         field.CompiledType = compiledField.Type;
         field.Reference = compiledField;
 
+        compiledStatement = new CompiledFieldGetter()
         {
-            compiledStatement = new CompiledFieldGetter()
-            {
-                Field = compiledField,
-                Object = prev,
-                Location = field.Location,
-                SaveValue = field.SaveValue,
-                Type = GeneralType.InsertTypeParameters(compiledField.Type, structType.TypeArguments) ?? compiledField.Type,
-            };
-            return true;
-        }
+            Field = compiledField,
+            Object = prev,
+            Location = field.Location,
+            SaveValue = field.SaveValue,
+            Type = GeneralType.InsertTypeParameters(compiledField.Type, structType.TypeArguments) ?? compiledField.Type,
+        };
+        return true;
     }
     bool CompileStatement(IndexCall index, [NotNullWhen(true)] out CompiledStatementWithValue? compiledStatement)
     {

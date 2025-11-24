@@ -17,4 +17,8 @@ public enum TokenAnalyzedType
     BuiltinType,
     TypeParameter,
     ConstantName,
+    MathOperator,
+    OtherOperator,
+    TypeModifier,
+    InstructionLabel,
 }

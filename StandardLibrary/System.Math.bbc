@@ -13,10 +13,15 @@ export inline byte isnan(this f32 v)
     ) == 0b_0_11111111_00000000000000000000000;
 }
 
+[External("random")]
+export inline int random()
+{
+    random(1);
+}
+
 /*
  * Source: https://en.wikipedia.org/wiki/Lehmer_random_number_generator
  */
-[External("random")]
 export int random(int state)
 {
 	// Precomputed parameters for Schrage's method

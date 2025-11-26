@@ -57,18 +57,10 @@ public partial class StatementCompiler
         @struct.SetFields(compiledFields.MoveToImmutable());
     }
 
-    void CompileFunctionAttributes(FunctionThingDefinition function)
+    void CompileFunctionAttributes<TFunction>(TFunction function)
+        where TFunction : FunctionThingDefinition, ICompiledFunctionDefinition, IHaveAttributes
     {
-        GeneralType? type = null;
-        TypeInstance? typeInstance = null;
-        if (function is IHaveType haveType)
-        {
-            if (!GeneralType.From(typeInstance = haveType.Type, FindType, out type, out PossibleDiagnostic? error))
-            {
-                Diagnostics.Add(error.ToError(typeInstance));
-                return;
-            }
-        }
+        GeneralType type = function.Type;
 
         foreach (AttributeUsage attribute in function.Attributes)
         {
@@ -96,7 +88,7 @@ public partial class StatementCompiler
                         break;
                     }
 
-                    // CheckExternalFunctionDeclaration(this, function, externalFunction, type, parameterTypes);
+                    CheckExternalFunctionDeclaration(this, function, externalFunction, type, (function as ICompiledFunctionDefinition).Parameters.ToImmutableArray(v => v.Type), Diagnostics);
 
                     break;
                 }
@@ -122,38 +114,27 @@ public partial class StatementCompiler
                         break;
                     }
 
-                    if (builtinFunction.Parameters.Length != function.Parameters.Count)
+                    if (builtinFunction.Parameters.Length != (function as ICompiledFunctionDefinition).Parameters.Length)
                     {
                         Diagnostics.Add(Diagnostic.Critical($"Wrong number of arguments passed to function \"{builtinName}\"", function.Identifier, function.File));
                     }
 
-                    if (type is null)
-                    {
-                        Diagnostics.Add(Diagnostic.Critical($"Can't use attribute \"{attribute.Identifier}\" on this function because its aint have a return type", typeInstance, function.File));
-                        continue;
-                    }
-
                     if (!builtinFunction.Type.Invoke(type))
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", typeInstance, function.File));
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type defined for function \"{builtinName}\"", (function as IHaveType)?.Type.Location ?? new Location(function.Identifier.Position, function.File)));
                     }
 
                     for (int i = 0; i < builtinFunction.Parameters.Length; i++)
                     {
-                        if (i >= function.Parameters.Count) break;
+                        if (i >= (function as ICompiledFunctionDefinition).Parameters.Length) break;
 
                         Predicate<GeneralType> definedParameterType = builtinFunction.Parameters[i];
-                        if (!GeneralType.From(function.Parameters.Parameters[i].Type, FindType, out GeneralType? passedParameterType, out PossibleDiagnostic? error))
-                        {
-                            Diagnostics.Add(error.ToError(function.Parameters.Parameters[i].Type));
-                            continue;
-                        }
-                        function.Parameters[i].Type.SetAnalyzedType(passedParameterType);
+                        GeneralType? passedParameterType = (function as ICompiledFunctionDefinition).Parameters[i].Type;
 
                         if (definedParameterType.Invoke(passedParameterType))
                         { continue; }
 
-                        Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", function.Parameters[i].Type, function.Parameters[i].File));
+                        Diagnostics.Add(Diagnostic.Critical($"Wrong type of parameter passed to function \"{builtinName}\". Parameter index: {i} Required type: \"{definedParameterType}\" Passed: \"{passedParameterType}\"", (function as FunctionThingDefinition).Parameters[i].Type, function.Parameters[i].File));
                     }
                     break;
                 }
@@ -180,16 +161,20 @@ public partial class StatementCompiler
                 }
                 default:
                 {
-                    CompileUserAttribute(function, attribute);
+                    if (!AttributeConstants.List.Contains(attribute.Identifier.Content)
+                        && !CompileUserAttribute(function, attribute))
+                    {
+                        Diagnostics.Add(Diagnostic.Warning($"Attribute `{attribute.Identifier}` not found", attribute.Identifier, attribute.File));
+                    }
                     break;
                 }
             }
         }
     }
 
-    void CompileVariableAttributes(VariableDeclaration function)
+    void CompileVariableAttributes(VariableDeclaration variable)
     {
-        foreach (AttributeUsage attribute in function.Attributes)
+        foreach (AttributeUsage attribute in variable.Attributes)
         {
             switch (attribute.Identifier.Content)
             {
@@ -211,14 +196,19 @@ public partial class StatementCompiler
                 }
                 default:
                 {
-                    CompileUserAttribute(function, attribute);
+                    if (!AttributeConstants.List.Contains(attribute.Identifier.Content)
+                        && !CompileUserAttribute(variable, attribute))
+                    {
+                        Diagnostics.Add(Diagnostic.Warning($"Attribute `{attribute.Identifier}` not found", attribute.Identifier, attribute.File));
+                    }
+
                     break;
                 }
             }
         }
     }
 
-    void CompileUserAttribute(IHaveAttributes context, AttributeUsage attribute)
+    bool CompileUserAttribute(IHaveAttributes context, AttributeUsage attribute)
     {
         foreach (UserDefinedAttribute userDefinedAttribute in UserDefinedAttributes)
         {
@@ -247,8 +237,10 @@ public partial class StatementCompiler
                 Diagnostics.Add(error.ToError(attribute));
             }
 
-            break;
+            return true;
         }
+
+        return false;
     }
 
     public static void CheckExternalFunctionDeclaration<TFunction>(IRuntimeInfoProvider runtime, TFunction definition, IExternalFunction externalFunction, DiagnosticsCollection diagnostics)
@@ -259,15 +251,17 @@ public partial class StatementCompiler
 
     public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, DiagnosticsCollection diagnostics)
     {
-        if (externalFunction.ParametersSize != parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime)))
+        int passedParametersSize = parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime));
+        int passedReturnType = returnType.SameAs(BasicType.Void) ? 0 : returnType.GetSize(runtime);
+        if (externalFunction.ParametersSize != passedParametersSize)
         {
-            diagnostics?.Add(Diagnostic.Critical($"Wrong size of parameters defined for external function \"{externalFunction.ToReadable()}\"", definition.Identifier, definition.File));
+            diagnostics?.Add(Diagnostic.Critical($"Wrong size of parameters defined ({passedParametersSize}) for external function \"{externalFunction.ToReadable()}\" {definition.ToReadable()}", definition.Identifier, definition.File));
             return;
         }
 
-        if (externalFunction.ReturnValueSize != (returnType.SameAs(BasicType.Void) ? 0 : returnType.GetSize(runtime)))
+        if (externalFunction.ReturnValueSize != passedReturnType)
         {
-            diagnostics?.Add(Diagnostic.Critical($"Wrong size of return type defined for external function \"{externalFunction.ToReadable()}\"", definition.Identifier, definition.File));
+            diagnostics?.Add(Diagnostic.Critical($"Wrong size of return type defined ({passedReturnType}) for external function \"{externalFunction.ToReadable()}\" {definition.ToReadable()}", definition.Identifier, definition.File));
             return;
         }
     }
@@ -299,8 +293,6 @@ public partial class StatementCompiler
             }
             parameters.Add(new CompiledParameter(parameterType, item));
         }
-
-        CompileFunctionAttributes(function);
 
         result = new(
             type,
@@ -349,6 +341,8 @@ public partial class StatementCompiler
         if (function.Template is not null)
         { GenericParameters.Pop(); }
 
+        CompileFunctionAttributes(result);
+
         return true;
     }
 
@@ -373,22 +367,21 @@ public partial class StatementCompiler
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
-        CompileFunctionAttributes(function);
-
         result = new(
             type,
             parameters.MoveToImmutable(),
             context,
             function
         );
+
+        CompileFunctionAttributes(result);
+
         return true;
     }
 
     bool CompileGeneralFunctionDefinition(GeneralFunctionDefinition function, GeneralType returnType, CompiledStruct context, [NotNullWhen(true)] out CompiledGeneralFunctionDefinition? result)
     {
         result = null;
-
-        CompileFunctionAttributes(function);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
@@ -407,6 +400,9 @@ public partial class StatementCompiler
             context,
             function
         );
+
+        CompileFunctionAttributes(result);
+
         return true;
     }
 
@@ -438,8 +434,6 @@ public partial class StatementCompiler
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
-        CompileFunctionAttributes(function);
-
         result = new(
             type,
             parameters.MoveToImmutable(),
@@ -448,6 +442,8 @@ public partial class StatementCompiler
 
         if (function.Template is not null)
         { GenericParameters.Pop(); }
+
+        CompileFunctionAttributes(result);
 
         return true;
     }
@@ -692,7 +688,8 @@ public partial class StatementCompiler
                             new TypeInstancePointer(new TypeInstanceSimple(genericParameter, @struct.File), Token.CreateAnonymous("*", TokenType.Operator), @struct.File)
                         ),
                         null,
-                        @struct.File),
+                        @struct.File,
+                        TokenPair.CreateAnonymous("(", ")")),
                     Token.CreateAnonymous("func"),
                     null
                 )
@@ -1143,16 +1140,15 @@ public partial class StatementCompiler
         using var _1 = _m3.Auto();
 #endif
 
-        CompiledFrame dummyFrame = Frames.Push(CompiledFrame.Empty);
+        using (Frames.PushAuto(CompiledFrame.Empty))
+        {
+            CompileDefinitions(file, parsedFiles);
 
-        CompileDefinitions(file, parsedFiles);
-
-        GenerateCode(
-            parsedFiles,
-            file
-        );
-
-        if (Frames.Pop() != dummyFrame) throw new InternalExceptionWithoutContext("Bruh");
+            GenerateCode(
+                parsedFiles,
+                file
+            );
+        }
 
         return new CompilerResult(
             parsedFiles,

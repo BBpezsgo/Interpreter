@@ -46,30 +46,5 @@ public abstract class TypeInstance :
     public abstract override string ToString();
     public virtual string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments) => ToString();
 
-    protected static bool TryGetAnalyzedType(GeneralType type, out TokenAnalyzedType analyzedType)
-    {
-        analyzedType = default;
-
-        switch (type.FinalValue)
-        {
-            case StructType:
-                analyzedType = TokenAnalyzedType.Struct;
-                return true;
-            case GenericType:
-                analyzedType = TokenAnalyzedType.TypeParameter;
-                return true;
-            case BuiltinType:
-                analyzedType = TokenAnalyzedType.BuiltinType;
-                return true;
-            case AliasType:
-                analyzedType = TokenAnalyzedType.Type;
-                return true;
-            case FunctionType functionType:
-                return TryGetAnalyzedType(functionType.ReturnType, out analyzedType);
-            default:
-                return false;
-        }
-    }
-
     public abstract void SetAnalyzedType(GeneralType type);
 }

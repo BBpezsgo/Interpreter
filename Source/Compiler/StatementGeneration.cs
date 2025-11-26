@@ -104,12 +104,6 @@ public partial class StatementCompiler
 
         if (deallocator.ExternalFunctionName is not null)
         {
-            if (!ExternalFunctions.TryGet(deallocator.ExternalFunctionName, out _, out PossibleDiagnostic? exception))
-            {
-                Diagnostics.Add(exception.ToError(deallocator));
-                return false;
-            }
-
             throw new NotImplementedException();
         }
 
@@ -1868,7 +1862,7 @@ public partial class StatementCompiler
             }
         }
 
-        CompiledFrame frame = Frames.Push(new CompiledFrame()
+        using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
@@ -1877,15 +1871,13 @@ public partial class StatementCompiler
             CurrentReturnType = functionType?.ReturnType,
             CompiledGeneratorContext = null,
             IsTopLevel = false,
-        });
-
-        try
+        }))
         {
-            Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty));
-
-            if (!CompileStatement(lambdaStatement.Body, out CompiledStatement? _body)) return false;
-
-            if (Frames.Last.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
+            CompiledStatement? _body;
+            using (Frames.Last.Scopes.PushAuto(new Scope(ImmutableArray<CompiledVariableConstant>.Empty)))
+            {
+                if (!CompileStatement(lambdaStatement.Body, out _body)) return false;
+            }
 
             CompiledBlock block;
 
@@ -1895,7 +1887,7 @@ public partial class StatementCompiler
             }
             else if (_body is CompiledStatementWithValue _compiledStatementWithValue)
             {
-                if (frame.CurrentReturnType is null || frame.CurrentReturnType.SameAs(BuiltinType.Void))
+                if (frame.Value.CurrentReturnType is null || frame.Value.CurrentReturnType.SameAs(BuiltinType.Void))
                 {
                     _compiledStatementWithValue.SaveValue = false;
                     block = new CompiledBlock()
@@ -1916,9 +1908,9 @@ public partial class StatementCompiler
                             Value = _compiledStatementWithValue,
                         }),
                     };
-                    if (!frame.CurrentReturnType.SameAs(_compiledStatementWithValue.Type))
+                    if (!frame.Value.CurrentReturnType.SameAs(_compiledStatementWithValue.Type))
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Lambda expression value's type ({_compiledStatementWithValue.Type}) doesn't match the return type {frame.CurrentReturnType}", _compiledStatementWithValue));
+                        Diagnostics.Add(Diagnostic.Critical($"Lambda expression value's type ({_compiledStatementWithValue.Type}) doesn't match the return type {frame.Value.CurrentReturnType}", _compiledStatementWithValue));
                     }
                 }
             }
@@ -1931,13 +1923,13 @@ public partial class StatementCompiler
                 };
             }
 
-            if (!frame.IsMsilCompatible)
+            if (!frame.Value.IsMsilCompatible)
             {
                 Frames.LastRef.IsMsilCompatible = false;
             }
 
-            ImmutableArray<CapturedLocal>.Builder closureBuilder = ImmutableArray.CreateBuilder<CapturedLocal>(frame.CapturedVariables.Count + frame.CapturedParameters.Count);
-            foreach (CompiledParameter item in frame.CapturedParameters)
+            ImmutableArray<CapturedLocal>.Builder closureBuilder = ImmutableArray.CreateBuilder<CapturedLocal>(frame.Value.CapturedVariables.Count + frame.Value.CapturedParameters.Count);
+            foreach (CompiledParameter item in frame.Value.CapturedParameters)
             {
                 closureBuilder.Add(new()
                 {
@@ -1946,7 +1938,7 @@ public partial class StatementCompiler
                     Variable = null,
                 });
             }
-            foreach (CompiledVariableDeclaration item in frame.CapturedVariables)
+            foreach (CompiledVariableDeclaration item in frame.Value.CapturedVariables)
             {
                 closureBuilder.Add(new()
                 {
@@ -1957,7 +1949,7 @@ public partial class StatementCompiler
             }
             ImmutableArray<CapturedLocal> closure = closureBuilder.MoveToImmutable();
 
-            functionType = new FunctionType(frame.CurrentReturnType ?? BuiltinType.Void, functionType?.Parameters ?? frame.CompiledParameters.ToImmutableArray(v => v.Type), !closure.IsEmpty);
+            functionType = new FunctionType(frame.Value.CurrentReturnType ?? BuiltinType.Void, functionType?.Parameters ?? frame.Value.CompiledParameters.ToImmutableArray(v => v.Type), !closure.IsEmpty);
 
             CompiledStatementWithValue? allocator = null;
             if (!closure.IsEmpty)
@@ -1978,8 +1970,8 @@ public partial class StatementCompiler
                 if (!CompileAllocation(LiteralStatement.CreateAnonymous(closureSize, lambdaStatement.Position, lambdaStatement.File), out allocator)) return false;
             }
 
-            if (!frame.CapturesGlobalVariables.HasValue) Frames.Last.CapturesGlobalVariables = null;
-            else if (frame.CapturesGlobalVariables.Value) Frames.Last.CapturesGlobalVariables = true;
+            if (!frame.Value.CapturesGlobalVariables.HasValue) Frames.Last.CapturesGlobalVariables = null;
+            else if (frame.Value.CapturesGlobalVariables.Value) Frames.Last.CapturesGlobalVariables = true;
 
             compiledStatement = new CompiledLambda(
                 functionType.ReturnType,
@@ -1998,10 +1990,6 @@ public partial class StatementCompiler
             };
 
             return true;
-        }
-        finally
-        {
-            if (Frames.Pop() != frame) throw new InternalExceptionWithoutContext("Bruh");
         }
     }
     bool CompileStatement(Assignment setter, [NotNullWhen(true)] out CompiledStatement? compiledStatement) => CompileSetter(setter.Left, setter.Right, out compiledStatement);
@@ -2733,13 +2721,14 @@ public partial class StatementCompiler
         }
         */
 
-        Scope scope = Frames.Last.Scopes.Push(CompileScope(block.Statements));
+        CompiledStatementWithValue? condition;
+        CompiledStatement? body;
 
-        if (!CompileStatement(whileLoop.Condition, out CompiledStatementWithValue? condition)) return false;
-
-        if (!CompileStatement(block, out CompiledStatement? body, true)) return false;
-
-        if (Frames.Last.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext();
+        using (Frames.Last.Scopes.PushAuto(CompileScope(block.Statements)))
+        {
+            if (!CompileStatement(whileLoop.Condition, out condition)) return false;
+            if (!CompileStatement(block, out body, true)) return false;
+        }
 
         compiledStatement = new CompiledWhileLoop()
         {
@@ -2753,53 +2742,56 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        Scope scope = Frames.Last.Scopes.Push(CompileScope(forLoop.VariableDeclaration is null ? Enumerable.Empty<Statement>() : Enumerable.Repeat(forLoop.VariableDeclaration, 1)));
-
         CompiledStatement? variableDeclaration = null;
-        if (forLoop.VariableDeclaration is not null &&
-            !CompileStatement(forLoop.VariableDeclaration, out variableDeclaration))
-        { return false; }
+        CompiledStatementWithValue? condition;
+        CompiledStatement? body;
+        CompiledStatement? expression;
 
-        /*
-        if (AllowEvaluating &&
-            TryCompute(forLoop.Condition, out CompiledValue condition))
+        using (Frames.Last.Scopes.PushAuto(CompileScope(forLoop.VariableDeclaration is null ? Enumerable.Empty<Statement>() : Enumerable.Repeat(forLoop.VariableDeclaration, 1))))
         {
-            if (condition)
+            if (forLoop.VariableDeclaration is not null &&
+                !CompileStatement(forLoop.VariableDeclaration, out variableDeclaration))
+            { return false; }
+
+            /*
+            if (AllowEvaluating &&
+                TryCompute(forLoop.Condition, out CompiledValue condition))
             {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
+                if (condition)
+                {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
 
-                CompileStatement(forLoop.Block);
+                    CompileStatement(forLoop.Block);
 
-                AddComment("For-loop expression");
-                CompileStatement(forLoop.Expression);
+                    AddComment("For-loop expression");
+                    CompileStatement(forLoop.Expression);
 
-                AddComment("Jump back");
-                AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
+                    AddComment("Jump back");
+                    AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
 
-                FinishJumpInstructions(BreakInstructions.Pop());
+                    FinishJumpInstructions(BreakInstructions.Pop());
 
-                OnScopeExit(forLoop.Position.After(), forLoop.File);
+                    OnScopeExit(forLoop.Position.After(), forLoop.File);
 
-                AddComment("}");
+                    AddComment("}");
+                }
+                else
+                {
+                    Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop fully trimmed", forLoop));
+
+                    OnScopeExit(forLoop.Position.After(), forLoop.File);
+
+                    AddComment("}");
+                }
+                return;
             }
-            else
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop fully trimmed", forLoop));
+            */
 
-                OnScopeExit(forLoop.Position.After(), forLoop.File);
+            if (!CompileStatement(forLoop.Condition, out condition)) return false;
 
-                AddComment("}");
-            }
-            return;
+            if (!CompileStatement(forLoop.Block, out body)) return false;
+            if (!CompileStatement(forLoop.Expression, out expression)) return false;
         }
-        */
-
-        if (!CompileStatement(forLoop.Condition, out CompiledStatementWithValue? condition)) return false;
-
-        if (!CompileStatement(forLoop.Block, out CompiledStatement? body)) return false;
-        if (!CompileStatement(forLoop.Expression, out CompiledStatement? expression)) return false;
-
-        if (Frames.Last.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
 
         compiledStatement = new CompiledForLoop()
         {
@@ -3340,15 +3332,14 @@ public partial class StatementCompiler
             return true;
         }
 
-        Scope scope = Frames.Last.Scopes.Push(CompileScope(block.Statements));
-
-        for (int i = 0; i < block.Statements.Length; i++)
+        using (Frames.Last.Scopes.PushAuto(CompileScope(block.Statements)))
         {
-            if (!CompileStatement(block.Statements[i], out CompiledStatement? item)) return false;
-            res.Add(item);
+            for (int i = 0; i < block.Statements.Length; i++)
+            {
+                if (!CompileStatement(block.Statements[i], out CompiledStatement? item)) return false;
+                res.Add(item);
+            }
         }
-
-        if (Frames.Last.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
 
         compiledStatement = new CompiledBlock()
         {
@@ -4101,7 +4092,7 @@ public partial class StatementCompiler
             }
         }
 
-        CompiledFrame frame = Frames.Push(new CompiledFrame()
+        using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = typeArguments ?? ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
@@ -4110,35 +4101,33 @@ public partial class StatementCompiler
             CurrentReturnType = returnType,
             CompiledGeneratorContext = compiledGeneratorContext,
             IsTopLevel = false,
-        });
-
-        try
+        }))
         {
-            Scope scope = frame.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty));
-
-            if (!CompileStatement(function.Block, out CompiledStatement? body)) return false;
-
-            if (prefixStatement is not null || suffixStatement is not null)
+            CompiledStatement? body;
+            using (frame.Value.Scopes.PushAuto(new Scope(ImmutableArray<CompiledVariableConstant>.Empty)))
             {
-                ImmutableArray<CompiledStatement> bodyStatements = ((CompiledBlock)body).Statements;
+                if (!CompileStatement(function.Block, out body)) return false;
 
-                ImmutableArray<CompiledStatement>.Builder v = ImmutableArray.CreateBuilder<CompiledStatement>(bodyStatements.Length + (prefixStatement is null ? 0 : 1) + (suffixStatement is null ? 0 : 1));
-                if (prefixStatement is not null) v.Add(prefixStatement);
-                v.AddRange(bodyStatements);
-                if (suffixStatement is not null) v.Add(suffixStatement);
-                bodyStatements = v.MoveToImmutable();
-
-                body = new CompiledBlock()
+                if (prefixStatement is not null || suffixStatement is not null)
                 {
-                    Location = body.Location,
-                    Statements = bodyStatements,
-                };
+                    ImmutableArray<CompiledStatement> bodyStatements = ((CompiledBlock)body).Statements;
+
+                    ImmutableArray<CompiledStatement>.Builder v = ImmutableArray.CreateBuilder<CompiledStatement>(bodyStatements.Length + (prefixStatement is null ? 0 : 1) + (suffixStatement is null ? 0 : 1));
+                    if (prefixStatement is not null) v.Add(prefixStatement);
+                    v.AddRange(bodyStatements);
+                    if (suffixStatement is not null) v.Add(suffixStatement);
+                    bodyStatements = v.MoveToImmutable();
+
+                    body = new CompiledBlock()
+                    {
+                        Location = body.Location,
+                        Statements = bodyStatements,
+                    };
+                }
             }
 
-            if (frame.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
-
-            ImmutableArray<CapturedLocal>.Builder closureBuilder = ImmutableArray.CreateBuilder<CapturedLocal>(frame.CapturedVariables.Count + frame.CapturedParameters.Count);
-            foreach (CompiledParameter item in frame.CapturedParameters)
+            ImmutableArray<CapturedLocal>.Builder closureBuilder = ImmutableArray.CreateBuilder<CapturedLocal>(frame.Value.CapturedVariables.Count + frame.Value.CapturedParameters.Count);
+            foreach (CompiledParameter item in frame.Value.CapturedParameters)
             {
                 closureBuilder.Add(new()
                 {
@@ -4147,7 +4136,7 @@ public partial class StatementCompiler
                     Variable = null,
                 });
             }
-            foreach (CompiledVariableDeclaration item in frame.CapturedVariables)
+            foreach (CompiledVariableDeclaration item in frame.Value.CapturedVariables)
             {
                 closureBuilder.Add(new()
                 {
@@ -4158,17 +4147,13 @@ public partial class StatementCompiler
             }
             ImmutableArray<CapturedLocal> closure = closureBuilder.MoveToImmutable();
 
-            function.IsMsilCompatible = function.IsMsilCompatible && frame.IsMsilCompatible;
+            function.IsMsilCompatible = function.IsMsilCompatible && frame.Value.IsMsilCompatible;
 
             GeneratedFunctions.Add(new(function, (CompiledBlock)body, closure));
 
             if (!closure.IsEmpty) throw new NotImplementedException();
 
             return true;
-        }
-        finally
-        {
-            if (Frames.Pop() != frame) throw new InternalExceptionWithoutContext("Bruh");
         }
 
     end:
@@ -4276,7 +4261,7 @@ public partial class StatementCompiler
             });
         }
 
-        CompiledFrame frame = Frames.Push(new CompiledFrame()
+        using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
             CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
@@ -4285,35 +4270,35 @@ public partial class StatementCompiler
             CurrentReturnType = ExitCodeType,
             CompiledGeneratorContext = null,
             IsTopLevel = true,
-        });
-        Scope scope = Frames.Last.Scopes.Push(new Scope(ImmutableArray<CompiledVariableConstant>.Empty));
-
-        foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
+        }))
         {
-            if (!CompileTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
-            CompiledTopLevelStatements.AddRange(v);
+            using (Frames.Last.Scopes.PushAuto(new Scope(ImmutableArray<CompiledVariableConstant>.Empty)))
+            {
+                foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
+                {
+                    if (!CompileTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
+                    CompiledTopLevelStatements.AddRange(v);
+                }
+
+                while (true)
+                {
+                    bool compiledAnything = false;
+
+                    compiledAnything = CompileFunctions(CompiledFunctions) || compiledAnything;
+                    compiledAnything = CompileFunctions(CompiledOperators) || compiledAnything;
+                    compiledAnything = CompileFunctions(CompiledGeneralFunctions) || compiledAnything;
+                    compiledAnything = CompileFunctions(CompiledConstructors) || compiledAnything;
+
+                    compiledAnything = CompileFunctionTemplates(CompilableFunctions) || compiledAnything;
+                    compiledAnything = CompileFunctionTemplates(CompilableConstructors) || compiledAnything;
+                    compiledAnything = CompileFunctionTemplates(CompilableOperators) || compiledAnything;
+                    compiledAnything = CompileFunctionTemplates(CompilableGeneralFunctions) || compiledAnything;
+
+                    if (!compiledAnything) break;
+                }
+            }
+            if (frame.Value.CapturedParameters.Count > 0 || frame.Value.CapturedVariables.Count > 0) throw new UnreachableException();
         }
-
-        while (true)
-        {
-            bool compiledAnything = false;
-
-            compiledAnything = CompileFunctions(CompiledFunctions) || compiledAnything;
-            compiledAnything = CompileFunctions(CompiledOperators) || compiledAnything;
-            compiledAnything = CompileFunctions(CompiledGeneralFunctions) || compiledAnything;
-            compiledAnything = CompileFunctions(CompiledConstructors) || compiledAnything;
-
-            compiledAnything = CompileFunctionTemplates(CompilableFunctions) || compiledAnything;
-            compiledAnything = CompileFunctionTemplates(CompilableConstructors) || compiledAnything;
-            compiledAnything = CompileFunctionTemplates(CompilableOperators) || compiledAnything;
-            compiledAnything = CompileFunctionTemplates(CompilableGeneralFunctions) || compiledAnything;
-
-            if (!compiledAnything) break;
-        }
-
-        if (Frames.Last.Scopes.Pop() != scope) throw new InternalExceptionWithoutContext("Bruh");
-        if (frame.CapturedParameters.Count > 0 || frame.CapturedVariables.Count > 0) throw new UnreachableException();
-        if (Frames.Pop() != frame) throw new InternalExceptionWithoutContext("Bruh");
 
         /*
         var allStatements =
@@ -4400,16 +4385,22 @@ public partial class StatementCompiler
     {
         if (statement.Deallocator is not null)
         {
-            CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Deallocator);
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
+            CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Deallocator);
+            if (f is not null)
+            {
+                AnalyseFunction(f, stack);
+                flags |= f.Flags;
+            }
         }
 
         if (statement.Destructor is not null)
         {
-            CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Destructor);
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
+            CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Destructor);
+            if (f is not null)
+            {
+                AnalyseFunction(f, stack);
+                flags |= f.Flags;
+            }
         }
     }
 
@@ -4584,9 +4575,12 @@ public partial class StatementCompiler
     void AnalyseFunction(CompiledFunctionCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         AnalyseFunction(statement.Arguments, ref flags, stack);
-        CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Function);
-        AnalyseFunction(f, stack);
-        flags |= f.Flags;
+        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
+        if (f is not null)
+        {
+            AnalyseFunction(f, stack);
+            flags |= f.Flags;
+        }
     }
     void AnalyseFunction(CompiledExternalFunctionCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
@@ -4634,24 +4628,33 @@ public partial class StatementCompiler
     }
     void AnalyseFunction(CompiledHeapAllocation statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
-        CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Allocator);
-        AnalyseFunction(f, stack);
-        flags |= f.Flags;
+        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Allocator);
+        if (f is not null)
+        {
+            AnalyseFunction(f, stack);
+            flags |= f.Flags;
+        }
     }
     void AnalyseFunction(CompiledConstructorCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         AnalyseFunction(statement.Object, ref flags, stack);
         AnalyseFunction(statement.Arguments, ref flags, stack);
-        CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Function);
-        AnalyseFunction(f, stack);
-        flags |= f.Flags;
+        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
+        if (f is not null)
+        {
+            AnalyseFunction(f, stack);
+            flags |= f.Flags;
+        }
     }
     void AnalyseFunction(CompiledDesctructorCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         AnalyseFunction(statement.Value, ref flags, stack);
-        CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Function);
-        AnalyseFunction(f, stack);
-        flags |= f.Flags;
+        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
+        if (f is not null)
+        {
+            AnalyseFunction(f, stack);
+            flags |= f.Flags;
+        }
     }
     void AnalyseFunction(CompiledTypeCast statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
@@ -4695,12 +4698,15 @@ public partial class StatementCompiler
     }
     void AnalyseFunction(FunctionAddressGetter statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
-        CompiledFunction f = GeneratedFunctions.First(v => v.Function == statement.Function);
-        AnalyseFunction(f, stack);
-        flags |= f.Flags;
-        if (f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables))
+        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
+        if (f is not null)
         {
-            Diagnostics.Add(Diagnostic.Error($"This is not supported for now", statement));
+            AnalyseFunction(f, stack);
+            flags |= f.Flags;
+            if (f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables))
+            {
+                Diagnostics.Add(Diagnostic.Error($"This is not supported for now", statement));
+            }
         }
     }
     void AnalyseFunction(InstructionLabelAddressGetter statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)

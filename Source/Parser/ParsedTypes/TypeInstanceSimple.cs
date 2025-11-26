@@ -42,7 +42,7 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
 
     public override void SetAnalyzedType(GeneralType type)
     {
-        Identifier.AnalyzedType = type switch
+        Identifier.AnalyzedType = type.FinalValue switch
         {
             StructType => TokenAnalyzedType.Struct,
             GenericType => TokenAnalyzedType.TypeParameter,

@@ -1430,7 +1430,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
         {
-            name.AnalyzedType = TokenAnalyzedType.Type;
+            name.AnalyzedType = alias.Value.FinalValue switch
+            {
+                BuiltinType => TokenAnalyzedType.BuiltinType,
+                StructType => TokenAnalyzedType.Struct,
+                GenericType => TokenAnalyzedType.TypeParameter,
+                _ => TokenAnalyzedType.Type,
+            };
             alias.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
 
             // HERE

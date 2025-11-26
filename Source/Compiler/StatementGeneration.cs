@@ -1106,7 +1106,7 @@ public partial class StatementCompiler
             callee.IsInlineable)
         {
             CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == callee);
-            if (f?.Body is not null)
+            if (f is not null)
             {
                 InlineContext inlineContext = new()
                 {
@@ -1201,13 +1201,13 @@ public partial class StatementCompiler
                 else
                 {
                     // Debugger.Break();
-                    InlineFunction(f.Body, new InlineContext()
-                    {
-                        Arguments = f.Function.Parameters
-                            .Select((value, index) => (value.Identifier.Content, compiledArguments[index]))
-                            .ToImmutableDictionary(v => v.Content, v => v.Item2),
-                    }, out inlined1);
-                    Diagnostics.Add(Diagnostic.FailedOptimization($"Failed to inline \"{callee.ToReadable()}\"", caller));
+                    //InlineFunction(f.Body, new InlineContext()
+                    //{
+                    //    Arguments = f.Function.Parameters
+                    //        .Select((value, index) => (value.Identifier.Content, compiledArguments[index]))
+                    //        .ToImmutableDictionary(v => v.Content, v => v.Item2),
+                    //}, out inlined1);
+                    Diagnostics.Add(Diagnostic.Warning($"Failed to inline \"{callee.ToReadable()}\"", caller));
                 }
             }
         }
@@ -1254,11 +1254,11 @@ public partial class StatementCompiler
             }
             else if (param is Identifier identifier)
             {
-                if (FindType(identifier.Token, identifier.File, out paramType))
+                if (FindType(identifier.Token, identifier.File, out paramType, out PossibleDiagnostic? typeError))
                 { paramType = OnGotStatementType(identifier, paramType); }
                 else
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Type \"{param}\" not found", param));
+                    Diagnostics.Add(typeError.ToError(identifier));
                     return false;
                 }
             }
@@ -3875,9 +3875,8 @@ public partial class StatementCompiler
             return true;
         }
 
-        if (!FindType(type.Identifier, type.File, out result))
+        if (!FindType(type.Identifier, type.File, out result, out error))
         {
-            error = new($"Can't parse \"{type}\" to \"{nameof(GeneralType)}\"", type);
             return false;
         }
 

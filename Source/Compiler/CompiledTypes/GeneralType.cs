@@ -81,7 +81,7 @@ public abstract class GeneralType :
                 { stackArraySize = _stackArraySize; }
             }
 
-            if (!GeneralType.From(type.StackArrayOf, typeFinder, out var of, out error, constComputer)) return false;
+            if (!GeneralType.From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
 
             result = new ArrayType(of, stackArraySize.HasValue ? new CompiledEvaluatedValue()
             {
@@ -95,7 +95,7 @@ public abstract class GeneralType :
         }
         else
         {
-            if (!GeneralType.From(type.StackArrayOf, typeFinder, out var of, out error, constComputer)) return false;
+            if (!GeneralType.From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
             result = new ArrayType(of, null);
             type.SetAnalyzedType(result);
             return true;
@@ -128,7 +128,7 @@ public abstract class GeneralType :
     {
         result = null;
 
-        if (!GeneralType.From(type.To, typeFinder, out var to, out error, constComputer)) return false;
+        if (!GeneralType.From(type.To, typeFinder, out GeneralType? to, out error, constComputer)) return false;
 
         result = new PointerType(to);
         type.SetAnalyzedType(result);
@@ -153,9 +153,8 @@ public abstract class GeneralType :
             return true;
         }
 
-        if (!typeFinder.Invoke(type.Identifier, type.File, out result))
+        if (!typeFinder.Invoke(type.Identifier, type.File, out result, out error))
         {
-            error = new($"Can't parse \"{type}\" to \"{nameof(GeneralType)}\"", type);
             return false;
         }
 
@@ -205,7 +204,7 @@ public abstract class GeneralType :
         ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (TypeInstance item in types)
         {
-            if (!GeneralType.From(item, typeFinder, out var _item, out error, constComputer)) return false;
+            if (!GeneralType.From(item, typeFinder, out GeneralType? _item, out error, constComputer)) return false;
             _result.Add(_item);
         }
         result = _result.MoveToImmutable();
@@ -226,7 +225,7 @@ public abstract class GeneralType :
         ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (T item in types)
         {
-            if (!GeneralType.From(item.Type, typeFinder, out var _item, out error, constComputer)) return false;
+            if (!GeneralType.From(item.Type, typeFinder, out GeneralType? _item, out error, constComputer)) return false;
             _result.Add(_item);
         }
         result = _result.MoveToImmutable();

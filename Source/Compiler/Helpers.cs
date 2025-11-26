@@ -1401,17 +1401,19 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Find Type
 
-    bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result)
+    bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out GeneralType? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);
+            error = null;
             return true;
         }
 
         if (Frames.Last.TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
         {
             result = typeArgument;
+            error = null;
             return true;
         }
 
@@ -1423,12 +1425,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 {
                     GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
                     result = new GenericType(GenericParameters[i][j], relevantFile);
+                    error = null;
                     return true;
                 }
             }
         }
 
-        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out _))
+        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out PossibleDiagnostic? aliasError))
         {
             name.AnalyzedType = alias.Value.FinalValue switch
             {
@@ -1441,36 +1444,46 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
             // HERE
             result = new AliasType(alias.Value, alias);
+            error = null;
             return true;
         }
 
-        if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out _))
+        if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out var structError))
         {
             name.AnalyzedType = TokenAnalyzedType.Struct;
             @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
 
             result = new StructType(@struct, relevantFile);
+            error = null;
             return true;
         }
 
-        if (GetFunction(FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunctionDefinition>? function, out _))
+        /*
+        if (GetFunction(FunctionQuery.Create<CompiledFunctionDefinition, string, Token>(name.Content, null, null, relevantFile), out FunctionQueryResult<CompiledFunctionDefinition>? function, out var functionError))
         {
             name.AnalyzedType = TokenAnalyzedType.FunctionName;
             function.Function.References.Add(new Reference<StatementWithValue?>(new Identifier(name, relevantFile), relevantFile));
 
             result = new FunctionType(function.Function);
+            error = null;
             return true;
         }
 
-        if (GetGlobalVariable(name.Content, relevantFile, out CompiledVariableDeclaration? globalVariable, out _))
+        if (GetGlobalVariable(name.Content, relevantFile, out CompiledVariableDeclaration? globalVariable, out var globalVariableError))
         {
             name.AnalyzedType = TokenAnalyzedType.VariableName;
 
             result = globalVariable.Type;
+            error = null;
             return true;
         }
+        */
 
         result = null;
+        error = new PossibleDiagnostic($"Can't find type `{name.Content}`", ImmutableArray.Create(
+            aliasError,
+            structError
+        ));
         return false;
     }
 
@@ -2071,7 +2084,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
 
-        if (FindType(identifier.Token, identifier.File, out GeneralType? result))
+        if (FindType(identifier.Token, identifier.File, out GeneralType? result, out PossibleDiagnostic? typeError))
         {
             OnGotStatementType(identifier, type = result);
             return true;
@@ -2084,7 +2097,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 globalVariableNotFoundError.ToError(identifier),
                 constantNotFoundError.ToError(identifier),
                 functionNotFoundError.ToError(identifier),
-                instructionLabelNotFound.ToError(identifier)
+                instructionLabelNotFound.ToError(identifier),
+                typeError.ToError(identifier)
             ));
         return false;
     }

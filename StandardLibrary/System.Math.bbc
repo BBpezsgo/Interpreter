@@ -44,7 +44,7 @@ export int random(int state)
 }
 
 /*
- * Calculates the sine of `x` using the Taylor series
+ * Returns the sine of `x` using the Taylor series
  *
  * Source: https://stackoverflow.com/a/67122267
  */
@@ -66,7 +66,7 @@ export float sin(float x)
 }
 
 /*
- * Calculates the cosine of `x` using the Taylor series
+ * Returns the cosine of `x` using the Taylor series
  * 
  * Source: https://stackoverflow.com/a/67122267
  */
@@ -88,7 +88,7 @@ export float cos(float x)
 }
 
 /*
- * Calculates the value of `base` to the power of `exp`
+ * Returns the value of `base` to the power of `exp`
  * 
  * Source: https://stackoverflow.com/a/101613
  */
@@ -110,7 +110,7 @@ export int pow(int base, int exp)
 }
 
 /*
- * Calculates the absolute value of `v`
+ * Returns the absolute value of `v`
  */
 export int abs(int v)
 {
@@ -119,7 +119,7 @@ export int abs(int v)
 }
 
 /*
- * Calculates the absolute value of `v`
+ * Returns the absolute value of `v`
  */
 export f32 abs(f32 v)
 {
@@ -258,7 +258,7 @@ int sqrt(int number)
 */
 
 /*
- * Calculates the square root of `s`
+ * Returns the square root of `s`
  * 
  * Source: https://en.wikipedia.org/wiki/Integer_square_root
  */
@@ -285,7 +285,7 @@ export int sqrt(int s)
 }
 
 /**
- * Calculates the base 10 logarithm of `v`
+ * Returns the base 10 logarithm of `v`
  */
 export int log10(i32 v)
 {
@@ -302,7 +302,7 @@ export int log10(i32 v)
 }
 
 /**
- * Calculates the base 10 logarithm of `v`
+ * Returns the base 10 logarithm of `v`
  */
 export byte log10(u8 v)
 {
@@ -312,6 +312,8 @@ export byte log10(u8 v)
 }
 
 /**
+ * Returns the square root of `s`
+ *
  * Source: https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Approximations_that_depend_on_the_floating_point_representation
  */
 [External("sqrt")]
@@ -322,6 +324,9 @@ export float sqrt(float z)
 	return _z as float;
 }
 
+/**
+ * Returns `v` rounded to the nearest integer
+ */
 export float round(float v)
 {
     f32 frac = v % 1f;

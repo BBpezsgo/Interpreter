@@ -1,14 +1,28 @@
 namespace LanguageCore;
 
-struct EndlessCheck
+public struct EndlessCheck
 {
-    int iteration;
+    int Iteration;
+    readonly int Max;
 
-    public void Step()
+    public EndlessCheck(int max = 1000)
     {
-        if (++iteration > 1000)
+        Iteration = 0;
+        Max = max;
+    }
+
+    public bool Step()
+    {
+        Iteration++;
+        int max = Max == 0 ? 1000 : Max;
+        if (Iteration == max)
+        {
+            return true;
+        }
+        else if (Iteration > max)
         {
             throw new EndlessLoopException();
         }
+        return false;
     }
 }

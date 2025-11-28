@@ -10,7 +10,7 @@ public class UsingDefinition :
     /// <summary>
     /// Set by the compiler
     /// </summary>
-    public string? CompiledUri { get; set; }
+    public Uri? CompiledUri { get; set; }
 
     public ImmutableArray<Token> Path { get; }
     public Token Keyword { get; }

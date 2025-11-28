@@ -109,3 +109,9 @@ public interface IExposeable
 {
     string? ExposedFunctionName { get; }
 }
+
+public interface ICallableDefinition :
+    IInFile
+{
+
+}

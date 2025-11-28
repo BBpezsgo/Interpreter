@@ -158,7 +158,7 @@ public class SourceCodeManager
                         if (CompiledUris.Contains(resolvedUri))
                         { return true; }
                         CompiledUris.Add(resolvedUri);
-                        if (initiator is not null) initiator.CompiledUri = resolvedUri.ToString();
+                        if (initiator is not null) initiator.CompiledUri = resolvedUri;
 
                         if (res.Stream is null)
                         {
@@ -204,7 +204,7 @@ public class SourceCodeManager
                         { return true; }
                         CompiledUris.Add(resolvedUri);
 
-                        if (initiator is not null) initiator.CompiledUri = resolvedUri.ToString();
+                        if (initiator is not null) initiator.CompiledUri = resolvedUri;
                         if (res.Stream is null)
                         {
                             Diagnostics.Add(Diagnostic.Internal($"Invalid handler for \"{resolvedUri}\": resulted in success but not provided a data stream", initiator?.Position ?? Position.UnknownPosition, initiator?.File));

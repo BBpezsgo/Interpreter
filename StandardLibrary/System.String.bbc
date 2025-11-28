@@ -65,7 +65,7 @@ export string tostring(this string text)
 }
 
 /*
- * Concatenate the two string `a` and `b`
+ * Concatenates the two string `a` and `b`
  * 
  * This will not modify the string `a` or `b`, it will allocates a new one
  */
@@ -193,7 +193,7 @@ export string substring(temp this string v, int start, int length)
 }
 
 /*
- * Reverses the string `v`
+ * Returns the reverse of `v`
  * 
  * This will not modify the string `v`, it will allocates a new one
  */

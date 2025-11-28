@@ -1,5 +1,4 @@
 ﻿using LanguageCore.Compiler;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser;
 
@@ -37,7 +36,7 @@ public abstract class TypeInstance :
         if (ReferenceEquals(this, obj)) return true;
         if (obj is null) return false;
         if (obj is not TypeInstance other) return false;
-        return this.Equals(other);
+        return Equals(other);
     }
 
     public abstract bool Equals(TypeInstance? other);

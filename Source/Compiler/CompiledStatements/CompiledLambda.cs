@@ -5,7 +5,8 @@ namespace LanguageCore.Compiler;
 public class CompiledLambda : CompiledStatementWithValue,
     ICompiledFunctionDefinition,
     IHaveCompiledType,
-    IHaveInstructionOffset
+    IHaveInstructionOffset,
+    ICallableDefinition
 {
     public int InstructionOffset { get; set; } = BBLang.Generator.CodeGeneratorForMain.InvalidFunctionAddress;
     public bool IsMsilCompatible { get; set; } = true;
@@ -28,6 +29,9 @@ public class CompiledLambda : CompiledStatementWithValue,
         ParameterDefinitions = parameterDefinitions;
         CapturedLocals = capturedLocals;
         File = file;
+
+        foreach (CompiledParameter parameter in parameters) parameter.Context = this;
+        foreach (ParameterDefinition parameter in parameterDefinitions.Parameters) parameter.Context = this;
     }
 
     public override string ToString()

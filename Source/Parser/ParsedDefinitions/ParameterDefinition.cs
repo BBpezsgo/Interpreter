@@ -7,15 +7,15 @@ namespace LanguageCore.Parser;
 public class ParameterDefinition :
     IPositioned,
     IHaveType,
-    IInContext<FunctionThingDefinition>,
+    IInContext<ICallableDefinition>,
     IIdentifiable<Token>,
     IInFile,
     ILocated
 {
     /// <summary>
-    /// Set by the <see cref="FunctionThingDefinition"/>
+    /// Set by the <see cref="ICallableDefinition"/>
     /// </summary>
-    [NotNull] public FunctionThingDefinition? Context { get; set; }
+    [NotNull] public ICallableDefinition? Context { get; set; }
 
     public Token Identifier { get; }
     public TypeInstance Type { get; }

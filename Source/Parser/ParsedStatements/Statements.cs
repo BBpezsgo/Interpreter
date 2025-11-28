@@ -1172,7 +1172,7 @@ public class Literal : StatementWithValue
     }
 
     public static Literal CreateAnonymous(LiteralType type, string value, IPositioned position, Uri file)
-        => Literal.CreateAnonymous(type, value, position.Position, file);
+        => CreateAnonymous(type, value, position.Position, file);
 
     public static Literal CreateAnonymous(LiteralType type, string value, Position position, Uri file)
     {
@@ -1191,10 +1191,10 @@ public class Literal : StatementWithValue
     }
 
     public static Literal CreateAnonymous(CompiledValue value, IPositioned position, Uri file)
-        => Literal.CreateAnonymous(value, position.Position, file);
+        => CreateAnonymous(value, position.Position, file);
 
     public static Literal CreateAnonymous(CompiledValue value, ILocated location)
-        => Literal.CreateAnonymous(value, location.Location.Position, location.Location.File);
+        => CreateAnonymous(value, location.Location.Position, location.Location.File);
 
     public static Literal CreateAnonymous(CompiledValue value, Position position, Uri file)
     {
@@ -1219,7 +1219,7 @@ public class Literal : StatementWithValue
         =>
         values
         .Zip(positions, (a, b) => (First: a, Second: b))
-        .Select(item => Literal.CreateAnonymous(item.First, item.Second.Location.Position, item.Second.Location.File));
+        .Select(item => CreateAnonymous(item.First, item.Second.Location.Position, item.Second.Location.File));
 
     public override string ToString()
     {
@@ -1608,7 +1608,6 @@ public class NewInstance : StatementWithValue, IHaveType, IInFile
     public Token KeywordToken { get; }
     public TypeInstance Type { get; }
 
-    public Identifier Keyword => new(KeywordToken, File);
     public override Position Position => new(KeywordToken, Type);
 
     public NewInstance(
@@ -1715,12 +1714,12 @@ public class ConstructorCall : StatementWithValue, IReadable, IReferenceableTo<C
     }
 }
 
-public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<CompiledGeneralFunctionDefinition>
+public class IndexCall : StatementWithValue, IReadable, IReferenceableTo<CompiledFunctionDefinition>
 {
     /// <summary>
     /// Set by the compiler
     /// </summary>
-    public CompiledGeneralFunctionDefinition? Reference { get; set; }
+    public CompiledFunctionDefinition? Reference { get; set; }
 
     public StatementWithValue PrevStatement { get; }
     public StatementWithValue Index { get; }

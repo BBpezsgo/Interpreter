@@ -75,6 +75,12 @@ struct Pair<TKey, TValue>
         this.key = key;
         this.value = value;
     }
+
+    export destructor()
+    {
+        delete this.key;
+        delete this.value;
+    }
 }
 
 struct HashMap<TKey, TValue>

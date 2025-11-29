@@ -94,6 +94,7 @@ public partial class StatementCompiler
     public class FunctionQueryResult<TFunction> where TFunction : notnull
     {
         public required TFunction Function { get; init; }
+        public required TFunction OriginalFunction { get; init; }
         public required ImmutableArray<ArgumentExpression?> Arguments { get; init; }
         public ImmutableDictionary<string, GeneralType>? TypeArguments { get; init; }
         public bool Success { get; init; }
@@ -136,6 +137,7 @@ public partial class StatementCompiler
         where TFunction : notnull
     {
         public required TFunction Function { get; init; }
+        public required TFunction OriginalFunction { get; init; }
         public required List<PossibleDiagnostic> Errors { get; init; }
 
         public bool IsIdentifierMatched { get; set; }
@@ -156,7 +158,7 @@ public partial class StatementCompiler
 
         public readonly int CompareTo(FunctionMatch<TFunction> other)
         {
-            if (this.Equals(other)) return Same;
+            if (Equals(other)) return Same;
 
             if (IsIdentifierMatched && !other.IsIdentifierMatched) return Better;
             if (!IsIdentifierMatched && other.IsIdentifierMatched) return Worse;
@@ -291,6 +293,7 @@ public partial class StatementCompiler
             result = new FunctionQueryResult<TFunction>()
             {
                 Function = best.Function,
+                OriginalFunction = best.OriginalFunction,
                 Success = true,
                 TypeArguments = best.TypeArguments,
                 Arguments = best.Arguments,
@@ -354,11 +357,12 @@ public partial class StatementCompiler
                 bool templateAlreadyAdded = false;
                 foreach (CompliableTemplate<TFunction> item in functions.Compilable)
                 {
-                    if (!object.ReferenceEquals(item.OriginalFunction, best.Function)) continue;
+                    if (!ReferenceEquals(item.OriginalFunction, best.Function)) continue;
                     if (!Utils.SequenceEquals(item.TypeArguments, best.TypeArguments, (a, b) => a.Equals(b))) continue;
                     result = new FunctionQueryResult<TFunction>()
                     {
                         Function = item.Function,
+                        OriginalFunction = item.OriginalFunction,
                         Success = true,
                         TypeArguments = best.TypeArguments,
                         Arguments = best.Arguments,
@@ -374,6 +378,7 @@ public partial class StatementCompiler
                     result = new FunctionQueryResult<TFunction>()
                     {
                         Function = template.Function,
+                        OriginalFunction = template.OriginalFunction,
                         Success = true,
                         TypeArguments = best.TypeArguments,
                         Arguments = best.Arguments,
@@ -402,6 +407,7 @@ public partial class StatementCompiler
         FunctionMatch<TFunction> result = new()
         {
             Function = function,
+            OriginalFunction = function,
             Errors = new(),
         };
 
@@ -448,7 +454,14 @@ public partial class StatementCompiler
                 }
             }
 
-            result.Errors.Add(new($"Function \"{query.Identifier}\" does not match with \"{function.Identifier}\""));
+            if (result.IdentifierBadness == 1)
+            {
+                result.Errors.Add(new($"Function \"{query.Identifier}\" does not match with \"{function.Identifier}\""));
+            }
+            else
+            {
+                result.Errors.Add(new($"No function found with name \"{query.Identifier}\""));
+            }
             return result;
         }
 

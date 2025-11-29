@@ -1,6 +1,5 @@
 ﻿using System.IO;
 using System.Runtime.InteropServices;
-using System.Threading;
 using CommandLine;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Brainfuck;
@@ -412,14 +411,12 @@ public static class Entry
 
                 if (externalFunctions.TryGet("stdout", out IExternalFunction? stdoutFunction, out _))
                 {
-                    static void callback(char c) => Console.Write(c);
-                    externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdoutFunction.Id, "stdout", callback));
+                    externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdoutFunction.Id, "stdout", Console.Write));
                 }
 
                 if (externalFunctions.TryGet("stdin", out IExternalFunction? stdinFunction, out _))
                 {
-                    static char callback() => (char)Console.Read();
-                    externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdinFunction.Id, "stdin", callback));
+                    externalFunctions.AddExternalFunction(ExternalFunctionSync.Create<char>(stdinFunction.Id, "stdin", static () => (char)Console.Read()));
                 }
 
                 CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, new(compilerSettings)

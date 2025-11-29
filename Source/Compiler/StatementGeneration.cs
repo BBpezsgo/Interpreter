@@ -21,15 +21,15 @@ public partial class StatementCompiler
 
         if (result.DidReplaceArguments) throw new UnreachableException();
 
-        CompiledFunctionDefinition allocator = result.Function;
+        result.Function.References.AddReference(size, size.File);
+        result.OriginalFunction.References.AddReference(size, size.File);
 
+        CompiledFunctionDefinition allocator = result.Function;
         if (!allocator.ReturnSomething)
         {
             Diagnostics.Add(Diagnostic.Critical($"Function with attribute [{AttributeConstants.BuiltinIdentifier}(\"{BuiltinFunctions.Allocate}\")] should return something", size));
             return false;
         }
-
-        allocator.References.AddReference(size, size.File);
 
         if (!allocator.CanUse(size.File))
         {
@@ -88,11 +88,12 @@ public partial class StatementCompiler
             return false;
         }
 
+        result.Function.References.Add(new Reference<Expression?>(null, location.File));
+        result.OriginalFunction.References.Add(new Reference<Expression?>(null, location.File));
+
         if (result.DidReplaceArguments) throw new UnreachableException();
 
         deallocator = result.Function;
-
-        deallocator.References.Add(new Reference<Expression?>(null, location.File));
 
         if (!deallocator.CanUse(location.File))
         {
@@ -158,9 +159,10 @@ public partial class StatementCompiler
             }
         }
 
-        CompiledGeneralFunctionDefinition? destructor = result.Function;
+        result.Function.References.Add(new Reference<Statement?>(null, location.File));
+        result.OriginalFunction.References.Add(new Reference<Statement?>(null, location.File));
 
-        destructor.References.Add(new Reference<Statement?>(null, location.File));
+        CompiledGeneralFunctionDefinition? destructor = result.Function;
 
         if (!destructor.CanUse(location.File))
         {
@@ -780,6 +782,7 @@ public partial class StatementCompiler
             if (!CompileType(newVariable.Type, out type, out PossibleDiagnostic? typeError))
             {
                 Diagnostics.Add(typeError.ToError(newVariable.Type));
+                type = BuiltinType.Any;
             }
             else
             {
@@ -1505,19 +1508,18 @@ public partial class StatementCompiler
         if (GetFunction(anyCall, out FunctionQueryResult<CompiledFunctionDefinition>? result, out PossibleDiagnostic? notFound, AddCompilable) &&
             anyCall.ToFunctionCall(out FunctionCallExpression? functionCall))
         {
-            CompiledFunctionDefinition compiledFunction = result.Function;
-
             if (anyCall.Expression is IdentifierExpression _identifier2)
             { _identifier2.AnalyzedType = TokenAnalyzedType.FunctionName; }
 
             if (anyCall.Expression is FieldExpression _field)
             { _field.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
 
-            anyCall.Reference = compiledFunction;
+            anyCall.Reference = result.OriginalFunction;
             if (anyCall.Expression is IReferenceableTo _ref1)
-            { _ref1.Reference = compiledFunction; }
+            { _ref1.Reference = result.OriginalFunction; }
 
-            compiledFunction.References.Add(new(anyCall, anyCall.File));
+            result.Function.References.Add(new(anyCall, anyCall.File));
+            result.OriginalFunction.References.Add(new(anyCall, anyCall.File));
 
             if (functionCall.CompiledType is not null)
             { OnGotStatementType(anyCall, functionCall.CompiledType); }
@@ -1624,17 +1626,18 @@ public partial class StatementCompiler
 
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperatorDefinition>? result, out PossibleDiagnostic? notFoundError))
         {
-            CompiledOperatorDefinition? operatorDefinition = result.Function;
+            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
+            @operator.Reference = result.OriginalFunction;
 
             if (result.DidReplaceArguments) throw new UnreachableException();
+
+            CompiledOperatorDefinition? operatorDefinition = result.Function;
 
             if (operatorDefinition.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
             {
                 Frames.LastRef.IsMsilCompatible = false;
             }
 
-            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            @operator.Reference = operatorDefinition;
             OnGotStatementType(@operator, operatorDefinition.Type);
 
             if (!CompileFunctionCall(@operator, @operator.Arguments.ToImmutableArray(ArgumentExpression.Wrap), result, out compiledStatement)) return false;
@@ -1646,11 +1649,13 @@ public partial class StatementCompiler
                 compiledStatement = CompiledEvaluatedValue.Create(evaluated, compiledStatement);
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
                 @operator.PredictedValue = evaluated;
-                operatorDefinition.References.Add(new Reference<Expression>(@operator, @operator.File, true));
+                result.Function.References.Add(new Reference<Expression>(@operator, @operator.File, true));
+                result.OriginalFunction.References.Add(new Reference<Expression>(@operator, @operator.File, true));
             }
             else
             {
-                operatorDefinition.References.Add(new Reference<Expression>(@operator, @operator.File));
+                result.Function.References.Add(new Reference<Expression>(@operator, @operator.File));
+                result.OriginalFunction.References.Add(new Reference<Expression>(@operator, @operator.File));
             }
 
             return true;
@@ -1866,12 +1871,13 @@ public partial class StatementCompiler
 
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperatorDefinition>? result, out PossibleDiagnostic? operatorNotFoundError))
         {
-            CompiledOperatorDefinition? operatorDefinition = result.Function;
+            @operator.Reference = result.OriginalFunction;
+            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             if (result.DidReplaceArguments) throw new UnreachableException();
 
-            @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            @operator.Reference = operatorDefinition;
+            CompiledOperatorDefinition? operatorDefinition = result.Function;
+
             OnGotStatementType(@operator, operatorDefinition.Type);
 
             if (operatorDefinition.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
@@ -1901,7 +1907,8 @@ public partial class StatementCompiler
                     return false;
                 }
 
-                operatorDefinition.References.Add(new Reference<Expression>(@operator, @operator.File));
+                result.Function.References.Add(new Reference<Expression>(@operator, @operator.File));
+                result.OriginalFunction.References.Add(new Reference<Expression>(@operator, @operator.File));
                 return CompileFunctionCall_External(compiledArguments, @operator.SaveValue, operatorDefinition, externalFunction, @operator.Location, out compiledStatement);
             }
 
@@ -2975,10 +2982,11 @@ public partial class StatementCompiler
             Frames.LastRef.IsMsilCompatible = false;
         }
 
-        CompiledConstructorDefinition? compiledFunction = result.Function;
+        result.Function.References.AddReference(constructorCall);
+        result.OriginalFunction.References.AddReference(constructorCall);
+        constructorCall.Reference = result.OriginalFunction;
 
-        compiledFunction.References.AddReference(constructorCall);
-        constructorCall.Reference = compiledFunction;
+        CompiledConstructorDefinition? compiledFunction = result.Function;
         OnGotStatementType(constructorCall, compiledFunction.Type);
 
         if (!compiledFunction.CanUse(constructorCall.File))
@@ -3099,7 +3107,9 @@ public partial class StatementCompiler
         if (GetIndexGetter(baseStatement.Type, indexStatement.Type, index.File, out FunctionQueryResult<CompiledFunctionDefinition>? indexer, out PossibleDiagnostic? notFoundError, AddCompilable))
         {
             indexer.Function.References.Add(new(index, index.File));
-            index.Reference = indexer.Function;
+            indexer.OriginalFunction.References.Add(new(index, index.File));
+            index.Reference = indexer.OriginalFunction;
+
             return CompileFunctionCall(index, ImmutableArray.Create(ArgumentExpression.Wrap(index.Object), index.Index), indexer, out compiledStatement);
         }
 

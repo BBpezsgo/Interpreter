@@ -786,7 +786,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         [NotNullWhen(true)] out CompiledStruct? result,
         [NotNullWhen(false)] out PossibleDiagnostic? error)
-        => StatementCompiler.GetStruct(
+        => GetStruct(
             CompiledStructs,
 
             structName,
@@ -4368,7 +4368,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         while (true)
         {
-            if (!TryCompute(forLoop.Condition, context, out CompiledValue condition))
+            CompiledValue condition;
+            if (forLoop.Condition is null)
+            { condition = true; }
+            else if (!TryCompute(forLoop.Condition, context, out condition))
             { return false; }
 
             if (!condition)
@@ -4386,7 +4389,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (context.IsBreaking)
             { break; }
 
-            if (!TryEvaluate(forLoop.Step, context))
+            if (forLoop.Step is not null && !TryEvaluate(forLoop.Step, context))
             { return false; }
 
             context.IsBreaking = false;

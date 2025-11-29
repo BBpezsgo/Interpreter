@@ -17,3 +17,5 @@ obj
 /Tests/TestResults
 /get-dump.sh
 /Unity/Runtime
+/bindebug
+/Experiments

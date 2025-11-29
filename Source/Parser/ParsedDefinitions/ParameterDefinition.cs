@@ -20,7 +20,7 @@ public class ParameterDefinition :
     public Token Identifier { get; }
     public TypeInstance Type { get; }
     public ImmutableArray<Token> Modifiers { get; }
-    public StatementWithValue? DefaultValue { get; }
+    public Expression? DefaultValue { get; }
 
     public bool IsRef => Modifiers.Contains(ModifierKeywords.Ref);
     public Position Position =>
@@ -39,7 +39,7 @@ public class ParameterDefinition :
         DefaultValue = other.DefaultValue;
     }
 
-    public ParameterDefinition(ImmutableArray<Token> modifiers, TypeInstance type, Token identifier, StatementWithValue? defaultValue, FunctionThingDefinition? context = null)
+    public ParameterDefinition(ImmutableArray<Token> modifiers, TypeInstance type, Token identifier, Expression? defaultValue, FunctionThingDefinition? context = null)
     {
         Modifiers = modifiers;
         Type = type;

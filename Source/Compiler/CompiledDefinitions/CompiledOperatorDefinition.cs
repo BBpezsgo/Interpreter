@@ -5,7 +5,7 @@ namespace LanguageCore.Compiler;
 
 public class CompiledOperatorDefinition : FunctionDefinition,
     IDefinition<CompiledOperatorDefinition>,
-    IReferenceable<StatementWithValue>,
+    IReferenceable<Expression>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledOperatorDefinition>,
@@ -19,7 +19,7 @@ public class CompiledOperatorDefinition : FunctionDefinition,
     public new GeneralType Type { get; }
     public new ImmutableArray<CompiledParameter> Parameters { get; }
     public new CompiledStruct? Context { get; }
-    public List<Reference<StatementWithValue>> References { get; }
+    public List<Reference<Expression>> References { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
 
@@ -28,7 +28,7 @@ public class CompiledOperatorDefinition : FunctionDefinition,
         Type = type;
         Parameters = parameters;
         Context = context;
-        References = new List<Reference<StatementWithValue>>();
+        References = new List<Reference<Expression>>();
     }
 
     public CompiledOperatorDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledOperatorDefinition other) : base(other)
@@ -36,7 +36,7 @@ public class CompiledOperatorDefinition : FunctionDefinition,
         Type = type;
         Parameters = parameters;
         Context = other.Context;
-        References = new List<Reference<StatementWithValue>>(other.References);
+        References = new List<Reference<Expression>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledOperatorDefinition other) => Extensions.IsSame(this, other);

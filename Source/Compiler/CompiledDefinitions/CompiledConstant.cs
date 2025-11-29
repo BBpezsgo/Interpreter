@@ -2,7 +2,7 @@
 
 namespace LanguageCore.Compiler;
 
-public class CompiledVariableConstant : VariableDeclaration,
+public class CompiledVariableConstant : VariableDefinition,
     IHaveCompiledType,
     IPositioned,
     IIdentifiable<string>
@@ -12,7 +12,7 @@ public class CompiledVariableConstant : VariableDeclaration,
 
     public new string Identifier => base.Identifier.Content;
 
-    public CompiledVariableConstant(CompiledValue value, GeneralType type, VariableDeclaration declaration) : base(declaration)
+    public CompiledVariableConstant(CompiledValue value, GeneralType type, VariableDefinition declaration) : base(declaration)
     {
         Value = value;
         Type = type;

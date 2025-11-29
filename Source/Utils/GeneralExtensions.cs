@@ -192,6 +192,8 @@ public static class GeneralExtensions
 
     public static ImmutableArray<T> AsImmutableUnsafe<T>(this T[] array) => ImmutableCollectionsMarshal.AsImmutableArray(array);
 
+    public static ImmutableArray<T> ToImmutableArray<S, T>(this IEnumerable<S> source, Func<S, T> converter) => source.Select(converter).ToImmutableArray();
+
     public static ImmutableArray<T> ToImmutableArray<S, T>(this IReadOnlyCollection<S> source, Func<S, T> converter)
     {
         ImmutableArray<T>.Builder result = ImmutableArray.CreateBuilder<T>(source.Count);

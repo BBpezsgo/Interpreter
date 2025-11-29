@@ -28,10 +28,10 @@ public partial class StatementCompiler
             };
 
         [DebuggerStepThrough]
-        public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, StatementWithValue> Create<TFunction, TIdentifier, TDefinedIdentifier>(
+        public static FunctionQuery<TFunction, TIdentifier, TDefinedIdentifier, ArgumentExpression> Create<TFunction, TIdentifier, TDefinedIdentifier>(
             TIdentifier? identifier,
-            ImmutableArray<StatementWithValue> arguments,
-            FunctionQueryArgumentConverter<StatementWithValue> converter,
+            ImmutableArray<ArgumentExpression> arguments,
+            FunctionQueryArgumentConverter<ArgumentExpression> converter,
             Uri? relevantFile = null,
             GeneralType? returnType = null,
             Action<CompliableTemplate<TFunction>>? addCompilable = null)
@@ -94,15 +94,15 @@ public partial class StatementCompiler
     public class FunctionQueryResult<TFunction> where TFunction : notnull
     {
         public required TFunction Function { get; init; }
-        public required ImmutableArray<StatementWithValue?> Arguments { get; init; }
+        public required ImmutableArray<ArgumentExpression?> Arguments { get; init; }
         public ImmutableDictionary<string, GeneralType>? TypeArguments { get; init; }
         public bool Success { get; init; }
         public bool DidReplaceArguments => !Arguments.IsDefault && Arguments.Any(v => v is not null);
 
-        public void ReplaceArgumentsIfNeeded(ref ImmutableArray<StatementWithValue> arguments)
+        public void ReplaceArgumentsIfNeeded(ref ImmutableArray<ArgumentExpression> arguments)
         {
             if (Arguments.IsDefault) return;
-            ImmutableArray<StatementWithValue>.Builder newArguments = ImmutableArray.CreateBuilder<StatementWithValue>(arguments.Length);
+            ImmutableArray<ArgumentExpression>.Builder newArguments = ImmutableArray.CreateBuilder<ArgumentExpression>(arguments.Length);
             for (int i = 0; i < arguments.Length; i++)
             {
                 newArguments.Add(Arguments[i] ?? arguments[i]);
@@ -148,7 +148,7 @@ public partial class StatementCompiler
         public TypeMatch? ParameterTypeMatch { get; set; }
 
         public ImmutableDictionary<string, GeneralType>? TypeArguments { get; set; }
-        public ImmutableArray<StatementWithValue?> Arguments { get; set; }
+        public ImmutableArray<ArgumentExpression?> Arguments { get; set; }
 
         const int Better = -1;
         const int Same = 0;
@@ -236,7 +236,7 @@ public partial class StatementCompiler
     }
 
     bool FunctionArgumentConverter(
-        StatementWithValue argument,
+        Expression argument,
         ParameterDefinition? parameterDefinition,
         GeneralType? expectedType,
         [NotNullWhen(true)] out GeneralType? result)
@@ -477,38 +477,38 @@ public partial class StatementCompiler
             result.IsFileMatches = true;
         }
 
-        bool TryReplaceArgument(ref StatementWithValue? argument, GeneralType passedType, GeneralType definedType, ParameterDefinition definition, TArgument passed)
+        bool TryReplaceArgument(ref ArgumentExpression? argument, GeneralType passedType, GeneralType definedType, ParameterDefinition definition, TArgument passed)
         {
-            if (passed is not StatementWithValue _v) return false;
+            if (passed is not Expression _v) return false;
             if (!definition.Modifiers.Contains(ModifierKeywords.This)) return false;
 
             if (!CanCastImplicitly(new PointerType(passedType), definedType, _v, out _)) return false;
 
-            argument ??= new AddressGetter(
+            argument ??= ArgumentExpression.Wrap(new GetReferenceExpression(
                 Tokenizing.Token.CreateAnonymous("&", Tokenizing.TokenType.Operator),
                 _v,
                 _v.File
-            );
+            ));
             return true;
         }
 
-        bool TryReplaceArgument2(ref StatementWithValue? argument, GeneralType passedType, GeneralType definedType, ParameterDefinition definition, TArgument passed, Dictionary<string, GeneralType> typeArguments)
+        bool TryReplaceArgument2(ref ArgumentExpression? argument, GeneralType passedType, GeneralType definedType, ParameterDefinition definition, TArgument passed, Dictionary<string, GeneralType> typeArguments)
         {
-            if (passed is not StatementWithValue _v) return false;
+            if (passed is not Expression _v) return false;
             if (!definition.Modifiers.Contains(ModifierKeywords.This)) return false;
 
             if (!definedType.Is(out PointerType? definedPointerType)) return false;
             if (!GeneralType.TryGetTypeParameters(definedPointerType.To, passedType, typeArguments)) return false;
 
-            argument ??= new AddressGetter(
+            argument ??= ArgumentExpression.Wrap(new GetReferenceExpression(
                 Tokenizing.Token.CreateAnonymous("&", Tokenizing.TokenType.Operator),
                 _v,
                 _v.File
-            );
+            ));
             return true;
         }
 
-        void GetArgumentMatch(ref TypeMatch typeMatch, ref StatementWithValue? compiledPassedArgument, GeneralType definedType, ParameterDefinition definition, TArgument passed, List<PossibleDiagnostic> errors)
+        void GetArgumentMatch(ref TypeMatch typeMatch, ref ArgumentExpression? compiledPassedArgument, GeneralType definedType, ParameterDefinition definition, TArgument passed, List<PossibleDiagnostic> errors)
         {
             if (typeMatch == TypeMatch.None) return;
 
@@ -597,7 +597,7 @@ public partial class StatementCompiler
             {
                 int checkCount = Math.Min(function.Parameters.Length, query.Arguments.Value.Length);
 
-                StatementWithValue?[] argumentValues = new StatementWithValue?[checkCount];
+                ArgumentExpression?[] argumentValues = new ArgumentExpression?[checkCount];
 
                 for (int i = 0; i < checkCount; i++)
                 {
@@ -655,7 +655,7 @@ public partial class StatementCompiler
                 result.ParameterTypeMatch = TypeMatch.Equals;
 
                 int checkCount = Math.Min(function.Parameters.Length, query.Arguments.Value.Length);
-                StatementWithValue?[] arguments = new StatementWithValue?[checkCount];
+                ArgumentExpression?[] arguments = new ArgumentExpression?[checkCount];
                 for (int i = 0; i < checkCount; i++)
                 {
                     GeneralType defined = function.Parameters[i].Type;

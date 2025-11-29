@@ -5,7 +5,7 @@ namespace LanguageCore.Compiler;
 
 public class CompiledFunctionDefinition : FunctionDefinition,
     IDefinition<CompiledFunctionDefinition>,
-    IReferenceable<StatementWithValue?>,
+    IReferenceable<Expression?>,
     IHaveCompiledType,
     IInContext<CompiledStruct?>,
     ITemplateable<CompiledFunctionDefinition>,
@@ -20,7 +20,7 @@ public class CompiledFunctionDefinition : FunctionDefinition,
     public new GeneralType Type { get; }
     public new ImmutableArray<CompiledParameter> Parameters { get; }
     public new CompiledStruct? Context { get; }
-    public List<Reference<StatementWithValue?>> References { get; }
+    public List<Reference<Expression?>> References { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
     public TypeInstance TypeToken => base.Type;
@@ -31,7 +31,7 @@ public class CompiledFunctionDefinition : FunctionDefinition,
         Parameters = parameters;
 
         Context = context;
-        References = new List<Reference<StatementWithValue?>>();
+        References = new List<Reference<Expression?>>();
     }
 
     public CompiledFunctionDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledFunctionDefinition other) : base(other)
@@ -40,7 +40,7 @@ public class CompiledFunctionDefinition : FunctionDefinition,
         Parameters = parameters;
 
         Context = other.Context;
-        References = new List<Reference<StatementWithValue?>>(other.References);
+        References = new List<Reference<Expression?>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledFunctionDefinition other)

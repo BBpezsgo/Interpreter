@@ -1377,12 +1377,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using (Code.Block(this, $"For"))
         {
-            VariableCleanupStack.Push(@for.VariableDeclaration is null ? 0 : PrecompileVariables(@for.VariableDeclaration, false));
+            VariableCleanupStack.Push(@for.Initialization is null ? 0 : PrecompileVariables(@for.Initialization, false));
 
-            if (@for.VariableDeclaration is not null)
+            if (@for.Initialization is not null)
             {
                 using (Code.Block(this, "Variable Declaration"))
-                { GenerateCodeForStatement(@for.VariableDeclaration); }
+                { GenerateCodeForStatement(@for.Initialization); }
             }
 
             int conditionAddress = Stack.NextAddress;
@@ -1402,7 +1402,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 using (Code.Block(this, "Compute expression"))
                 {
-                    GenerateCodeForStatement(@for.Expression);
+                    GenerateCodeForStatement(@for.Step);
                 }
 
                 using (Code.Block(this, "Compute condition again"))
@@ -1716,7 +1716,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             switch (statement.Operator)
             {
-                case BinaryOperatorCall.CompEQ:
+                case BinaryOperatorCallExpression.CompEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1733,7 +1733,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.Addition:
+                case BinaryOperatorCallExpression.Addition:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1750,7 +1750,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.Subtraction:
+                case BinaryOperatorCallExpression.Subtraction:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1767,7 +1767,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     return;
                 }
-                case BinaryOperatorCall.Multiplication:
+                case BinaryOperatorCallExpression.Multiplication:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1784,7 +1784,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.Division:
+                case BinaryOperatorCallExpression.Division:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1801,7 +1801,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.Modulo:
+                case BinaryOperatorCallExpression.Modulo:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1818,7 +1818,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.CompLT:
+                case BinaryOperatorCallExpression.CompLT:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1835,7 +1835,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.CompGT:
+                case BinaryOperatorCallExpression.CompGT:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1857,7 +1857,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.CompGEQ:
+                case BinaryOperatorCallExpression.CompGEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1876,7 +1876,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.CompLEQ:
+                case BinaryOperatorCallExpression.CompLEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1893,7 +1893,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.CompNEQ:
+                case BinaryOperatorCallExpression.CompNEQ:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1910,7 +1910,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.LogicalAND:
+                case BinaryOperatorCallExpression.LogicalAND:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1935,7 +1935,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.LogicalOR:
+                case BinaryOperatorCallExpression.LogicalOR:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1961,7 +1961,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.BitshiftLeft:
+                case BinaryOperatorCallExpression.BitshiftLeft:
                 {
                     int valueAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -1989,7 +1989,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.BitshiftRight:
+                case BinaryOperatorCallExpression.BitshiftRight:
                 {
                     int valueAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))
@@ -2017,7 +2017,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                     break;
                 }
-                case BinaryOperatorCall.BitwiseAND:
+                case BinaryOperatorCallExpression.BitwiseAND:
                 {
                     GeneralType leftType = statement.Left.Type;
 
@@ -2083,7 +2083,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             switch (statement.Operator)
             {
-                case UnaryOperatorCall.LogicalNOT:
+                case UnaryOperatorCallExpression.LogicalNOT:
                 {
                     int leftAddress = Stack.NextAddress;
                     using (Code.Block(this, "Compute left-side value"))

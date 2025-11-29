@@ -5,10 +5,10 @@ namespace LanguageCore.Parser;
 
 public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStackArray?>
 {
-    public StatementWithValue? StackArraySize { get; }
+    public Expression? StackArraySize { get; }
     public TypeInstance StackArrayOf { get; }
 
-    public TypeInstanceStackArray(TypeInstance stackArrayOf, StatementWithValue? sizeValue, Uri file) : base(file)
+    public TypeInstanceStackArray(TypeInstance stackArrayOf, Expression? sizeValue, Uri file) : base(file)
     {
         StackArrayOf = stackArrayOf;
         StackArraySize = sizeValue;

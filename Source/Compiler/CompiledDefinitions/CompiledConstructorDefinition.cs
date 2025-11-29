@@ -5,7 +5,7 @@ namespace LanguageCore.Compiler;
 
 public class CompiledConstructorDefinition : ConstructorDefinition,
     IDefinition<CompiledConstructorDefinition>,
-    IReferenceable<ConstructorCall>,
+    IReferenceable<ConstructorCallExpression>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledConstructorDefinition>,
@@ -21,7 +21,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
     public new GeneralType Type { get; }
     public new ImmutableArray<CompiledParameter> Parameters { get; }
     public new CompiledStruct Context { get; set; }
-    public List<Reference<ConstructorCall>> References { get; }
+    public List<Reference<ConstructorCallExpression>> References { get; }
 
     GeneralType IIdentifiable<GeneralType>.Identifier => Type;
 
@@ -32,7 +32,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
         Type = type;
         Parameters = parameters;
         Context = context;
-        References = new List<Reference<ConstructorCall>>();
+        References = new List<Reference<ConstructorCallExpression>>();
     }
 
     public CompiledConstructorDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledConstructorDefinition other) : base(other)
@@ -40,7 +40,7 @@ public class CompiledConstructorDefinition : ConstructorDefinition,
         Type = type;
         Parameters = parameters;
         Context = other.Context;
-        References = new List<Reference<ConstructorCall>>(other.References);
+        References = new List<Reference<ConstructorCallExpression>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledConstructorDefinition other)

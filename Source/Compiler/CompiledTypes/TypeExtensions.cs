@@ -3,7 +3,7 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
-public delegate bool ComputeValue(StatementWithValue value, out CompiledValue computedValue);
+public delegate bool ComputeValue(Expression value, out CompiledValue computedValue);
 public delegate bool FindType(Token token, Uri relevantFile, [NotNullWhen(true)] out GeneralType? computedValue, [NotNullWhen(false)] out PossibleDiagnostic? error);
 
 public static class TypeExtensions

@@ -136,47 +136,47 @@ public static class LanguageOperators
 {
     public static HashSet<string> UnaryOperators { get; } = new HashSet<string>()
     {
-        UnaryOperatorCall.LogicalNOT,
-        UnaryOperatorCall.BinaryNOT,
-        UnaryOperatorCall.UnaryPlus,
-        UnaryOperatorCall.UnaryMinus,
+        UnaryOperatorCallExpression.LogicalNOT,
+        UnaryOperatorCallExpression.BinaryNOT,
+        UnaryOperatorCallExpression.UnaryPlus,
+        UnaryOperatorCallExpression.UnaryMinus,
     };
 
     public static HashSet<string> BinaryOperators { get; } = new HashSet<string>()
     {
-        BinaryOperatorCall.CompLT,
-        BinaryOperatorCall.CompGT,
-        BinaryOperatorCall.CompEQ,
-        BinaryOperatorCall.CompNEQ,
-        BinaryOperatorCall.CompLEQ,
-        BinaryOperatorCall.CompGEQ,
+        BinaryOperatorCallExpression.CompLT,
+        BinaryOperatorCallExpression.CompGT,
+        BinaryOperatorCallExpression.CompEQ,
+        BinaryOperatorCallExpression.CompNEQ,
+        BinaryOperatorCallExpression.CompLEQ,
+        BinaryOperatorCallExpression.CompGEQ,
 
-        BinaryOperatorCall.Addition,
-        BinaryOperatorCall.Subtraction,
-        BinaryOperatorCall.Multiplication,
-        BinaryOperatorCall.Division,
-        BinaryOperatorCall.Modulo,
-        BinaryOperatorCall.LogicalAND,
-        BinaryOperatorCall.LogicalOR,
-        BinaryOperatorCall.BitwiseAND,
-        BinaryOperatorCall.BitwiseOR,
-        BinaryOperatorCall.BitwiseXOR,
-        BinaryOperatorCall.BitshiftLeft,
-        BinaryOperatorCall.BitshiftRight,
+        BinaryOperatorCallExpression.Addition,
+        BinaryOperatorCallExpression.Subtraction,
+        BinaryOperatorCallExpression.Multiplication,
+        BinaryOperatorCallExpression.Division,
+        BinaryOperatorCallExpression.Modulo,
+        BinaryOperatorCallExpression.LogicalAND,
+        BinaryOperatorCallExpression.LogicalOR,
+        BinaryOperatorCallExpression.BitwiseAND,
+        BinaryOperatorCallExpression.BitwiseOR,
+        BinaryOperatorCallExpression.BitwiseXOR,
+        BinaryOperatorCallExpression.BitshiftLeft,
+        BinaryOperatorCallExpression.BitshiftRight,
     };
 
     public static ImmutableDictionary<string, int> Precedencies { get; } = new Dictionary<string, int>()
     {
-        { BinaryOperatorCall.BitwiseOR, 4 },
-        { BinaryOperatorCall.BitwiseAND, 4 },
-        { BinaryOperatorCall.BitwiseXOR, 4 },
-        { BinaryOperatorCall.BitshiftLeft, 4 },
-        { BinaryOperatorCall.BitshiftRight, 4 },
+        { BinaryOperatorCallExpression.BitwiseOR, 4 },
+        { BinaryOperatorCallExpression.BitwiseAND, 4 },
+        { BinaryOperatorCallExpression.BitwiseXOR, 4 },
+        { BinaryOperatorCallExpression.BitshiftLeft, 4 },
+        { BinaryOperatorCallExpression.BitshiftRight, 4 },
 
-        { BinaryOperatorCall.CompEQ, 5 },
-        { BinaryOperatorCall.CompNEQ, 5 },
-        { BinaryOperatorCall.CompLEQ, 5 },
-        { BinaryOperatorCall.CompGEQ, 5 },
+        { BinaryOperatorCallExpression.CompEQ, 5 },
+        { BinaryOperatorCallExpression.CompNEQ, 5 },
+        { BinaryOperatorCallExpression.CompLEQ, 5 },
+        { BinaryOperatorCallExpression.CompGEQ, 5 },
 
         { "=", 10 },
 
@@ -187,21 +187,21 @@ public static class LanguageOperators
         { "/=", 12 },
         { "%=", 12 },
 
-        { BinaryOperatorCall.CompLT, 20 },
-        { BinaryOperatorCall.CompGT, 20 },
+        { BinaryOperatorCallExpression.CompLT, 20 },
+        { BinaryOperatorCallExpression.CompGT, 20 },
 
-        { BinaryOperatorCall.Addition, 30 },
-        { BinaryOperatorCall.Subtraction, 30 },
+        { BinaryOperatorCallExpression.Addition, 30 },
+        { BinaryOperatorCallExpression.Subtraction, 30 },
 
-        { BinaryOperatorCall.Multiplication, 31 },
-        { BinaryOperatorCall.Division, 31 },
-        { BinaryOperatorCall.Modulo, 31 },
+        { BinaryOperatorCallExpression.Multiplication, 31 },
+        { BinaryOperatorCallExpression.Division, 31 },
+        { BinaryOperatorCallExpression.Modulo, 31 },
 
         { "++", 40 },
         { "--", 40 },
 
-        { BinaryOperatorCall.LogicalAND, 2 },
-        { BinaryOperatorCall.LogicalOR, 2 },
+        { BinaryOperatorCallExpression.LogicalAND, 2 },
+        { BinaryOperatorCallExpression.LogicalOR, 2 },
     }.ToImmutableDictionary();
 }
 

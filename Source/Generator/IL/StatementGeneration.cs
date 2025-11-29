@@ -824,9 +824,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledForLoop statement, ILProxy il, ref bool successful)
     {
-        if (statement.VariableDeclaration is not null)
+        if (statement.Initialization is not null)
         {
-            EmitStatement(statement.VariableDeclaration, il, ref successful);
+            EmitStatement(statement.Initialization, il, ref successful);
         }
 
         Label loopStart = il.DefineLabel();
@@ -839,7 +839,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         il.Emit(OpCodes.Brfalse, loopEnd);
 
         EmitStatement(statement.Body, il, ref successful);
-        EmitStatement(statement.Expression, il, ref successful);
+        EmitStatement(statement.Step, il, ref successful);
         il.Emit(OpCodes.Br, loopStart);
 
         il.MarkLabel(loopEnd);

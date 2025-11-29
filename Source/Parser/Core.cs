@@ -23,7 +23,7 @@ public interface IHaveType
 
 public interface IReferenceableTo<TReference> : IInFile, IReferenceableTo
 {
-    new TReference? Reference { get; set; }
+    new TReference? Reference { get; internal set; }
     object? IReferenceableTo.Reference
     {
         get => Reference;
@@ -33,7 +33,7 @@ public interface IReferenceableTo<TReference> : IInFile, IReferenceableTo
 
 public interface IReferenceableTo : IInFile
 {
-    object? Reference { get; set; }
+    object? Reference { get; internal set; }
 }
 
 public enum LiteralType

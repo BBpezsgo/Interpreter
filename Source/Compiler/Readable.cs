@@ -3,7 +3,7 @@ using LanguageCore.Parser.Statements;
 
 namespace LanguageCore;
 
-public delegate bool FindStatementType(StatementWithValue statement, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics);
+public delegate bool FindStatementType(Expression statement, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics);
 
 public interface IReadable
 {

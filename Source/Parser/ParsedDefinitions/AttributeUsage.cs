@@ -11,7 +11,7 @@ public class AttributeUsage :
     ILocated
 {
     public Token Identifier { get; }
-    public ImmutableArray<Literal> Parameters { get; }
+    public ImmutableArray<LiteralExpression> Parameters { get; }
     public Uri File { get; }
 
     public Position Position =>
@@ -20,7 +20,7 @@ public class AttributeUsage :
 
     public Location Location => new(Position, File);
 
-    public AttributeUsage(Token identifier, ImmutableArray<Literal> parameters, Uri file)
+    public AttributeUsage(Token identifier, ImmutableArray<LiteralExpression> parameters, Uri file)
     {
         Identifier = identifier;
         Parameters = parameters;

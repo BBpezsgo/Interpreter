@@ -1216,12 +1216,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment("for (...) {");
 
-        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, forLoop.VariableDeclaration is CompiledVariableDeclaration wah ? Enumerable.Repeat(wah, 1) : Enumerable.Empty<CompiledVariableDeclaration>(), false);
+        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, forLoop.Initialization is CompiledVariableDeclaration wah ? Enumerable.Repeat(wah, 1) : Enumerable.Empty<CompiledVariableDeclaration>(), false);
 
-        if (forLoop.VariableDeclaration is not null)
+        if (forLoop.Initialization is not null)
         {
             AddComment("For-loop variable");
-            GenerateCodeForStatement(forLoop.VariableDeclaration);
+            GenerateCodeForStatement(forLoop.Initialization);
         }
 
         AddComment("For-loop condition");
@@ -1235,7 +1235,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(forLoop.Body);
 
         AddComment("For-loop expression");
-        GenerateCodeForStatement(forLoop.Expression);
+        GenerateCodeForStatement(forLoop.Step);
 
         AddComment("Jump back");
         Code.Emit(Opcode.Jump, conditionOffsetFor.Relative());

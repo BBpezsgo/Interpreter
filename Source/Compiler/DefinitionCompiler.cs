@@ -172,7 +172,7 @@ public partial class StatementCompiler
         }
     }
 
-    void CompileVariableAttributes(VariableDeclaration variable)
+    void CompileVariableAttributes(VariableDefinition variable)
     {
         foreach (AttributeUsage attribute in variable.Attributes)
         {
@@ -724,24 +724,24 @@ public partial class StatementCompiler
         {
             Block = new Block(
                 ImmutableArray.Create<Statement>(
-                    new Assignment(
+                    new SimpleAssignmentStatement(
                         Token.CreateAnonymous("="),
-                        new Field(
-                            new Identifier(Token.CreateAnonymous("this"), @struct.File),
-                            new Identifier(Token.CreateAnonymous("_genstate"), @struct.File),
+                        new FieldExpression(
+                            new IdentifierExpression(Token.CreateAnonymous("this"), @struct.File),
+                            new IdentifierExpression(Token.CreateAnonymous("_genstate"), @struct.File),
                             @struct.File
                         ),
-                        new Identifier(Token.CreateAnonymous("state"), @struct.File),
+                        new IdentifierExpression(Token.CreateAnonymous("state"), @struct.File),
                         @struct.File
                     ),
-                    new Assignment(
+                    new SimpleAssignmentStatement(
                         Token.CreateAnonymous("="),
-                        new Field(
-                            new Identifier(Token.CreateAnonymous("this"), @struct.File),
-                            new Identifier(nextFunction.Identifier, @struct.File),
+                        new FieldExpression(
+                            new IdentifierExpression(Token.CreateAnonymous("this"), @struct.File),
+                            new IdentifierExpression(nextFunction.Identifier, @struct.File),
                             @struct.File
                         ),
-                        new Identifier(Token.CreateAnonymous("func"), @struct.File),
+                        new IdentifierExpression(Token.CreateAnonymous("func"), @struct.File),
                         @struct.File
                     )
                 ),

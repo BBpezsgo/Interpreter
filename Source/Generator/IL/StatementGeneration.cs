@@ -835,11 +835,20 @@ public partial class CodeGeneratorForIL : CodeGenerator
         LoopLabels.Push(loopEnd);
 
         il.MarkLabel(loopStart);
-        EmitStatement(statement.Condition, il, ref successful);
-        il.Emit(OpCodes.Brfalse, loopEnd);
+
+        if (statement.Condition is not null)
+        {
+            EmitStatement(statement.Condition, il, ref successful);
+            il.Emit(OpCodes.Brfalse, loopEnd);
+        }
 
         EmitStatement(statement.Body, il, ref successful);
-        EmitStatement(statement.Step, il, ref successful);
+
+        if (statement.Step is not null)
+        {
+            EmitStatement(statement.Step, il, ref successful);
+        }
+
         il.Emit(OpCodes.Br, loopStart);
 
         il.MarkLabel(loopEnd);

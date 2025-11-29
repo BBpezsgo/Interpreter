@@ -1386,8 +1386,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             int conditionAddress = Stack.NextAddress;
-            using (Code.Block(this, "Compute condition"))
-            { GenerateCodeForStatement(@for.Condition); }
+            if (@for.Condition is not null)
+            {
+                using (Code.Block(this, "Compute condition"))
+                { GenerateCodeForStatement(@for.Condition); }
+            }
+            else
+            {
+                Code.SetValue(conditionAddress, true);
+            }
 
             Code.CommentLine($"Condition result at {conditionAddress}");
 
@@ -1400,15 +1407,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     GenerateCodeForStatement(CompiledBlock.CreateIfNot(@for.Body));
                 }
 
-                using (Code.Block(this, "Compute expression"))
+                if (@for.Step is not null)
                 {
-                    GenerateCodeForStatement(@for.Step);
+                    using (Code.Block(this, "Compute expression"))
+                    {
+                        GenerateCodeForStatement(@for.Step);
+                    }
                 }
 
-                using (Code.Block(this, "Compute condition again"))
+                if (@for.Condition is not null)
                 {
-                    GenerateCodeForStatement(@for.Condition);
-                    Stack.PopAndStore(conditionAddress);
+                    using (Code.Block(this, "Compute condition again"))
+                    {
+                        GenerateCodeForStatement(@for.Condition);
+                        Stack.PopAndStore(conditionAddress);
+                    }
                 }
 
                 using StackAddress tempAddress = Stack.GetTemporaryAddress(1, @for);

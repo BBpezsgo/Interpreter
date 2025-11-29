@@ -1395,6 +1395,9 @@ public sealed class Parser
         { throw new SyntaxException($"Expected \"(\" after \"{keyword}\" keyword", keyword.Position.After(), File); }
 
         Statement? initialization;
+        Expression? condition;
+        Statement? step;
+
         if (ExpectOperator(";", out Token? semicolon1))
         {
             initialization = null;
@@ -1411,20 +1414,35 @@ public sealed class Parser
             initialization.Semicolon = semicolon1;
         }
 
-        if (!ExpectExpression(out Expression? condition))
-        { throw new SyntaxException($"Expected condition after \"{keyword}\" initialization", semicolon1.Position.After(), File); }
+        if (ExpectOperator(";", out Token? semicolon2))
+        {
+            condition = null;
+        }
+        else
+        {
+            if (!ExpectExpression(out condition))
+            { throw new SyntaxException($"Expected condition after \"{keyword}\" initialization", semicolon1.Position.After(), File); }
 
-        if (!ExpectOperator(";", out Token? semicolon2))
-        { throw new SyntaxException($"Expected \";\" after \"{keyword}\" condition", condition.Position.After(), File); }
-        condition.Semicolon = semicolon2;
+            if (!ExpectOperator(";", out semicolon2))
+            { throw new SyntaxException($"Expected \";\" after \"{keyword}\" condition", condition.Position.After(), File); }
+            condition.Semicolon = semicolon2;
+        }
 
-        if (!ExpectStatementUnchecked(out Statement? step))
-        { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", semicolon2.Position.After(), File); }
+        if (ExpectOperator(")", out Token? bracketEnd))
+        {
+            step = null;
+        }
+        else
+        {
+            if (!ExpectStatementUnchecked(out step))
+            { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", semicolon2.Position.After(), File); }
 
-        SetStatementThings(step);
+            SetStatementThings(step);
 
-        if (!ExpectOperator(")", out Token? bracketEnd))
-        { throw new SyntaxException($"Expected \")\" after \"{keyword}\" assignment", step.Position.After(), File); }
+            if (!ExpectOperator(")", out bracketEnd))
+            { throw new SyntaxException($"Expected \")\" after \"{keyword}\" assignment", step.Position.After(), File); }
+            step.Semicolon = semicolon2;
+        }
 
         if (!ExpectBlock(out Block? block))
         { throw new SyntaxException($"Expected block", bracketEnd.Position.After(), File); }

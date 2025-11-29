@@ -2609,13 +2609,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         inlined = null;
 
         Statement? initialization = null;
+        Expression? condition = null;
+        Statement? step = null;
+
         if (statement.Initialization is not null &&
             !InlineMacro(statement.Initialization, parameters, out initialization))
         { return false; }
 
-        Expression condition = InlineMacro(statement.Condition, parameters);
+        if (statement.Condition is not null)
+        { condition = InlineMacro(statement.Condition, parameters); }
 
-        if (!InlineMacro(statement.Step, parameters, out Statement? step))
+        if (statement.Step is not null &&
+            !InlineMacro(statement.Step, parameters, out step))
         { return false; }
 
         if (!InlineMacro(statement.Block, parameters, out Block? block))

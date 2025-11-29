@@ -1275,62 +1275,24 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        CompiledStatement? variableDeclaration = null;
-        CompiledStatementWithValue? condition;
+        CompiledStatement? initialization = null;
+        CompiledStatementWithValue? condition = null;
         CompiledStatement? body;
-        CompiledStatement? expression;
+        CompiledStatement? step = null;
 
         using (Frames.Last.Scopes.PushAuto(CompileScope(forLoop.Initialization is null ? Enumerable.Empty<Statement>() : Enumerable.Repeat(forLoop.Initialization, 1))))
         {
-            if (forLoop.Initialization is not null &&
-                !CompileStatement(forLoop.Initialization, out variableDeclaration))
-            { return false; }
-
-            /*
-            if (AllowEvaluating &&
-                TryCompute(forLoop.Condition, out CompiledValue condition))
-            {
-                if (condition)
-                {
-                    Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop condition evaluated as true", forLoop.Condition));
-
-                    CompileStatement(forLoop.Block);
-
-                    AddComment("For-loop expression");
-                    CompileStatement(forLoop.Expression);
-
-                    AddComment("Jump back");
-                    AddInstruction(Opcode.Jump, beginOffset - GeneratedCode.Count);
-
-                    FinishJumpInstructions(BreakInstructions.Pop());
-
-                    OnScopeExit(forLoop.Position.After(), forLoop.File);
-
-                    AddComment("}");
-                }
-                else
-                {
-                    Diagnostics.Add(Diagnostic.OptimizationNotice($"For-loop fully trimmed", forLoop));
-
-                    OnScopeExit(forLoop.Position.After(), forLoop.File);
-
-                    AddComment("}");
-                }
-                return;
-            }
-            */
-
-            if (!CompileExpression(forLoop.Condition, out condition)) return false;
-
+            if (forLoop.Initialization is not null && !CompileStatement(forLoop.Initialization, out initialization)) return false;
+            if (forLoop.Condition is not null && !CompileExpression(forLoop.Condition, out condition)) return false;
             if (!CompileStatement(forLoop.Block, out body)) return false;
-            if (!CompileStatement(forLoop.Step, out expression)) return false;
+            if (forLoop.Step is not null && !CompileStatement(forLoop.Step, out step)) return false;
         }
 
         compiledStatement = new CompiledForLoop()
         {
-            Initialization = variableDeclaration,
+            Initialization = initialization,
             Condition = condition,
-            Step = expression,
+            Step = step,
             Body = body,
             Location = forLoop.Location,
         };
@@ -2209,7 +2171,7 @@ public partial class StatementCompiler
             {
                 compiledParameters.Insert(0, new CompiledParameter(PointerType.Any, new ParameterDefinition(
                     ImmutableArray<Token>.Empty,
-                    null,
+                    null!,
                     Token.CreateAnonymous("closure"),
                     null
                 )));
@@ -3756,7 +3718,7 @@ public partial class StatementCompiler
             case RuntimeType.U32: result = BuiltinType.U32; error = null; return true;
             case RuntimeType.I32: result = BuiltinType.I32; error = null; return true;
             case RuntimeType.F32: result = BuiltinType.F32; error = null; return true;
-            case RuntimeType.Null: result = result = null; error = new($"Invalid type"); return false;
+            case RuntimeType.Null: result = null; error = new($"Invalid type"); return false;
             default: throw new UnreachableException();
         }
     }
@@ -4427,13 +4389,9 @@ public partial class StatementCompiler
                 AnalyseFunction(v.Of, ref flags, stack);
                 if (v.Length is not null) AnalyseFunction(v.Length, ref flags, stack);
                 break;
-            case BuiltinType v:
-                break;
             case FunctionType v:
                 AnalyseFunction(v.ReturnType, ref flags, stack);
                 foreach (GeneralType i in v.Parameters) AnalyseFunction(i, ref flags, stack);
-                break;
-            case GenericType v:
                 break;
             case PointerType v:
                 AnalyseFunction(v.To, ref flags, stack);
@@ -4441,7 +4399,11 @@ public partial class StatementCompiler
             case StructType v:
                 foreach (KeyValuePair<string, GeneralType> i in v.TypeArguments) AnalyseFunction(i.Value, ref flags, stack);
                 break;
-            default: throw new UnreachableException();
+            case BuiltinType:
+            case GenericType:
+                break;
+            default:
+                throw new UnreachableException();
         }
     }
 
@@ -4525,8 +4487,8 @@ public partial class StatementCompiler
     void AnalyseFunction(CompiledForLoop statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         if (statement.Initialization is not null) AnalyseFunction(statement.Initialization, ref flags, stack);
-        AnalyseFunction(statement.Condition, ref flags, stack);
-        AnalyseFunction(statement.Step, ref flags, stack);
+        if (statement.Condition is not null) AnalyseFunction(statement.Condition, ref flags, stack);
+        if (statement.Step is not null) AnalyseFunction(statement.Step, ref flags, stack);
         AnalyseFunction(statement.Body, ref flags, stack);
     }
     void AnalyseFunction(CompiledLiteralList statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)

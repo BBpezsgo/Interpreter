@@ -6,8 +6,8 @@ public class ForLoopStatement : StatementWithBlock
 {
     public Token KeywordToken { get; }
     public Statement? Initialization { get; }
-    public Expression Condition { get; }
-    public Statement Step { get; }
+    public Expression? Condition { get; }
+    public Statement? Step { get; }
 
     public IdentifierExpression Identifier => new(KeywordToken, File);
     public override Position Position => new(KeywordToken, Block);
@@ -15,8 +15,8 @@ public class ForLoopStatement : StatementWithBlock
     public ForLoopStatement(
         Token keyword,
         Statement? initialization,
-        Expression condition,
-        Statement step,
+        Expression? condition,
+        Statement? step,
         Block body,
         Uri file)
         : base(body, file)
@@ -40,11 +40,17 @@ public class ForLoopStatement : StatementWithBlock
             { yield return statement; }
         }
 
-        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
+        if (Condition is not null)
+        {
+            foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
+            { yield return statement; }
+        }
 
-        foreach (Statement statement in Step.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
+        if (Step is not null)
+        {
+            foreach (Statement statement in Step.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
+            { yield return statement; }
+        }
 
         foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
         { yield return statement; }

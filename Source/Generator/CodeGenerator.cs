@@ -217,6 +217,6 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
             if (CompiledParameters[i] != parameter) continue;
             return i;
         }
-        throw null;
+        throw new LanguageException($"Parameter {parameter.Identifier.Content} not found", parameter.Position, parameter.File);
     }
 }

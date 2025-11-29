@@ -615,7 +615,7 @@ public partial class StatementCompiler
                 @struct,
                 new FieldDefinition(
                     Token.CreateAnonymous("_genstate"),
-                    null,
+                    null!,
                     ImmutableArray<Token>.Empty,
                     ImmutableArray<AttributeUsage>.Empty
                 )
@@ -632,7 +632,7 @@ public partial class StatementCompiler
                 @struct,
                 new FieldDefinition(
                     nextFunction.Identifier,
-                    null,
+                    null!,
                     ImmutableArray<Token>.Empty,
                     ImmutableArray<AttributeUsage>.Empty
                 )

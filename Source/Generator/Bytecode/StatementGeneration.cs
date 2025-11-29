@@ -1224,18 +1224,24 @@ public partial class CodeGeneratorForMain : CodeGenerator
             GenerateCodeForStatement(forLoop.Initialization);
         }
 
-        AddComment("For-loop condition");
         InstructionLabel conditionOffsetFor = Code.MarkLabel();
 
         InstructionLabel endLabel = Code.DefineLabel();
 
-        GenerateCodeForCondition(forLoop.Condition, endLabel);
+        if (forLoop.Condition is not null)
+        {
+            AddComment("For-loop condition");
+            GenerateCodeForCondition(forLoop.Condition, endLabel);
+        }
 
         BreakInstructions.Push(new ControlFlowFrame(endLabel));
         GenerateCodeForStatement(forLoop.Body);
 
-        AddComment("For-loop expression");
-        GenerateCodeForStatement(forLoop.Step);
+        if (forLoop.Step is not null)
+        {
+            AddComment("For-loop expression");
+            GenerateCodeForStatement(forLoop.Step);
+        }
 
         AddComment("Jump back");
         Code.Emit(Opcode.Jump, conditionOffsetFor.Relative());

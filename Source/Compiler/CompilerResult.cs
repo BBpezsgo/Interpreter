@@ -57,7 +57,7 @@ public readonly struct CompilerResult
         res.AppendLine("// Top level statements");
         foreach (CompiledStatement statement in Statements)
         {
-            if (statement is EmptyStatement) continue;
+            if (statement is CompiledEmptyStatement) continue;
             res.Append(statement.Stringify(0));
             res.Append(';');
             res.AppendLine();

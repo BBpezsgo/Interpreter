@@ -83,7 +83,7 @@ public abstract class GeneralType :
 
             if (!GeneralType.From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
 
-            result = new ArrayType(of, stackArraySize.HasValue ? new CompiledEvaluatedValue()
+            result = new ArrayType(of, stackArraySize.HasValue ? new CompiledConstantValue()
             {
                 Value = stackArraySize.Value,
                 Location = type.StackArraySize.Location,

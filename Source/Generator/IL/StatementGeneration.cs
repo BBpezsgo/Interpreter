@@ -11,11 +11,11 @@ namespace LanguageCore.IL.Generator;
 
 public partial class CodeGeneratorForIL : CodeGenerator
 {
-    readonly Dictionary<CompiledVariableDeclaration, LocalBuilder> LocalBuilders = new();
+    readonly Dictionary<CompiledVariableDefinition, LocalBuilder> LocalBuilders = new();
     readonly Stack<Label> LoopLabels = new();
     readonly Dictionary<ICompiledFunctionDefinition, DynamicMethod> FunctionBuilders = new();
     readonly HashSet<ICompiledFunctionDefinition> EmittedFunctions = new();
-    readonly Dictionary<CompiledInstructionLabelDeclaration, Label> EmittedLabels = new();
+    readonly Dictionary<CompiledLabelDeclaration, Label> EmittedLabels = new();
     readonly ModuleBuilder Module;
 
     public readonly List<string>? Builders;
@@ -98,7 +98,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
     }
 
-    void EmitStatement(CompiledEvaluatedValue statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledConstantValue statement, ILProxy il, ref bool successful)
     {
         switch (statement.Value.Type)
         {
@@ -421,7 +421,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         successful = false;
         return;
     }
-    void EmitStatement(CompiledVariableDeclaration statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledVariableDefinition statement, ILProxy il, ref bool successful)
     {
         if (statement.IsGlobal)
         {
@@ -470,7 +470,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
         }
     }
-    void EmitStatement(CompiledVariableGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledVariableAccess statement, ILProxy il, ref bool successful)
     {
         if (statement.Variable.IsGlobal)
         {
@@ -497,17 +497,17 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         LoadLocal(il, local.LocalIndex);
     }
-    void EmitStatement(CompiledParameterGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledParameterAccess statement, ILProxy il, ref bool successful)
     {
-        LoadArgument(il, GetParameterIndex(statement.Variable));
+        LoadArgument(il, GetParameterIndex(statement.Parameter));
     }
-    void EmitStatement(CompiledFieldGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledFieldAccess statement, ILProxy il, ref bool successful)
     {
-        CompiledStatementWithValue _object = statement.Object;
+        CompiledExpression _object = statement.Object;
 
         if (!_object.Type.Is(out PointerType? objectType))
         {
-            _object = new CompiledAddressGetter()
+            _object = new CompiledGetReference()
             {
                 Of = _object,
                 Type = objectType = new PointerType(_object.Type),
@@ -584,7 +584,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             {
                 if (f.UnmarshaledCallback.Method.IsStatic)
                 {
-                    foreach (CompiledPassedArgument item in statement.Arguments)
+                    foreach (CompiledArgument item in statement.Arguments)
                     {
                         EmitStatement(item.Value, il, ref successful);
                     }
@@ -608,7 +608,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     EmitValue(i, il);
                     il.Emit(OpCodes.Ldelem_Ref);
 
-                    foreach (CompiledPassedArgument item in statement.Arguments)
+                    foreach (CompiledArgument item in statement.Arguments)
                     {
                         EmitStatement(item.Value, il, ref successful);
                     }
@@ -631,7 +631,20 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
         }
     }
-    void EmitStatement(CompiledVariableSetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledSetter setter, ILProxy il, ref bool successful)
+    {
+        switch (setter.Target)
+        {
+            case CompiledVariableAccess v: EmitSetter(v, setter.Value, il, ref successful); break;
+            case CompiledParameterAccess v: EmitSetter(v, setter.Value, il, ref successful); break;
+            case CompiledFieldAccess v: EmitSetter(v, setter.Value, il, ref successful); break;
+            case CompiledDereference v: EmitSetter(v, setter.Value, il, ref successful); break;
+            case CompiledElementAccess v: EmitSetter(v, setter.Value, il, ref successful); break;
+            case CompiledRegisterAccess v: EmitSetter(v, setter.Value, il, ref successful); break;
+            default: throw new UnreachableException(setter.Target.GetType().Name);
+        }
+    }
+    void EmitSetter(CompiledVariableAccess statement, CompiledExpression value, ILProxy il, ref bool successful)
     {
         if (statement.Variable.IsGlobal)
         {
@@ -645,7 +658,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
             }
 
-            EmitStatement(statement.Value, il, ref successful);
+            EmitStatement(value, il, ref successful);
             il.Emit(OpCodes.Stsfld, field);
             return;
         }
@@ -657,7 +670,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        switch (statement.Value)
+        switch (value)
         {
             case CompiledConstructorCall constructorCall:
                 EmitStatement(constructorCall, il, ref successful, local);
@@ -666,23 +679,23 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 EmitStatement(stackAllocation, il, ref successful, local);
                 break;
             default:
-                EmitStatement(statement.Value, il, ref successful);
+                EmitStatement(value, il, ref successful);
                 StoreLocal(il, local.LocalIndex);
                 break;
         }
     }
-    void EmitStatement(CompiledParameterSetter statement, ILProxy il, ref bool successful)
+    void EmitSetter(CompiledParameterAccess statement, CompiledExpression value, ILProxy il, ref bool successful)
     {
-        EmitStatement(statement.Value, il, ref successful);
-        il.Emit(OpCodes.Starg, GetParameterIndex(statement.Variable));
+        EmitStatement(value, il, ref successful);
+        il.Emit(OpCodes.Starg, GetParameterIndex(statement.Parameter));
     }
-    void EmitStatement(CompiledFieldSetter statement, ILProxy il, ref bool successful)
+    void EmitSetter(CompiledFieldAccess statement, CompiledExpression value, ILProxy il, ref bool successful)
     {
-        CompiledStatementWithValue _object = statement.Object;
+        CompiledExpression _object = statement.Object;
 
         if (!_object.Type.Is(out PointerType? objectType))
         {
-            _object = new CompiledAddressGetter()
+            _object = new CompiledGetReference()
             {
                 Of = _object,
                 Type = objectType = new PointerType(_object.Type),
@@ -716,7 +729,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
             }
 
-            EmitStatement(statement.Value, il, ref successful);
+            EmitStatement(value, il, ref successful);
             il.Emit(OpCodes.Stfld, field);
         }
         else
@@ -725,7 +738,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
         }
     }
-    void EmitStatement(CompiledIndirectSetter statement, ILProxy il, ref bool successful)
+    void EmitSetter(CompiledDereference statement, CompiledExpression value, ILProxy il, ref bool successful)
     {
         if (!Settings.AllowPointers)
         {
@@ -734,11 +747,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        switch (statement.AddressValue)
+        switch (statement.Address)
         {
-            case CompiledVariableGetter:
-            case CompiledParameterGetter:
-            case CompiledFieldGetter:
+            case CompiledVariableAccess:
+            case CompiledParameterAccess:
+            case CompiledFieldAccess:
                 break;
             default:
                 Diagnostics.Add(Diagnostic.Critical($"Unsafe!!!", statement, successful));
@@ -746,11 +759,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 break;
         }
 
-        EmitStatement(statement.AddressValue, il, ref successful);
-        EmitStatement(statement.Value, il, ref successful);
-        if (!statement.AddressValue.Type.Is(out PointerType? pointer))
+        EmitStatement(statement.Address, il, ref successful);
+        EmitStatement(value, il, ref successful);
+        if (!statement.Address.Type.Is(out PointerType? pointer))
         {
-            Diagnostics.Add(Diagnostic.Critical($"This should be a pointer", statement.AddressValue));
+            Diagnostics.Add(Diagnostic.Critical($"This should be a pointer", statement.Address));
             successful = false;
             return;
         }
@@ -762,7 +775,79 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
     }
-    void EmitStatement(CompiledPointer statement, ILProxy il, ref bool successful)
+    void EmitSetter(CompiledElementAccess statement, CompiledExpression value, ILProxy il, ref bool successful)
+    {
+        if (statement.Base.Type.Is(out PointerType? basePointerType) &&
+            basePointerType.To.Is(out ArrayType? baseArrayType))
+        {
+            if (!ToType(baseArrayType.Of, out _, out PossibleDiagnostic? typeError))
+            {
+                Diagnostics.Add(typeError.ToError(statement.Base));
+                successful = false;
+                return;
+            }
+
+            EmitStatement(statement.Base, il, ref successful);
+
+            EmitStatement(statement.Index, il, ref successful);
+
+            if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
+            {
+                Diagnostics.Add(typeError.ToError(statement.Base));
+                successful = false;
+                return;
+            }
+            if (elementSize != 1)
+            {
+                EmitValue(elementSize, il);
+
+                il.Emit(OpCodes.Mul);
+                il.Emit(OpCodes.Add);
+            }
+            else
+            {
+                Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
+                il.Emit(OpCodes.Add);
+            }
+
+            EmitStatement(value, il, ref successful);
+
+            if (!StoreIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
+            {
+                Diagnostics.Add(loadIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
+
+            return;
+        }
+
+        if (statement.Base.Type.Is(out baseArrayType))
+        {
+            EmitInlineArrayElementRef(statement.Base, statement.Index, il, ref successful);
+
+            EmitStatement(value, il, ref successful);
+
+            if (!StoreIndirect(baseArrayType.Of, il, out PossibleDiagnostic? storeIndirectError))
+            {
+                Diagnostics.Add(storeIndirectError.ToError(statement));
+                successful = false;
+                return;
+            }
+
+            return;
+        }
+
+        Debugger.Break();
+        Diagnostics.Add(Diagnostic.Critical($"Unimplemented index setter {statement.Base.Type}[{statement.Index.Type}]", statement));
+        successful = false;
+    }
+    void EmitSetter(CompiledRegisterAccess statement, CompiledExpression value, ILProxy il, ref bool successful)
+    {
+        successful = false;
+        Diagnostics.Add(Diagnostic.Critical($"Direct register access isn't supported in MSIL", statement, false));
+    }
+    void EmitStatement(CompiledDereference statement, ILProxy il, ref bool successful)
     {
         if (!Settings.AllowPointers)
         {
@@ -771,11 +856,11 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        switch (statement.To)
+        switch (statement.Address)
         {
-            case CompiledVariableGetter:
-            case CompiledParameterGetter:
-            case CompiledFieldGetter:
+            case CompiledVariableAccess:
+            case CompiledParameterAccess:
+            case CompiledFieldAccess:
                 break;
             default:
                 Debugger.Break();
@@ -784,18 +869,18 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 return;
         }
 
-        EmitStatement(statement.To, il, ref successful);
+        EmitStatement(statement.Address, il, ref successful);
 
-        if (!statement.To.Type.Is(out PointerType? pointer))
+        if (!statement.Address.Type.Is(out PointerType? pointer))
         {
-            Diagnostics.Add(Diagnostic.Critical($"This should be a pointer", statement.To));
+            Diagnostics.Add(Diagnostic.Critical($"This should be a pointer", statement.Address));
             successful = false;
             return;
         }
 
         if (!LoadIndirect(pointer.To, il, out PossibleDiagnostic? error))
         {
-            Diagnostics.Add(error.ToError(statement.To));
+            Diagnostics.Add(error.ToError(statement.Address));
             successful = false;
             return;
         }
@@ -913,7 +998,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             EmitStatement(v, il, ref successful);
         }
     }
-    void EmitStatement(CompiledAddressGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledGetReference statement, ILProxy il, ref bool successful)
     {
         if (!Settings.AllowPointers)
         {
@@ -924,7 +1009,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         switch (statement.Of)
         {
-            case CompiledVariableGetter v:
+            case CompiledVariableAccess v:
                 if (v.Variable.IsGlobal)
                 {
                     //Diagnostics.Add(Diagnostic.CriticalNoBreak($"Global variables not supported", statement));
@@ -949,15 +1034,15 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 }
                 il.Emit(OpCodes.Ldloca_S, local);
                 break;
-            case CompiledParameterGetter v:
-                il.Emit(OpCodes.Ldarga_S, GetParameterIndex(v.Variable));
+            case CompiledParameterAccess v:
+                il.Emit(OpCodes.Ldarga_S, GetParameterIndex(v.Parameter));
                 break;
-            case CompiledFieldGetter v:
-                CompiledStatementWithValue _object = v.Object;
+            case CompiledFieldAccess v:
+                CompiledExpression _object = v.Object;
 
                 if (!_object.Type.Is(out PointerType? objectType))
                 {
-                    _object = new CompiledAddressGetter()
+                    _object = new CompiledGetReference()
                     {
                         Of = _object,
                         Type = objectType = new PointerType(_object.Type),
@@ -998,7 +1083,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     successful = false;
                 }
                 break;
-            case CompiledIndexGetter v:
+            case CompiledElementAccess v:
                 if (v.Base.Type.Is(out PointerType? basePointerType) &&
                     basePointerType.To.Is(out ArrayType? baseArrayType))
                 {
@@ -1145,7 +1230,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         }
     }
-    void EmitStatement(CompiledFakeTypeCast statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledReinterpretation statement, ILProxy il, ref bool successful)
     {
         if (statement.Type.Is(out PointerType? resultPointerType) &&
             statement.Value is CompiledFunctionCall allocatorCaller &&
@@ -1192,7 +1277,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                 }
                 return;
             }
-            else if (allocatorCaller.Arguments[0].Value is CompiledEvaluatedValue valueArgument)
+            else if (allocatorCaller.Arguments[0].Value is CompiledConstantValue valueArgument)
             {
                 if (!FindSize(resultPointerType.To, out int size, out PossibleDiagnostic? sizeError))
                 {
@@ -1278,7 +1363,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
         }
 
-        if (statement.Value is CompiledEvaluatedValue fromValue &&
+        if (statement.Value is CompiledConstantValue fromValue &&
             statement.Type.Is(out toTypeP))
         {
             if (CompiledValue.IsZero(fromValue.Value))
@@ -1327,10 +1412,10 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
 
         EmitStatement(statement.Value, il, ref successful);
-        Diagnostics.Add(Diagnostic.Internal($"Fake type casts are unsafe (tried to cast {statement.Value.Type} to {statement.Type})", statement, successful));
+        Diagnostics.Add(Diagnostic.Internal($"Fake type casts are unsafe (tried to cast {statement.Value.Type} to {statement.Type})", statement, false));
         successful = false;
     }
-    void EmitStatement(CompiledTypeCast statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledCast statement, ILProxy il, ref bool successful)
     {
         EmitStatement(statement.Value, il, ref successful);
         switch (statement.Type.FinalValue)
@@ -1370,17 +1455,17 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         switch (statement.Value)
         {
-            case CompiledStringInstance compiledStringInstance:
+            case CompiledString compiledStringInstance:
                 il.Emit(OpCodes.Ldstr, compiledStringInstance.Value);
                 il.Emit(OpCodes.Newobj, typeof(RuntimeException).GetConstructor(new Type[] { typeof(string) })!);
                 il.Emit(OpCodes.Throw);
                 break;
-            case CompiledStackStringInstance stackStringInstance:
+            case CompiledStackString stackStringInstance:
                 il.Emit(OpCodes.Ldstr, stackStringInstance.Value);
                 il.Emit(OpCodes.Newobj, typeof(RuntimeException).GetConstructor(new Type[] { typeof(string) })!);
                 il.Emit(OpCodes.Throw);
                 break;
-            case CompiledEvaluatedValue compiledEvaluatedValue:
+            case CompiledConstantValue compiledEvaluatedValue:
                 il.Emit(OpCodes.Ldstr, compiledEvaluatedValue.Value.ToStringValue() ?? string.Empty);
                 il.Emit(OpCodes.Newobj, typeof(RuntimeException).GetConstructor(new Type[] { typeof(string) })!);
                 il.Emit(OpCodes.Throw);
@@ -1515,7 +1600,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
         }
     }
-    void EmitStatement(CompiledStringInstance statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledString statement, ILProxy il, ref bool successful)
     {
         if (!Settings.AllowHeap)
         {
@@ -1549,7 +1634,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             }
         }
     }
-    void EmitStatement(CompiledIndexGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledElementAccess statement, ILProxy il, ref bool successful)
     {
         if (statement.Base.Type.Is(out PointerType? basePointerType) &&
             basePointerType.To.Is(out ArrayType? baseArrayType))
@@ -1563,7 +1648,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
             EmitStatement(statement.Base, il, ref successful);
 
-            if (statement.Index is CompiledEvaluatedValue evaluatedIndex && evaluatedIndex.Value == 0)
+            if (statement.Index is CompiledConstantValue evaluatedIndex && evaluatedIndex.Value == 0)
             {
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Index 0", statement.Base));
             }
@@ -1619,74 +1704,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         Diagnostics.Add(Diagnostic.Critical($"This should be an array", statement.Base));
         successful = false;
     }
-    void EmitStatement(CompiledIndexSetter statement, ILProxy il, ref bool successful)
-    {
-        if (statement.Base.Type.Is(out PointerType? basePointerType) &&
-            basePointerType.To.Is(out ArrayType? baseArrayType))
-        {
-            if (!ToType(baseArrayType.Of, out _, out PossibleDiagnostic? typeError))
-            {
-                Diagnostics.Add(typeError.ToError(statement.Base));
-                successful = false;
-                return;
-            }
-
-            EmitStatement(statement.Base, il, ref successful);
-
-            EmitStatement(statement.Index, il, ref successful);
-
-            if (!FindSize(baseArrayType.Of, out int elementSize, out typeError))
-            {
-                Diagnostics.Add(typeError.ToError(statement.Base));
-                successful = false;
-                return;
-            }
-            if (elementSize != 1)
-            {
-                EmitValue(elementSize, il);
-
-                il.Emit(OpCodes.Mul);
-                il.Emit(OpCodes.Add);
-            }
-            else
-            {
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Element size is 1 byte 😀", statement.Base));
-                il.Emit(OpCodes.Add);
-            }
-
-            EmitStatement(statement.Value, il, ref successful);
-
-            if (!StoreIndirect(baseArrayType.Of, il, out PossibleDiagnostic? loadIndirectError))
-            {
-                Diagnostics.Add(loadIndirectError.ToError(statement));
-                successful = false;
-                return;
-            }
-
-            return;
-        }
-
-        if (statement.Base.Type.Is(out baseArrayType))
-        {
-            EmitInlineArrayElementRef(statement.Base, statement.Index, il, ref successful);
-
-            EmitStatement(statement.Value, il, ref successful);
-
-            if (!StoreIndirect(baseArrayType.Of, il, out PossibleDiagnostic? storeIndirectError))
-            {
-                Diagnostics.Add(storeIndirectError.ToError(statement));
-                successful = false;
-                return;
-            }
-
-            return;
-        }
-
-        Debugger.Break();
-        Diagnostics.Add(Diagnostic.Critical($"Unimplemented index setter {statement.Base.Type}[{statement.Index.Type}]", statement));
-        successful = false;
-    }
-    void EmitStatement(FunctionAddressGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledFunctionReference statement, ILProxy il, ref bool successful)
     {
         if (!Settings.AllowPointers)
         {
@@ -1719,7 +1737,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledGoto statement, ILProxy il, ref bool successful)
     {
-        if (statement.Value is InstructionLabelAddressGetter instructionLabelAddressGetter)
+        if (statement.Value is CompiledLabelReference instructionLabelAddressGetter)
         {
             if (!EmittedLabels.TryGetValue(instructionLabelAddressGetter.InstructionLabel, out Label label))
             {
@@ -1733,7 +1751,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             successful = false;
         }
     }
-    void EmitStatement(CompiledInstructionLabelDeclaration statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledLabelDeclaration statement, ILProxy il, ref bool successful)
     {
         if (!EmittedLabels.TryGetValue(statement, out Label label))
         {
@@ -1741,27 +1759,22 @@ public partial class CodeGeneratorForIL : CodeGenerator
         }
         il.MarkLabel(label);
     }
-    void EmitStatement(RegisterGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledRegisterAccess statement, ILProxy il, ref bool successful)
     {
         successful = false;
         Diagnostics.Add(Diagnostic.Critical($"Direct register access isn't supported in MSIL", statement, false));
     }
-    void EmitStatement(RegisterSetter statement, ILProxy il, ref bool successful)
-    {
-        successful = false;
-        Diagnostics.Add(Diagnostic.Critical($"Direct register access isn't supported in MSIL", statement, false));
-    }
-    void EmitStatement(InstructionLabelAddressGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledLabelReference statement, ILProxy il, ref bool successful)
     {
         successful = false;
         Diagnostics.Add(Diagnostic.Critical($"This isn't supported in MSIL", statement, false));
     }
-    void EmitStatement(CompiledLiteralList statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledList statement, ILProxy il, ref bool successful)
     {
         successful = false;
         Diagnostics.Add(Diagnostic.Critical($"Arrays on stack aren't supported in MSIL", statement, false));
     }
-    void EmitStatement(CompilerVariableGetter statement, ILProxy il, ref bool successful)
+    void EmitStatement(CompiledCompilerVariableAccess statement, ILProxy il, ref bool successful)
     {
         if (statement.Identifier == "IL")
         {
@@ -1781,54 +1794,49 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         switch (statement)
         {
-            case EmptyStatement: break;
+            case CompiledEmptyStatement: break;
             case CompiledReturn v: EmitStatement(v, il, ref successful); break;
-            case CompiledEvaluatedValue v: EmitStatement(v, il, ref successful); break;
+            case CompiledConstantValue v: EmitStatement(v, il, ref successful); break;
             case CompiledBinaryOperatorCall v: EmitStatement(v, il, ref successful); break;
             case CompiledUnaryOperatorCall v: EmitStatement(v, il, ref successful); break;
-            case CompiledVariableDeclaration v: EmitStatement(v, il, ref successful); break;
-            case CompiledVariableGetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledParameterGetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledFieldGetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledPointer v: EmitStatement(v, il, ref successful); break;
+            case CompiledVariableDefinition v: EmitStatement(v, il, ref successful); break;
+            case CompiledVariableAccess v: EmitStatement(v, il, ref successful); break;
+            case CompiledParameterAccess v: EmitStatement(v, il, ref successful); break;
+            case CompiledFieldAccess v: EmitStatement(v, il, ref successful); break;
+            case CompiledDereference v: EmitStatement(v, il, ref successful); break;
             case CompiledFunctionCall v: EmitStatement(v, il, ref successful); break;
             case CompiledExternalFunctionCall v: EmitStatement(v, il, ref successful); break;
-            case CompiledVariableSetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledParameterSetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledFieldSetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledIndirectSetter v: EmitStatement(v, il, ref successful); break;
+            case CompiledSetter v: EmitStatement(v, il, ref successful); break;
             case CompiledWhileLoop v: EmitStatement(v, il, ref successful); break;
             case CompiledBlock v: EmitStatement(v, il, ref successful); break;
             case CompiledForLoop v: EmitStatement(v, il, ref successful); break;
             case CompiledIf v: EmitStatement(v, il, ref successful); break;
             case CompiledBreak v: EmitStatement(v, il, ref successful); break;
-            case CompiledAddressGetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledFakeTypeCast v: EmitStatement(v, il, ref successful); break;
-            case CompiledTypeCast v: EmitStatement(v, il, ref successful); break;
+            case CompiledGetReference v: EmitStatement(v, il, ref successful); break;
+            case CompiledReinterpretation v: EmitStatement(v, il, ref successful); break;
+            case CompiledCast v: EmitStatement(v, il, ref successful); break;
             case CompiledCrash v: EmitStatement(v, il, ref successful); break;
-            case CompiledStatementWithValueThatActuallyDoesntHaveValue v: EmitStatement(v.Statement, il, ref successful); break;
+            case CompiledDummyExpression v: EmitStatement(v.Statement, il, ref successful); break;
             case CompiledSizeof v: EmitStatement(v, il, ref successful); break;
             case CompiledDelete v: EmitStatement(v, il, ref successful); break;
             case CompiledStackAllocation v: EmitStatement(v, il, ref successful); break;
             case CompiledConstructorCall v: EmitStatement(v, il, ref successful); break;
-            case CompiledStringInstance v: EmitStatement(v, il, ref successful); break;
-            case CompiledIndexGetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledIndexSetter v: EmitStatement(v, il, ref successful); break;
-            case FunctionAddressGetter v: EmitStatement(v, il, ref successful); break;
+            case CompiledString v: EmitStatement(v, il, ref successful); break;
+            case CompiledElementAccess v: EmitStatement(v, il, ref successful); break;
+            case CompiledFunctionReference v: EmitStatement(v, il, ref successful); break;
             case CompiledRuntimeCall v: EmitStatement(v, il, ref successful); break;
             case CompiledGoto v: EmitStatement(v, il, ref successful); break;
-            case CompiledInstructionLabelDeclaration v: EmitStatement(v, il, ref successful); break;
-            case RegisterGetter v: EmitStatement(v, il, ref successful); break;
-            case InstructionLabelAddressGetter v: EmitStatement(v, il, ref successful); break;
-            case RegisterSetter v: EmitStatement(v, il, ref successful); break;
-            case CompiledLiteralList v: EmitStatement(v, il, ref successful); break;
-            case CompilerVariableGetter v: EmitStatement(v, il, ref successful); break;
+            case CompiledLabelDeclaration v: EmitStatement(v, il, ref successful); break;
+            case CompiledRegisterAccess v: EmitStatement(v, il, ref successful); break;
+            case CompiledLabelReference v: EmitStatement(v, il, ref successful); break;
+            case CompiledList v: EmitStatement(v, il, ref successful); break;
+            case CompiledCompilerVariableAccess v: EmitStatement(v, il, ref successful); break;
             case CompiledLambda v: EmitStatement(v, il, ref successful); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }
 
-    void EmitInlineArrayElementRef(CompiledStatementWithValue @base, CompiledStatementWithValue index, ILProxy il, ref bool successful)
+    void EmitInlineArrayElementRef(CompiledExpression @base, CompiledExpression index, ILProxy il, ref bool successful)
     {
         if (!@base.Type.Is(out ArrayType? baseArrayType))
         {
@@ -1843,7 +1851,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return;
         }
 
-        EmitStatement(new CompiledAddressGetter()
+        EmitStatement(new CompiledGetReference()
         {
             Of = @base,
             Location = @base.Location,
@@ -2067,7 +2075,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     bool ToType(ArrayType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        if (type.Length is not CompiledEvaluatedValue _length)
+        if (type.Length is not CompiledConstantValue _length)
         {
             error = new PossibleDiagnostic($"The array's length must be a constant", false);
             result = null;
@@ -2157,7 +2165,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     void EmitFunctionBody(ImmutableArray<CompiledStatement> statements, GeneralType returnType, ILProxy il, ref bool successful)
     {
-        ImmutableArray<KeyValuePair<CompiledVariableDeclaration, LocalBuilder>> savedLocals = LocalBuilders.ToImmutableArray();
+        ImmutableArray<KeyValuePair<CompiledVariableDefinition, LocalBuilder>> savedLocals = LocalBuilders.ToImmutableArray();
         ImmutableArray<Label> savedLoopLabels = LoopLabels.ToImmutableArray();
 
         LocalBuilders.Clear();

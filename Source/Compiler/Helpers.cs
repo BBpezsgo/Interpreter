@@ -17,7 +17,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     readonly List<CompiledAlias> CompiledAliases = new();
 
     readonly Stack<CompiledVariableConstant> CompiledGlobalConstants = new();
-    readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables = new();
+    readonly Stack<CompiledVariableDefinition> CompiledGlobalVariables = new();
 
     readonly DiagnosticsCollection Diagnostics;
 
@@ -251,7 +251,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     bool GetLocalSymbolType(IdentifierExpression symbolName, [NotNullWhen(true)] out GeneralType? type)
     {
-        if (GetVariable(symbolName.Content, out CompiledVariableDeclaration? variable, out _))
+        if (GetVariable(symbolName.Content, out CompiledVariableDefinition? variable, out _))
         {
             type = variable.Type;
             return true;
@@ -716,7 +716,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
         else
         {
-            CompileExpression(variableDeclaration.InitialValue, out CompiledStatementWithValue? compiledInitialValue, constantType);
+            CompileExpression(variableDeclaration.InitialValue, out CompiledExpression? compiledInitialValue, constantType);
             if (!TryCompute(compiledInitialValue, out constantValue))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Constant value must be evaluated at compile-time", variableDeclaration.InitialValue));
@@ -1010,13 +1010,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         File,
     }
 
-    bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetVariable(variableName, Frames.Last, out compiledVariable, out error);
+    bool GetVariable(string variableName, [NotNullWhen(true)] out CompiledVariableDefinition? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetVariable(variableName, Frames.Last, out compiledVariable, out error);
 
-    static bool GetVariable(string variableName, CompiledFrame frame, [NotNullWhen(true)] out CompiledVariableDeclaration? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool GetVariable(string variableName, CompiledFrame frame, [NotNullWhen(true)] out CompiledVariableDefinition? compiledVariable, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         foreach (Scope scope in frame.Scopes)
         {
-            foreach (CompiledVariableDeclaration compiledVariable_ in scope.Variables)
+            foreach (CompiledVariableDefinition compiledVariable_ in scope.Variables)
             {
                 if (compiledVariable_.Identifier == variableName)
                 {
@@ -1036,17 +1036,17 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         string variableName,
         Uri relevantFile,
 
-        [NotNullWhen(true)] out CompiledVariableDeclaration? result,
+        [NotNullWhen(true)] out CompiledVariableDefinition? result,
         [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        CompiledVariableDeclaration? result_ = default;
+        CompiledVariableDefinition? result_ = default;
         PossibleDiagnostic? error_ = null;
 
         GlobalVariablePerfectus perfectus = GlobalVariablePerfectus.None;
 
         static GlobalVariablePerfectus Max(GlobalVariablePerfectus a, GlobalVariablePerfectus b) => a > b ? a : b;
 
-        bool HandleIdentifier(CompiledVariableDeclaration variable)
+        bool HandleIdentifier(CompiledVariableDefinition variable)
         {
             if (variableName is not null &&
                 variable.Identifier != variableName)
@@ -1056,7 +1056,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        bool HandleFile(CompiledVariableDeclaration variable)
+        bool HandleFile(CompiledVariableDefinition variable)
         {
             if (relevantFile is null ||
                 variable.Location.File != relevantFile)
@@ -1076,7 +1076,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        foreach (CompiledVariableDeclaration variable in CompiledGlobalVariables)
+        foreach (CompiledVariableDefinition variable in CompiledGlobalVariables)
         {
             if (!HandleIdentifier(variable))
             { continue; }
@@ -1124,9 +1124,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
 
-    bool GetInstructionLabel(string identifier, [NotNullWhen(true)] out CompiledInstructionLabelDeclaration? instructionLabel, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetInstructionLabel(string identifier, [NotNullWhen(true)] out CompiledLabelDeclaration? instructionLabel, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in Frames[^1].InstructionLabels)
+        foreach (CompiledLabelDeclaration compiledInstructionLabel in Frames[^1].InstructionLabels)
         {
             if (compiledInstructionLabel.Identifier != identifier) continue;
             instructionLabel = compiledInstructionLabel;
@@ -1134,7 +1134,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        foreach (CompiledInstructionLabelDeclaration compiledInstructionLabel in Frames[0].InstructionLabels)
+        foreach (CompiledLabelDeclaration compiledInstructionLabel in Frames[0].InstructionLabels)
         {
             if (compiledInstructionLabel.Identifier != identifier) continue;
             instructionLabel = compiledInstructionLabel;
@@ -1252,14 +1252,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
 
-    public bool CanCastImplicitly(CompiledStatementWithValue value, GeneralType destination, out CompiledStatementWithValue assignedValue, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    public bool CanCastImplicitly(CompiledExpression value, GeneralType destination, out CompiledExpression assignedValue, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         GeneralType source = value.Type;
         assignedValue = value;
 
         if (CanCastImplicitly(source, destination, out error)) return true;
 
-        if (value is CompiledStringInstance stringInstance)
+        if (value is CompiledString stringInstance)
         {
             if (destination.Is(out PointerType? pointerType) &&
                 pointerType.To.Is(out ArrayType? arrayType) &&
@@ -1284,7 +1284,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
 
-        if (value is CompiledStackStringInstance stackStringInstance)
+        if (value is CompiledStackString stackStringInstance)
         {
             if (destination.Is(out ArrayType? destArrayType) &&
                 destArrayType.Of.SameAs(BasicType.U16))
@@ -1324,11 +1324,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
                 if (!sourceFunctionType.HasClosure && targetFunctionType.HasClosure)
                 {
-                    if (!CompileAllocation(LiteralExpression.CreateAnonymous(PointerSize, value.Location.Position, value.Location.File), out CompiledStatementWithValue? allocator))
+                    if (!CompileAllocation(LiteralExpression.CreateAnonymous(PointerSize, value.Location.Position, value.Location.File), out CompiledExpression? allocator))
                     {
                         return false;
                     }
-                    assignedValue = new CompiledTypeCast()
+                    assignedValue = new CompiledCast()
                     {
                         Type = targetFunctionType,
                         Value = value,
@@ -1607,7 +1607,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             itemType = BuiltinType.Any;
         }
 
-        type = new ArrayType(itemType, new CompiledEvaluatedValue()
+        type = new ArrayType(itemType, new CompiledConstantValue()
         {
             Value = list.Values.Length,
             Location = list.Location,
@@ -1950,7 +1950,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
 
                 diagnostics.Add(Diagnostic.Warning($"No type defined for string literals, using the default u16[]*", literal));
-                OnGotStatementType(literal, type = new PointerType(new ArrayType(BuiltinType.Char, new CompiledEvaluatedValue()
+                OnGotStatementType(literal, type = new PointerType(new ArrayType(BuiltinType.Char, new CompiledConstantValue()
                 {
                     Value = literal.Value.Length + 1,
                     Location = literal.Location,
@@ -2038,7 +2038,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (GetVariable(identifier.Content, out CompiledVariableDeclaration? variable, out PossibleDiagnostic? variableNotFoundError))
+        if (GetVariable(identifier.Content, out CompiledVariableDefinition? variable, out PossibleDiagnostic? variableNotFoundError))
         {
             identifier.AnalyzedType = TokenAnalyzedType.VariableName;
             identifier.Reference = variable;
@@ -2046,7 +2046,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariableDeclaration? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
+        if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariableDefinition? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             identifier.AnalyzedType = TokenAnalyzedType.VariableName;
             identifier.Reference = globalVariable;
@@ -2855,20 +2855,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     class InlineContext
     {
-        public required ImmutableDictionary<string, CompiledPassedArgument> Arguments { get; init; }
-        public List<CompiledPassedArgument> InlinedArguments { get; } = new();
-        public Dictionary<CompiledVariableDeclaration, CompiledVariableDeclaration> VariableReplacements { get; } = new();
+        public required ImmutableDictionary<string, CompiledArgument> Arguments { get; init; }
+        public List<CompiledArgument> InlinedArguments { get; } = new();
+        public Dictionary<CompiledVariableDefinition, CompiledVariableDefinition> VariableReplacements { get; } = new();
     }
 
-    static bool Inline(IEnumerable<CompiledPassedArgument> statements, InlineContext context, [NotNullWhen(true)] out ImmutableArray<CompiledPassedArgument> inlined)
+    static bool Inline(IEnumerable<CompiledArgument> statements, InlineContext context, [NotNullWhen(true)] out ImmutableArray<CompiledArgument> inlined)
     {
-        inlined = ImmutableArray<CompiledPassedArgument>.Empty;
-        ImmutableArray<CompiledPassedArgument>.Builder res = ImmutableArray.CreateBuilder<CompiledPassedArgument>();
+        inlined = ImmutableArray<CompiledArgument>.Empty;
+        ImmutableArray<CompiledArgument>.Builder res = ImmutableArray.CreateBuilder<CompiledArgument>();
 
-        foreach (CompiledPassedArgument statement in statements)
+        foreach (CompiledArgument statement in statements)
         {
-            if (!Inline(statement.Value, context, out CompiledStatementWithValue? v)) return false;
-            res.Add(new CompiledPassedArgument()
+            if (!Inline(statement.Value, context, out CompiledExpression? v)) return false;
+            res.Add(new CompiledArgument()
             {
                 Value = v,
                 Cleanup = new CompiledCleanup()
@@ -2906,16 +2906,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return true;
     }
 
-    static bool Inline(CompiledSizeof statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledSizeof statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(CompiledBinaryOperatorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledBinaryOperatorCall statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Left, context, out CompiledStatementWithValue? inlinedLeft)) return false;
-        if (!Inline(statement.Right, context, out CompiledStatementWithValue? inlinedRight)) return false;
+        if (!Inline(statement.Left, context, out CompiledExpression? inlinedLeft)) return false;
+        if (!Inline(statement.Right, context, out CompiledExpression? inlinedRight)) return false;
 
         inlined = new CompiledBinaryOperatorCall()
         {
@@ -2928,10 +2928,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledUnaryOperatorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledUnaryOperatorCall statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Left, context, out CompiledStatementWithValue? inlinedLeft)) return false;
+        if (!Inline(statement.Left, context, out CompiledExpression? inlinedLeft)) return false;
 
         inlined = new CompiledUnaryOperatorCall()
         {
@@ -2943,20 +2943,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledEvaluatedValue statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledConstantValue statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(RegisterGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledRegisterAccess statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(CompiledVariableGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledVariableAccess statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!context.VariableReplacements.TryGetValue(statement.Variable, out CompiledVariableDeclaration? replacedVariable))
+        if (!context.VariableReplacements.TryGetValue(statement.Variable, out CompiledVariableDefinition? replacedVariable))
         {
             if (statement.Variable.IsGlobal)
             {
@@ -2968,7 +2968,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             }
         }
 
-        inlined = new CompiledVariableGetter()
+        inlined = new CompiledVariableAccess()
         {
             Variable = replacedVariable,
             Type = statement.Type,
@@ -2977,11 +2977,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledParameterGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledParameterAccess statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
 
-        if (context.Arguments.TryGetValue(statement.Variable.Identifier.Content, out CompiledPassedArgument? inlinedArgument))
+        if (context.Arguments.TryGetValue(statement.Parameter.Identifier.Content, out CompiledArgument? inlinedArgument))
         {
             if (inlinedArgument.Cleanup.Deallocator is not null ||
                 inlinedArgument.Cleanup.Destructor is not null)
@@ -2994,25 +2994,25 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    static bool Inline(FunctionAddressGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledFunctionReference statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(InstructionLabelAddressGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledLabelReference statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(CompiledFieldGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledFieldAccess statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Object, context, out CompiledStatementWithValue? inlinedObject)) return false;
+        if (!Inline(statement.Object, context, out CompiledExpression? inlinedObject)) return false;
 
-        while (inlinedObject is CompiledAddressGetter addressGetter)
+        while (inlinedObject is CompiledGetReference addressGetter)
         { inlinedObject = addressGetter.Of; }
 
-        inlined = new CompiledFieldGetter()
+        inlined = new CompiledFieldAccess()
         {
             Object = inlinedObject,
             Field = statement.Field,
@@ -3022,13 +3022,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledIndexGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledElementAccess statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Base, context, out CompiledStatementWithValue? inlinedBase)) return false;
-        if (!Inline(statement.Index, context, out CompiledStatementWithValue? inlinedIndex)) return false;
+        if (!Inline(statement.Base, context, out CompiledExpression? inlinedBase)) return false;
+        if (!Inline(statement.Index, context, out CompiledExpression? inlinedIndex)) return false;
 
-        inlined = new CompiledIndexGetter()
+        inlined = new CompiledElementAccess()
         {
             Base = inlinedBase,
             Index = inlinedIndex,
@@ -3038,12 +3038,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledAddressGetter statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledGetReference statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Of, context, out CompiledStatementWithValue? inlinedOf)) return false;
+        if (!Inline(statement.Of, context, out CompiledExpression? inlinedOf)) return false;
 
-        inlined = new CompiledAddressGetter()
+        inlined = new CompiledGetReference()
         {
             Of = inlinedOf,
             Type = statement.Type,
@@ -3052,30 +3052,30 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledPointer statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledDereference statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.To, context, out CompiledStatementWithValue? inlinedTo)) return false;
+        if (!Inline(statement.Address, context, out CompiledExpression? inlinedTo)) return false;
 
-        inlined = new CompiledPointer()
+        inlined = new CompiledDereference()
         {
-            To = inlinedTo,
+            Address = inlinedTo,
             Type = statement.Type,
             Location = statement.Location,
             SaveValue = statement.SaveValue,
         };
         return true;
     }
-    static bool Inline(CompiledStackAllocation statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledStackAllocation statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(CompiledConstructorCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledConstructorCall statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Object, context, out CompiledStatementWithValue? inlinedObject)) return false;
-        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+        if (!Inline(statement.Object, context, out CompiledExpression? inlinedObject)) return false;
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledArgument> inlinedArguments)) return false;
 
         inlined = new CompiledConstructorCall()
         {
@@ -3088,13 +3088,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledTypeCast statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledCast statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
 
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
 
-        inlined = new CompiledFakeTypeCast()
+        inlined = new CompiledReinterpretation()
         {
             Value = inlinedValue,
             Location = statement.Location,
@@ -3103,13 +3103,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledFakeTypeCast statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledReinterpretation statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
 
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
 
-        inlined = new CompiledFakeTypeCast()
+        inlined = new CompiledReinterpretation()
         {
             Value = inlinedValue,
             Location = statement.Location,
@@ -3118,12 +3118,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledRuntimeCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledRuntimeCall statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
 
-        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
-        if (!Inline(statement.Function, context, out CompiledStatementWithValue? inlinedFunction)) return false;
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledArgument> inlinedArguments)) return false;
+        if (!Inline(statement.Function, context, out CompiledExpression? inlinedFunction)) return false;
 
         inlined = new CompiledRuntimeCall()
         {
@@ -3135,11 +3135,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledFunctionCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledFunctionCall statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
 
-        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledArgument> inlinedArguments)) return false;
 
         inlined = new CompiledFunctionCall()
         {
@@ -3151,11 +3151,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledExternalFunctionCall statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledExternalFunctionCall statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
 
-        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledPassedArgument> inlinedArguments)) return false;
+        if (!Inline(statement.Arguments, context, out ImmutableArray<CompiledArgument> inlinedArguments)) return false;
 
         inlined = new CompiledExternalFunctionCall()
         {
@@ -3168,12 +3168,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledStatementWithValueThatActuallyDoesntHaveValue statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledDummyExpression statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         if (!Inline(statement.Statement, context, out CompiledStatement? inlinedStatement)) return false;
 
-        inlined = new CompiledStatementWithValueThatActuallyDoesntHaveValue()
+        inlined = new CompiledDummyExpression()
         {
             Statement = inlinedStatement,
             Type = statement.Type,
@@ -3182,22 +3182,22 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledStringInstance statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledString statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(CompiledStackStringInstance statement, InlineContext context, out CompiledStatementWithValue inlined)
+    static bool Inline(CompiledStackString statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(CompiledVariableDeclaration statement, InlineContext context, out CompiledStatement inlined)
+    static bool Inline(CompiledVariableDefinition statement, InlineContext context, out CompiledStatement inlined)
     {
         inlined = statement;
-        if (!Inline(statement.InitialValue, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.InitialValue, context, out CompiledExpression? inlinedValue)) return false;
 
-        CompiledVariableDeclaration _inlined = new()
+        CompiledVariableDefinition _inlined = new()
         {
             InitialValue = inlinedValue,
             Cleanup = statement.Cleanup,
@@ -3213,7 +3213,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     static bool Inline(CompiledReturn statement, InlineContext context, out CompiledStatement inlined)
     {
         inlined = statement;
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
 
         inlined = new CompiledReturn()
         {
@@ -3226,7 +3226,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
 
         inlined = new CompiledCrash()
         {
@@ -3244,7 +3244,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
 
         inlined = new CompiledDelete()
         {
@@ -3258,7 +3258,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
 
         inlined = new CompiledGoto()
         {
@@ -3267,99 +3267,17 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(RegisterSetter statement, InlineContext context, out CompiledStatement inlined)
+    static bool Inline(CompiledSetter statement, InlineContext context, out CompiledStatement inlined)
     {
         inlined = statement;
 
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
+        if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
+        if (!Inline(statement.Target, context, out CompiledStatement? target)) return false;
 
-        inlined = new RegisterSetter()
+        inlined = new CompiledSetter()
         {
             Value = inlinedValue,
-            Register = statement.Register,
-            IsCompoundAssignment = statement.IsCompoundAssignment,
-            Location = statement.Location,
-        };
-        return true;
-    }
-    static bool Inline(CompiledVariableSetter statement, InlineContext context, out CompiledStatement inlined)
-    {
-        inlined = statement;
-
-        if (!context.VariableReplacements.TryGetValue(statement.Variable, out CompiledVariableDeclaration? replacedVariable))
-        {
-            if (statement.Variable.IsGlobal)
-            {
-                replacedVariable = statement.Variable;
-            }
-            else
-            {
-                return false;
-            }
-        }
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
-
-        inlined = new CompiledVariableSetter()
-        {
-            Value = inlinedValue,
-            Variable = replacedVariable,
-            IsCompoundAssignment = statement.IsCompoundAssignment,
-            Location = statement.Location,
-        };
-        return true;
-    }
-    static bool Inline(CompiledParameterSetter statement, InlineContext context, out CompiledStatement inlined)
-    {
-        inlined = statement;
-        return false;
-    }
-    static bool Inline(CompiledIndirectSetter statement, InlineContext context, out CompiledStatement inlined)
-    {
-        inlined = statement;
-
-        if (!Inline(statement.AddressValue, context, out CompiledStatementWithValue? inlinedAddressValue)) return false;
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
-
-        inlined = new CompiledIndirectSetter()
-        {
-            AddressValue = inlinedAddressValue,
-            Value = inlinedValue,
-            IsCompoundAssignment = statement.IsCompoundAssignment,
-            Location = statement.Location,
-        };
-        return true;
-    }
-    static bool Inline(CompiledFieldSetter statement, InlineContext context, out CompiledStatement inlined)
-    {
-        inlined = statement;
-
-        if (!Inline(statement.Object, context, out CompiledStatementWithValue? inlinedObject)) return false;
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
-
-        inlined = new CompiledFieldSetter()
-        {
-            Object = inlinedObject,
-            Value = inlinedValue,
-            Field = statement.Field,
-            Type = statement.Type,
-            IsCompoundAssignment = statement.IsCompoundAssignment,
-            Location = statement.Location,
-        };
-        return true;
-    }
-    static bool Inline(CompiledIndexSetter statement, InlineContext context, out CompiledStatement inlined)
-    {
-        inlined = statement;
-
-        if (!Inline(statement.Base, context, out CompiledStatementWithValue? inlinedBase)) return false;
-        if (!Inline(statement.Index, context, out CompiledStatementWithValue? inlinedIndex)) return false;
-        if (!Inline(statement.Value, context, out CompiledStatementWithValue? inlinedValue)) return false;
-
-        inlined = new CompiledIndexSetter()
-        {
-            Base = inlinedBase,
-            Index = inlinedIndex,
-            Value = inlinedValue,
+            Target = (CompiledAccessExpression)target,
             IsCompoundAssignment = statement.IsCompoundAssignment,
             Location = statement.Location,
         };
@@ -3369,7 +3287,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
+        if (!Inline(statement.Condition, context, out CompiledExpression? inlinedCondition)) return false;
         if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
 
         inlined = new CompiledWhileLoop()
@@ -3386,7 +3304,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         CompiledStatement? inlinedVariableDeclaration = null;
         if (statement.Initialization is not null && !Inline(statement.Initialization, context, out inlinedVariableDeclaration)) return false;
-        if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
+        if (!Inline(statement.Condition, context, out CompiledExpression? inlinedCondition)) return false;
         if (!Inline(statement.Step, context, out CompiledStatement? inlinedExpression)) return false;
         if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
 
@@ -3404,7 +3322,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
 
-        if (!Inline(statement.Condition, context, out CompiledStatementWithValue? inlinedCondition)) return false;
+        if (!Inline(statement.Condition, context, out CompiledExpression? inlinedCondition)) return false;
         if (!Inline(statement.Body, context, out CompiledStatement? inlinedBody)) return false;
         if (!Inline(statement.Next, context, out CompiledStatement? inlinedNext)) return false;
 
@@ -3455,12 +3373,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         };
         return true;
     }
-    static bool Inline(CompiledInstructionLabelDeclaration statement, InlineContext context, out CompiledStatement inlined)
+    static bool Inline(CompiledLabelDeclaration statement, InlineContext context, out CompiledStatement inlined)
     {
         inlined = statement;
         return true;
     }
-    static bool Inline(EmptyStatement statement, InlineContext context, out CompiledStatement inlined)
+    static bool Inline(CompiledEmptyStatement statement, InlineContext context, out CompiledStatement inlined)
     {
         inlined = statement;
         return true;
@@ -3476,27 +3394,22 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         switch (statement)
         {
-            case CompiledVariableDeclaration v: return Inline(v, context, out inlined);
+            case CompiledVariableDefinition v: return Inline(v, context, out inlined);
             case CompiledReturn v: return Inline(v, context, out inlined);
             case CompiledCrash v: return Inline(v, context, out inlined);
             case CompiledBreak v: return Inline(v, context, out inlined);
             case CompiledDelete v: return Inline(v, context, out inlined);
             case CompiledGoto v: return Inline(v, context, out inlined);
-            case RegisterSetter v: return Inline(v, context, out inlined);
-            case CompiledVariableSetter v: return Inline(v, context, out inlined);
-            case CompiledParameterSetter v: return Inline(v, context, out inlined);
-            case CompiledIndirectSetter v: return Inline(v, context, out inlined);
-            case CompiledFieldSetter v: return Inline(v, context, out inlined);
-            case CompiledIndexSetter v: return Inline(v, context, out inlined);
+            case CompiledSetter v: return Inline(v, context, out inlined);
             case CompiledWhileLoop v: return Inline(v, context, out inlined);
             case CompiledForLoop v: return Inline(v, context, out inlined);
             case CompiledIf v: return Inline(v, context, out inlined);
             case CompiledElse v: return Inline(v, context, out inlined);
             case CompiledBlock v: return Inline(v, context, out inlined);
-            case CompiledInstructionLabelDeclaration v: return Inline(v, context, out inlined);
-            case EmptyStatement v: return Inline(v, context, out inlined);
-            case CompiledStatementWithValue v:
-                if (Inline(v, context, out CompiledStatementWithValue inlinedWithValue))
+            case CompiledLabelDeclaration v: return Inline(v, context, out inlined);
+            case CompiledEmptyStatement v: return Inline(v, context, out inlined);
+            case CompiledExpression v:
+                if (Inline(v, context, out CompiledExpression inlinedWithValue))
                 {
                     inlined = inlinedWithValue;
                     return true;
@@ -3509,7 +3422,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             default: throw new NotImplementedException(statement.GetType().Name);
         }
     }
-    static bool Inline(CompiledStatementWithValue? statement, InlineContext context, [NotNullIfNotNull(nameof(statement))] out CompiledStatementWithValue? inlined)
+    static bool Inline(CompiledExpression? statement, InlineContext context, [NotNullIfNotNull(nameof(statement))] out CompiledExpression? inlined)
     {
         if (statement is null)
         {
@@ -3522,26 +3435,26 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledSizeof v => Inline(v, context, out inlined),
             CompiledBinaryOperatorCall v => Inline(v, context, out inlined),
             CompiledUnaryOperatorCall v => Inline(v, context, out inlined),
-            CompiledEvaluatedValue v => Inline(v, context, out inlined),
-            RegisterGetter v => Inline(v, context, out inlined),
-            CompiledVariableGetter v => Inline(v, context, out inlined),
-            CompiledParameterGetter v => Inline(v, context, out inlined),
-            FunctionAddressGetter v => Inline(v, context, out inlined),
-            InstructionLabelAddressGetter v => Inline(v, context, out inlined),
-            CompiledFieldGetter v => Inline(v, context, out inlined),
-            CompiledIndexGetter v => Inline(v, context, out inlined),
-            CompiledAddressGetter v => Inline(v, context, out inlined),
-            CompiledPointer v => Inline(v, context, out inlined),
+            CompiledConstantValue v => Inline(v, context, out inlined),
+            CompiledRegisterAccess v => Inline(v, context, out inlined),
+            CompiledVariableAccess v => Inline(v, context, out inlined),
+            CompiledParameterAccess v => Inline(v, context, out inlined),
+            CompiledFunctionReference v => Inline(v, context, out inlined),
+            CompiledLabelReference v => Inline(v, context, out inlined),
+            CompiledFieldAccess v => Inline(v, context, out inlined),
+            CompiledElementAccess v => Inline(v, context, out inlined),
+            CompiledGetReference v => Inline(v, context, out inlined),
+            CompiledDereference v => Inline(v, context, out inlined),
             CompiledStackAllocation v => Inline(v, context, out inlined),
             CompiledConstructorCall v => Inline(v, context, out inlined),
-            CompiledTypeCast v => Inline(v, context, out inlined),
-            CompiledFakeTypeCast v => Inline(v, context, out inlined),
+            CompiledCast v => Inline(v, context, out inlined),
+            CompiledReinterpretation v => Inline(v, context, out inlined),
             CompiledRuntimeCall v => Inline(v, context, out inlined),
             CompiledFunctionCall v => Inline(v, context, out inlined),
             CompiledExternalFunctionCall v => Inline(v, context, out inlined),
-            CompiledStatementWithValueThatActuallyDoesntHaveValue v => Inline(v, context, out inlined),
-            CompiledStringInstance v => Inline(v, context, out inlined),
-            CompiledStackStringInstance v => Inline(v, context, out inlined),
+            CompiledDummyExpression v => Inline(v, context, out inlined),
+            CompiledString v => Inline(v, context, out inlined),
+            CompiledStackString v => Inline(v, context, out inlined),
 
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
@@ -3855,7 +3768,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     class EvaluationScope
     {
-        public readonly Dictionary<CompiledVariableDeclaration, CompiledValue> Variables = new();
+        public readonly Dictionary<CompiledVariableDefinition, CompiledValue> Variables = new();
     }
 
     class EvaluationFrame
@@ -3885,7 +3798,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             RuntimeStatements = new();
         }
 
-        public bool TryGetVariable(CompiledVariableDeclaration name, out CompiledValue value)
+        public bool TryGetVariable(CompiledVariableDefinition name, out CompiledValue value)
         {
             value = default;
 
@@ -3911,7 +3824,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return Frames.LastOrDefault.Parameters.TryGetValue(name, out value);
         }
 
-        public bool TrySetVariable(CompiledVariableDeclaration name, CompiledValue value)
+        public bool TrySetVariable(CompiledVariableDefinition name, CompiledValue value)
         {
             if (Frames.LastOrDefault is null)
             { return false; }
@@ -3951,9 +3864,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
-    bool TryCompute(CompiledPointer pointer, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledDereference pointer, EvaluationContext context, out CompiledValue value)
     {
-        if (pointer.To is CompiledAddressGetter addressGetter)
+        if (pointer.Address is CompiledGetReference addressGetter)
         { return TryCompute(addressGetter.Of, context, out value); }
 
         value = CompiledValue.Null;
@@ -4030,7 +3943,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
         }
     }
-    bool TryCompute(CompiledEvaluatedValue literal, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledConstantValue literal, EvaluationContext context, out CompiledValue value)
     {
         value = literal.Value;
         return true;
@@ -4081,7 +3994,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = new CompiledValue(size);
         return true;
     }
-    bool TryCompute(CompiledVariableGetter identifier, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledVariableAccess identifier, EvaluationContext context, out CompiledValue value)
     {
         if (!context.TryGetVariable(identifier.Variable, out value))
         {
@@ -4091,9 +4004,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryCompute(CompiledParameterGetter identifier, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledParameterAccess identifier, EvaluationContext context, out CompiledValue value)
     {
-        if (!context.TryGetParameter(identifier.Variable.Identifier.Content, out value))
+        if (!context.TryGetParameter(identifier.Parameter.Identifier.Content, out value))
         {
             value = CompiledValue.Null;
             return false;
@@ -4101,7 +4014,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryCompute(CompiledFakeTypeCast typeCast, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledReinterpretation typeCast, EvaluationContext context, out CompiledValue value)
     {
         if (!TryCompute(typeCast.Value, context, out value))
         {
@@ -4114,7 +4027,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.CreateUnsafe(value.I32, builtinType.RuntimeType);
         return true;
     }
-    bool TryCompute(CompiledTypeCast typeCast, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledCast typeCast, EvaluationContext context, out CompiledValue value)
     {
         if (!TryCompute(typeCast.Value, context, out value))
         {
@@ -4128,7 +4041,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = casted;
         return true;
     }
-    bool TryCompute(CompiledIndexGetter indexCall, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledElementAccess indexCall, EvaluationContext context, out CompiledValue value)
     {
         if (!TryCompute(indexCall.Index, context, out CompiledValue index))
         {
@@ -4136,7 +4049,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (indexCall.Base is CompiledStringInstance stringInstance)
+        if (indexCall.Base is CompiledString stringInstance)
         {
             if (index == stringInstance.Value.Length)
             { value = new CompiledValue('\0'); }
@@ -4145,7 +4058,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (indexCall.Base is CompiledStackStringInstance stackString)
+        if (indexCall.Base is CompiledStackString stackString)
         {
             if (index == stackString.Value.Length)
             { value = new CompiledValue('\0'); }
@@ -4154,7 +4067,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
-        if (indexCall.Base is CompiledLiteralList listLiteral &&
+        if (indexCall.Base is CompiledList listLiteral &&
             TryCompute(listLiteral.Values[(int)index], context, out value))
         {
             return true;
@@ -4163,15 +4076,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         value = CompiledValue.Null;
         return false;
     }
-    bool TryCompute(FunctionAddressGetter functionAddressGetter, EvaluationContext context, out CompiledValue value)
+    bool TryCompute(CompiledFunctionReference functionAddressGetter, EvaluationContext context, out CompiledValue value)
     {
         value = CompiledValue.Null;
         return false;
     }
 
-    bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, out CompiledValue value)
+    bool TryCompute([NotNullWhen(true)] CompiledExpression? statement, out CompiledValue value)
         => TryCompute(statement, EvaluationContext.Empty, out value);
-    bool TryCompute(IEnumerable<CompiledStatementWithValue>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
+    bool TryCompute(IEnumerable<CompiledExpression>? statements, EvaluationContext context, [NotNullWhen(true)] out ImmutableArray<CompiledValue> values)
     {
         if (statements is null)
         {
@@ -4180,7 +4093,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
 
         ImmutableArray<CompiledValue>.Builder result = ImmutableArray.CreateBuilder<CompiledValue>();
-        foreach (CompiledStatementWithValue statement in statements)
+        foreach (CompiledExpression statement in statements)
         {
             if (!TryCompute(statement, context, out CompiledValue value))
             {
@@ -4194,45 +4107,45 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         values = result.ToImmutable();
         return true;
     }
-    bool TryCompute([NotNullWhen(true)] CompiledStatementWithValue? statement, EvaluationContext context, out CompiledValue value)
+    bool TryCompute([NotNullWhen(true)] CompiledExpression? statement, EvaluationContext context, out CompiledValue value)
     {
         value = CompiledValue.Null;
         return statement switch
         {
-            CompiledEvaluatedValue v => TryCompute(v, context, out value),
+            CompiledConstantValue v => TryCompute(v, context, out value),
             CompiledBinaryOperatorCall v => TryCompute(v, context, out value),
             CompiledUnaryOperatorCall v => TryCompute(v, context, out value),
-            CompiledPointer v => TryCompute(v, context, out value),
+            CompiledDereference v => TryCompute(v, context, out value),
             CompiledFunctionCall v => TryCompute(v, context, out value),
             CompiledSizeof v => TryCompute(v, context, out value),
-            CompiledVariableGetter v => TryCompute(v, context, out value),
-            CompiledParameterGetter v => TryCompute(v, context, out value),
-            CompiledFakeTypeCast v => TryCompute(v, context, out value),
-            CompiledTypeCast v => TryCompute(v, context, out value),
-            CompiledIndexGetter v => TryCompute(v, context, out value),
-            CompiledPassedArgument v => TryCompute(v.Value, context, out value),
-            FunctionAddressGetter v => TryCompute(v, context, out value),
+            CompiledVariableAccess v => TryCompute(v, context, out value),
+            CompiledParameterAccess v => TryCompute(v, context, out value),
+            CompiledReinterpretation v => TryCompute(v, context, out value),
+            CompiledCast v => TryCompute(v, context, out value),
+            CompiledElementAccess v => TryCompute(v, context, out value),
+            CompiledArgument v => TryCompute(v.Value, context, out value),
+            CompiledFunctionReference v => TryCompute(v, context, out value),
             CompiledLambda v => false, // TODO
 
-            CompiledStringInstance => false,
-            CompiledStackStringInstance => false,
+            CompiledString => false,
+            CompiledStackString => false,
             CompiledExternalFunctionCall => false,
             CompiledRuntimeCall => false,
-            CompiledFieldGetter => false,
+            CompiledFieldAccess => false,
             CompiledStackAllocation => false,
             CompiledConstructorCall => false,
-            CompiledAddressGetter => false,
-            CompiledLiteralList => false,
-            CompiledStatementWithValueThatActuallyDoesntHaveValue => false,
-            RegisterGetter => false,
-            InstructionLabelAddressGetter => false,
+            CompiledGetReference => false,
+            CompiledList => false,
+            CompiledDummyExpression => false,
+            CompiledRegisterAccess => false,
+            CompiledLabelReference => false,
             null => false,
 
             _ => throw new NotImplementedException(statement.GetType().ToString()),
         };
     }
 
-    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -4248,7 +4161,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return false;
     }
-    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledStatementWithValue> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
+    bool TryEvaluate(ICompiledFunctionDefinition function, ImmutableArray<CompiledExpression> parameters, EvaluationContext context, out CompiledValue? value, [NotNullWhen(true)] out ImmutableArray<RuntimeStatement2> runtimeStatements)
     {
         value = default;
         runtimeStatements = default;
@@ -4436,7 +4349,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         context.PopScope();
         return result;
     }
-    bool TryEvaluate(CompiledVariableDeclaration variableDeclaration, EvaluationContext context)
+    bool TryEvaluate(CompiledVariableDefinition variableDeclaration, EvaluationContext context)
     {
         CompiledValue value;
 
@@ -4460,37 +4373,27 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return true;
     }
-    bool TryEvaluate(CompiledVariableSetter anyAssignment, EvaluationContext context)
+    bool TryEvaluate(CompiledSetter anyAssignment, EvaluationContext context)
     {
         if (!TryCompute(anyAssignment.Value, context, out CompiledValue value))
         { return false; }
 
-        if (!context.TrySetVariable(anyAssignment.Variable, value))
-        { return false; }
+        if (anyAssignment.Target is CompiledVariableAccess targetVariable)
+        {
+            if (!context.TrySetVariable(targetVariable.Variable, value))
+            { return false; }
+        }
+        else if (anyAssignment.Target is CompiledParameterAccess targetParameter)
+        {
+            if (!context.TrySetParameter(targetParameter.Parameter.Identifier.Content, value))
+            { return false; }
+        }
+        else
+        {
+            return false;
+        }
 
         return true;
-    }
-    bool TryEvaluate(CompiledParameterSetter anyAssignment, EvaluationContext context)
-    {
-        if (!TryCompute(anyAssignment.Value, context, out CompiledValue value))
-        { return false; }
-
-        if (!context.TrySetParameter(anyAssignment.Variable.Identifier.Content, value))
-        { return false; }
-
-        return true;
-    }
-    bool TryEvaluate(CompiledFieldSetter anyAssignment, EvaluationContext context)
-    {
-        return false;
-    }
-    bool TryEvaluate(CompiledIndexSetter anyAssignment, EvaluationContext context)
-    {
-        return false;
-    }
-    bool TryEvaluate(CompiledIndirectSetter anyAssignment, EvaluationContext context)
-    {
-        return false;
     }
     bool TryEvaluate(CompiledReturn keywordCall, EvaluationContext context)
     {
@@ -4525,16 +4428,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool TryEvaluate(CompiledStatement statement, EvaluationContext context) => statement switch
     {
-        CompiledStatementWithValue v => TryCompute(v, context, out _),
+        CompiledExpression v => TryCompute(v, context, out _),
         CompiledBlock v => TryEvaluate(v, context),
-        CompiledVariableDeclaration v => TryEvaluate(v, context),
+        CompiledVariableDefinition v => TryEvaluate(v, context),
         CompiledWhileLoop v => TryEvaluate(v, context),
         CompiledForLoop v => TryEvaluate(v, context),
-        CompiledVariableSetter v => TryEvaluate(v, context),
-        CompiledParameterSetter v => TryEvaluate(v, context),
-        CompiledFieldSetter v => TryEvaluate(v, context),
-        CompiledIndexSetter v => TryEvaluate(v, context),
-        CompiledIndirectSetter v => TryEvaluate(v, context),
+        CompiledSetter v => TryEvaluate(v, context),
         CompiledReturn v => TryEvaluate(v, context),
         CompiledCrash v => TryEvaluate(v, context),
         CompiledBreak v => TryEvaluate(v, context),
@@ -4595,7 +4494,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (!FindSize(type.Of, out int elementSize, out error)) return false;
 
-        if (type.Length is not CompiledEvaluatedValue evaluatedStatement)
+        if (type.Length is not CompiledConstantValue evaluatedStatement)
         {
             error = new PossibleDiagnostic($"Can't compute the array type's length");
             return false;
@@ -4662,10 +4561,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         Bruh = 4,
     }
 
-    StatementComplexity GetStatementComplexity(IEnumerable<CompiledStatementWithValue> statements)
+    StatementComplexity GetStatementComplexity(IEnumerable<CompiledExpression> statements)
     {
         StatementComplexity res = StatementComplexity.None;
-        foreach (CompiledStatementWithValue statement in statements) res |= GetStatementComplexity(statement);
+        foreach (CompiledExpression statement in statements) res |= GetStatementComplexity(statement);
         return res;
     }
 
@@ -4680,32 +4579,32 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
-    StatementComplexity GetStatementComplexity(CompiledStatementWithValue statement) => statement switch
+    StatementComplexity GetStatementComplexity(CompiledExpression statement) => statement switch
     {
         CompiledSizeof v => GetStatementComplexity(v.Of),
-        CompiledPassedArgument v => GetStatementComplexity(v.Value) | ((v.Cleanup.Destructor is not null || v.Cleanup.Deallocator is not null) ? StatementComplexity.Complex | StatementComplexity.Volatile : StatementComplexity.None),
+        CompiledArgument v => GetStatementComplexity(v.Value) | ((v.Cleanup.Destructor is not null || v.Cleanup.Deallocator is not null) ? StatementComplexity.Complex | StatementComplexity.Volatile : StatementComplexity.None),
         CompiledBinaryOperatorCall v => GetStatementComplexity(v.Left) | GetStatementComplexity(v.Right) | StatementComplexity.Complex,
         CompiledUnaryOperatorCall v => GetStatementComplexity(v.Left) | StatementComplexity.Complex,
-        CompiledEvaluatedValue => StatementComplexity.None,
-        RegisterGetter => StatementComplexity.None,
-        CompiledVariableGetter => StatementComplexity.None,
-        CompiledParameterGetter => StatementComplexity.None,
-        FunctionAddressGetter => StatementComplexity.None,
-        InstructionLabelAddressGetter => StatementComplexity.None,
-        CompiledFieldGetter v => GetStatementComplexity(v.Object),
-        CompiledIndexGetter v => GetStatementComplexity(v.Base) | GetStatementComplexity(v.Index),
-        CompiledAddressGetter v => GetStatementComplexity(v.Of),
-        CompiledPointer v => GetStatementComplexity(v.To),
+        CompiledConstantValue => StatementComplexity.None,
+        CompiledRegisterAccess => StatementComplexity.None,
+        CompiledVariableAccess => StatementComplexity.None,
+        CompiledParameterAccess => StatementComplexity.None,
+        CompiledFunctionReference => StatementComplexity.None,
+        CompiledLabelReference => StatementComplexity.None,
+        CompiledFieldAccess v => GetStatementComplexity(v.Object),
+        CompiledElementAccess v => GetStatementComplexity(v.Base) | GetStatementComplexity(v.Index),
+        CompiledGetReference v => GetStatementComplexity(v.Of),
+        CompiledDereference v => GetStatementComplexity(v.Address),
         CompiledStackAllocation => StatementComplexity.Bruh,
         CompiledConstructorCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
-        CompiledTypeCast v => GetStatementComplexity(v.Value) | StatementComplexity.Complex,
-        CompiledFakeTypeCast v => GetStatementComplexity(v.Value),
+        CompiledCast v => GetStatementComplexity(v.Value) | StatementComplexity.Complex,
+        CompiledReinterpretation v => GetStatementComplexity(v.Value),
         CompiledRuntimeCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
         CompiledFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Complex | StatementComplexity.Volatile,
         CompiledExternalFunctionCall v => GetStatementComplexity(v.Arguments) | StatementComplexity.Volatile,
-        CompiledStatementWithValueThatActuallyDoesntHaveValue => StatementComplexity.Bruh,
-        CompiledStringInstance => StatementComplexity.Complex | StatementComplexity.Volatile,
-        CompiledStackStringInstance => StatementComplexity.Bruh,
+        CompiledDummyExpression => StatementComplexity.Bruh,
+        CompiledString => StatementComplexity.Complex | StatementComplexity.Volatile,
+        CompiledStackString => StatementComplexity.Bruh,
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -4761,7 +4660,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         switch (statement)
         {
-            case CompiledVariableDeclaration v:
+            case CompiledVariableDefinition v:
                 yield return v;
                 if (v.InitialValue is not null)
                 {
@@ -4806,67 +4705,45 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Left)) yield return v2;
                 break;
-            case CompiledEvaluatedValue v:
+            case CompiledConstantValue v:
                 yield return v;
                 break;
-            case RegisterGetter v:
+            case CompiledRegisterAccess v:
                 yield return v;
                 break;
-            case CompiledVariableGetter v:
+            case CompiledVariableAccess v:
                 yield return v;
                 break;
-            case CompiledParameterGetter v:
+            case CompiledParameterAccess v:
                 yield return v;
                 break;
-            case FunctionAddressGetter v:
+            case CompiledFunctionReference v:
                 yield return v;
                 break;
-            case InstructionLabelAddressGetter v:
+            case CompiledLabelReference v:
                 yield return v;
                 break;
-            case CompiledFieldGetter v:
+            case CompiledFieldAccess v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Object)) yield return v2;
                 break;
-            case CompiledIndexGetter v:
+            case CompiledElementAccess v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Base)) yield return v2;
                 foreach (CompiledStatement v2 in Visit(v.Index)) yield return v2;
                 break;
-            case CompiledAddressGetter v:
+            case CompiledGetReference v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Of)) yield return v2;
                 break;
-            case RegisterSetter v:
-                yield return v;
-                break;
-            case CompiledVariableSetter v:
+            case CompiledSetter v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Target)) yield return v2;
                 break;
-            case CompiledParameterSetter v:
+            case CompiledDereference v:
                 yield return v;
-                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
-                break;
-            case CompiledIndirectSetter v:
-                yield return v;
-                foreach (CompiledStatement v2 in Visit(v.AddressValue)) yield return v2;
-                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
-                break;
-            case CompiledFieldSetter v:
-                yield return v;
-                foreach (CompiledStatement v2 in Visit(v.Object)) yield return v2;
-                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
-                break;
-            case CompiledIndexSetter v:
-                yield return v;
-                foreach (CompiledStatement v2 in Visit(v.Base)) yield return v2;
-                foreach (CompiledStatement v2 in Visit(v.Index)) yield return v2;
-                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
-                break;
-            case CompiledPointer v:
-                yield return v;
-                foreach (CompiledStatement v2 in Visit(v.To)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Address)) yield return v2;
                 break;
             case CompiledWhileLoop v:
                 yield return v;
@@ -4899,12 +4776,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 foreach (CompiledStatement v2 in Visit(v.Type)) yield return v2;
                 foreach (CompiledStatement v2 in Visit(v.Arguments)) yield return v2;
                 break;
-            case CompiledTypeCast v:
+            case CompiledCast v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Type)) yield return v2;
                 foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
                 break;
-            case CompiledFakeTypeCast v:
+            case CompiledReinterpretation v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
                 break;
@@ -4925,23 +4802,23 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Statements)) yield return v2;
                 break;
-            case CompiledInstructionLabelDeclaration v:
+            case CompiledLabelDeclaration v:
                 yield return v;
                 break;
-            case CompiledStatementWithValueThatActuallyDoesntHaveValue v:
+            case CompiledDummyExpression v:
                 yield return v;
                 break;
-            case CompiledStringInstance v:
+            case CompiledString v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Allocator)) yield return v2;
                 break;
-            case CompiledStackStringInstance v:
+            case CompiledStackString v:
                 yield return v;
                 break;
-            case EmptyStatement v:
+            case CompiledEmptyStatement v:
                 yield return v;
                 break;
-            case CompiledPassedArgument v:
+            case CompiledArgument v:
                 yield return v;
                 foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
                 foreach (CompiledStatement v2 in Visit(v.Cleanup)) yield return v2;
@@ -4975,13 +4852,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (statement is CompiledBlock compiledBlock)
         {
-            if (!compiledBlock.Statements.Any(v => v is CompiledVariableDeclaration or CompiledInstructionLabelDeclaration))
+            if (!compiledBlock.Statements.Any(v => v is CompiledVariableDefinition or CompiledLabelDeclaration))
             {
                 return ReduceStatements(compiledBlock.Statements);
             }
         }
 
-        if (statement is not CompiledStatementWithValue statementWithValue)
+        if (statement is not CompiledExpression statementWithValue)
         {
             return ImmutableArray.Create(statement);
         }
@@ -4993,32 +4870,32 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         return statementWithValue switch
         {
-            CompiledPassedArgument v => ReduceStatements(v.Value, true),
+            CompiledArgument v => ReduceStatements(v.Value, true),
             CompiledBinaryOperatorCall v => ReduceStatements(v.Left, true).AddRange(ReduceStatements(v.Right, true)),
             CompiledUnaryOperatorCall v => ReduceStatements(v.Left, true),
-            CompiledIndexGetter v => ReduceStatements(v.Base, true).AddRange(ReduceStatements(v.Index, true)),
-            CompiledAddressGetter v => ReduceStatements(v.Of, true),
-            CompiledPointer v => ReduceStatements(v.To, true),
+            CompiledElementAccess v => ReduceStatements(v.Base, true).AddRange(ReduceStatements(v.Index, true)),
+            CompiledGetReference v => ReduceStatements(v.Of, true),
+            CompiledDereference v => ReduceStatements(v.Address, true),
             CompiledConstructorCall v => ReduceStatements(v.Arguments, true),
-            CompiledTypeCast v => ReduceStatements(v.Value, true),
-            CompiledFakeTypeCast v => ReduceStatements(v.Value, true),
-            CompiledStatementWithValueThatActuallyDoesntHaveValue v => ReduceStatements(v.Statement),
+            CompiledCast v => ReduceStatements(v.Value, true),
+            CompiledReinterpretation v => ReduceStatements(v.Value, true),
+            CompiledDummyExpression v => ReduceStatements(v.Statement),
 
             CompiledRuntimeCall or
             CompiledFunctionCall or
             CompiledExternalFunctionCall => ImmutableArray.Create(statement),
 
             CompiledSizeof or
-            CompiledEvaluatedValue or
-            RegisterGetter or
-            CompiledVariableGetter or
-            CompiledParameterGetter or
-            FunctionAddressGetter or
-            InstructionLabelAddressGetter or
-            CompiledFieldGetter or
+            CompiledConstantValue or
+            CompiledRegisterAccess or
+            CompiledVariableAccess or
+            CompiledParameterAccess or
+            CompiledFunctionReference or
+            CompiledLabelReference or
+            CompiledFieldAccess or
             CompiledStackAllocation or
-            CompiledStringInstance or
-            CompiledStackStringInstance => ImmutableArray<CompiledStatement>.Empty,
+            CompiledString or
+            CompiledStackString => ImmutableArray<CompiledStatement>.Empty,
             _ => throw new NotImplementedException(),
         };
     }

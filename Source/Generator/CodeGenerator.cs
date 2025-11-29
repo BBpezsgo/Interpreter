@@ -49,9 +49,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
     #region Protected Fields
 
     protected readonly Stack<CompiledParameter> CompiledParameters;
-    protected readonly Stack<CompiledVariableDeclaration> CompiledLocalVariables;
-    protected readonly Stack<CompiledVariableDeclaration> CompiledGlobalVariables;
-    protected readonly Stack<CompiledInstructionLabelDeclaration> CompiledInstructionLabels;
+    protected readonly Stack<CompiledVariableDefinition> CompiledLocalVariables;
+    protected readonly Stack<CompiledVariableDefinition> CompiledGlobalVariables;
+    protected readonly Stack<CompiledLabelDeclaration> CompiledInstructionLabels;
 
     protected bool InFunction;
     protected readonly Dictionary<string, GeneralType> TypeArguments;
@@ -77,9 +77,9 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
         TopLevelStatements = compilerResult.Statements;
 
         CompiledParameters = new Stack<CompiledParameter>();
-        CompiledLocalVariables = new Stack<CompiledVariableDeclaration>();
-        CompiledGlobalVariables = new Stack<CompiledVariableDeclaration>();
-        CompiledInstructionLabels = new Stack<CompiledInstructionLabelDeclaration>();
+        CompiledLocalVariables = new Stack<CompiledVariableDefinition>();
+        CompiledGlobalVariables = new Stack<CompiledVariableDefinition>();
+        CompiledInstructionLabels = new Stack<CompiledLabelDeclaration>();
 
         InFunction = false;
         TypeArguments = new Dictionary<string, GeneralType>();
@@ -154,7 +154,7 @@ public abstract class CodeGenerator : IRuntimeInfoProvider
 
         if (!FindSize(type.Of, out int elementSize, out error)) return false;
 
-        if (type.Length is not CompiledEvaluatedValue evaluatedStatement)
+        if (type.Length is not CompiledConstantValue evaluatedStatement)
         {
             error = new PossibleDiagnostic($"Can't compute the array type's length");
             return false;

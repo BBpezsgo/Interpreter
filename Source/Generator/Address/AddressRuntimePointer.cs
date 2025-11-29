@@ -2,9 +2,9 @@ namespace LanguageCore.Compiler;
 
 public class AddressRuntimePointer : Address
 {
-    public CompiledStatementWithValue PointerValue { get; }
+    public CompiledExpression PointerValue { get; }
 
-    public AddressRuntimePointer(CompiledStatementWithValue pointerValue)
+    public AddressRuntimePointer(CompiledExpression pointerValue)
     {
         PointerValue = pointerValue;
     }

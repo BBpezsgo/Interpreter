@@ -8,10 +8,10 @@ public class ArrayType : GeneralType,
     IEquatable<ArrayType>
 {
     public GeneralType Of { get; }
-    public CompiledStatementWithValue? Length { get; }
-    public int? ComputedLength => Length is CompiledEvaluatedValue evaluatedValue ? (int)evaluatedValue.Value : null;
+    public CompiledExpression? Length { get; }
+    public int? ComputedLength => Length is CompiledConstantValue evaluatedValue ? (int)evaluatedValue.Value : null;
 
-    public ArrayType(GeneralType of, CompiledStatementWithValue? length)
+    public ArrayType(GeneralType of, CompiledExpression? length)
     {
         Of = of;
         Length = length;

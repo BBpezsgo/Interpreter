@@ -179,8 +179,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     readonly ImmutableArray<IExternalFunction> ExternalFunctions;
     readonly List<(ExternalFunctionScopedSync Function, ExternalFunctionScopedSyncCallback Reference)> GeneratedUnmanagedFunctions = new();
-    readonly Dictionary<CompiledInstructionLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
-    readonly Dictionary<CompiledVariableDeclaration, GeneratedVariable> GeneratedVariables = new();
+    readonly Dictionary<CompiledLabelDeclaration, GeneratedInstructionLabel> GeneratedInstructionLabels = new();
+    readonly Dictionary<CompiledVariableDefinition, GeneratedVariable> GeneratedVariables = new();
     readonly HashSet<ICompiledFunctionDefinition> GeneratedFunctions = new();
 
     readonly Stack<CompiledScope> CleanupStack2;

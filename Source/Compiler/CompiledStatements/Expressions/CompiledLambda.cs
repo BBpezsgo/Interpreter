@@ -2,7 +2,7 @@
 
 namespace LanguageCore.Compiler;
 
-public class CompiledLambda : CompiledStatementWithValue,
+public class CompiledLambda : CompiledExpression,
     ICompiledFunctionDefinition,
     IHaveCompiledType,
     IHaveInstructionOffset,
@@ -16,7 +16,7 @@ public class CompiledLambda : CompiledStatementWithValue,
     public ParameterDefinitionCollection ParameterDefinitions { get; }
     public CompiledBlock Block { get; }
     public ImmutableArray<CapturedLocal> CapturedLocals { get; }
-    public CompiledStatementWithValue? Allocator { get; init; }
+    public CompiledExpression? Allocator { get; init; }
     public Uri File { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);

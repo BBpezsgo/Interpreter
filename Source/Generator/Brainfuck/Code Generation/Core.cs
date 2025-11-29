@@ -378,15 +378,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
     #region Addressing Helpers
 
-    bool TryGetAddress(CompiledStatementWithValue statement, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledExpression statement, [NotNullWhen(true)] out Address? address, out int size)
     {
         switch (statement)
         {
-            case CompiledIndexGetter index: return TryGetAddress(index, out address, out size);
-            case CompiledPointer pointer: return TryGetAddress(pointer, out address, out size);
-            case CompiledVariableGetter identifier: return TryGetAddress(identifier, out address, out size);
-            case CompiledParameterGetter identifier: return TryGetAddress(identifier, out address, out size);
-            case CompiledFieldGetter field: return TryGetAddress(field, out address, out size);
+            case CompiledElementAccess index: return TryGetAddress(index, out address, out size);
+            case CompiledDereference pointer: return TryGetAddress(pointer, out address, out size);
+            case CompiledVariableAccess identifier: return TryGetAddress(identifier, out address, out size);
+            case CompiledParameterAccess identifier: return TryGetAddress(identifier, out address, out size);
+            case CompiledFieldAccess field: return TryGetAddress(field, out address, out size);
             default:
             {
                 Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
@@ -396,7 +396,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             }
         }
     }
-    bool TryGetAddress(CompiledIndexGetter index, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledElementAccess index, [NotNullWhen(true)] out Address? address, out int size)
     {
         if (index.Base.Type.Is(out PointerType? prevPointerType) && !(
             GetVariable(index.Base, out BrainfuckVariable? prevVariable, out _) &&
@@ -408,7 +408,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             if (size != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index); }
 
-            if (index.Index is CompiledEvaluatedValue indexValue)
+            if (index.Index is CompiledConstantValue indexValue)
             {
                 address = new AddressRuntimePointer(index.Base) + ((int)indexValue.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
                 return true;
@@ -434,7 +434,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             if (size != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index); }
 
-            if (index.Index is CompiledEvaluatedValue indexValue)
+            if (index.Index is CompiledConstantValue indexValue)
             {
                 address += (int)indexValue.Value * 2 * arrayType.Of.GetSize(this, Diagnostics, index.Base);
                 return true;
@@ -448,7 +448,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         size = default;
         return default;
     }
-    bool TryGetAddress(CompiledFieldGetter field, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledFieldAccess field, [NotNullWhen(true)] out Address? address, out int size)
     {
         GeneralType type = field.Object.Type;
 
@@ -504,15 +504,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         size = default;
         return false;
     }
-    bool TryGetAddress(CompiledPointer pointer, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledDereference pointer, [NotNullWhen(true)] out Address? address, out int size)
     {
-        if (pointer.To is not CompiledEvaluatedValue _addressToSet)
-        { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.To); }
+        if (pointer.Address is not CompiledConstantValue _addressToSet)
+        { throw new NotSupportedException($"Runtime pointer address in not supported", pointer.Address); }
         CompiledValue addressToSet = _addressToSet.Value;
 
         if (!CompiledValue.TryShrinkTo8bit(ref addressToSet))
         {
-            Diagnostics.Add(Diagnostic.Critical($"Address value must be a byte (not \"{addressToSet.Type}\")", pointer.To));
+            Diagnostics.Add(Diagnostic.Critical($"Address value must be a byte (not \"{addressToSet.Type}\")", pointer.Address));
             address = default;
             size = default;
             return default;
@@ -522,7 +522,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         size = 1;
         return true;
     }
-    bool TryGetAddress(CompiledVariableGetter identifier, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledVariableAccess identifier, [NotNullWhen(true)] out Address? address, out int size)
     {
         if (!GetVariable(identifier, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
@@ -536,7 +536,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         size = variable.Size;
         return true;
     }
-    bool TryGetAddress(CompiledParameterGetter identifier, [NotNullWhen(true)] out Address? address, out int size)
+    bool TryGetAddress(CompiledParameterAccess identifier, [NotNullWhen(true)] out Address? address, out int size)
     {
         if (!GetVariable(identifier, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
         {
@@ -620,19 +620,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         result = null;
         return false;
     }
-    bool GetVariable(CompiledStatementWithValue name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetVariable(CompiledExpression name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         result = null;
         error = null;
         return name switch
         {
-            CompiledVariableGetter identifier => GetVariable(identifier, out result, out error),
-            CompiledParameterGetter identifier => GetVariable(identifier, out result, out error),
-            CompiledPointer pointer => GetVariable(pointer, out result, out error),
+            CompiledVariableAccess identifier => GetVariable(identifier, out result, out error),
+            CompiledParameterAccess identifier => GetVariable(identifier, out result, out error),
+            CompiledDereference pointer => GetVariable(pointer, out result, out error),
             _ => false
         };
     }
-    bool GetVariable(CompiledVariableGetter name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetVariable(CompiledVariableAccess name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         foreach (BrainfuckVariable v in CompiledVariables)
         {
@@ -646,19 +646,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         return GetVariable(name.Variable.Identifier, name.Variable.Location.File, out result, out error);
     }
-    bool GetVariable(CompiledParameterGetter name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetVariable(name.Variable.Identifier.Content, name.Variable.File, out result, out error);
-    bool GetVariable(CompiledPointer name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetVariable(CompiledParameterAccess name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GetVariable(name.Parameter.Identifier.Content, name.Parameter.File, out result, out error);
+    bool GetVariable(CompiledDereference name, [NotNullWhen(true)] out BrainfuckVariable? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        switch (name.To)
+        switch (name.Address)
         {
-            case CompiledVariableGetter v:
+            case CompiledVariableAccess v:
                 if (!GetVariable(v, out result, out error))
                 {
                     result = null;
                     return false;
                 }
                 break;
-            case CompiledParameterGetter v:
+            case CompiledParameterAccess v:
                 if (!GetVariable(v, out result, out error))
                 {
                     result = null;
@@ -749,7 +749,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             compilerResult.File
         );
 
-        CompiledVariables.Add(new BrainfuckVariable(Stack.PushVirtual(1), false, false, null, ExitCodeType.GetSize(this), new CompiledVariableDeclaration()
+        CompiledVariables.Add(new BrainfuckVariable(Stack.PushVirtual(1), false, false, null, ExitCodeType.GetSize(this), new CompiledVariableDefinition()
         {
             Identifier = implicitReturnValueVariable.Identifier.Content,
             InitialValue = null,
@@ -763,7 +763,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             },
         }));
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.Statements.OfType<CompiledVariableDeclaration>();
+        IEnumerable<CompiledVariableDefinition> globalVariableDeclarations = compilerResult.Statements.OfType<CompiledVariableDefinition>();
 
         if (Settings.ClearGlobalVariablesBeforeExit)
         { VariableCleanupStack.Push(PrecompileVariables(globalVariableDeclarations, false)); }

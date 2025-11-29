@@ -9,8 +9,8 @@ public class CompiledField : FieldDefinition,
     public new CompiledStruct Context { get; set; }
     public new GeneralType Type { get; }
 
-    public HashSet<CompiledFieldGetter> Getters { get; } = new();
-    public HashSet<CompiledFieldSetter> Setters { get; } = new();
+    public HashSet<CompiledFieldAccess> Getters { get; } = new();
+    public HashSet<CompiledFieldAccess> Setters { get; } = new();
 
     public CompiledField(GeneralType type, CompiledStruct context, FieldDefinition definition) : base(definition)
     {

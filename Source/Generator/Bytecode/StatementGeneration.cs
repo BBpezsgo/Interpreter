@@ -203,7 +203,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region GenerateCodeForStatement
 
-    void GenerateCodeForStatement(CompiledVariableDeclaration newVariable)
+    void GenerateCodeForStatement(CompiledVariableDefinition newVariable)
     {
         // if (newVariable.Getters.Count == 0 &&
         //     newVariable.Setters.Count == 0)
@@ -220,26 +220,32 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment($"New Variable \"{newVariable.Identifier}\" {{");
 
-        if (newVariable.InitialValue is CompiledLiteralList literalList)
+        if (newVariable.InitialValue is CompiledList literalList)
         {
             for (int i = 0; i < literalList.Values.Length; i++)
             {
-                CompiledStatementWithValue value = literalList.Values[i];
-                GenerateCodeForValueSetter(new CompiledIndexSetter()
+                CompiledExpression value = literalList.Values[i];
+                GenerateCodeForValueSetter(new CompiledSetter()
                 {
-                    Base = new CompiledVariableGetter()
+                    Target = new CompiledElementAccess()
                     {
-                        Variable = newVariable,
-                        Location = newVariable.Location,
-                        SaveValue = true,
-                        Type = newVariable.Type,
-                    },
-                    Index = new CompiledEvaluatedValue()
-                    {
-                        Value = i,
+                        Base = new CompiledVariableAccess()
+                        {
+                            Variable = newVariable,
+                            Location = newVariable.Location,
+                            SaveValue = true,
+                            Type = newVariable.Type,
+                        },
+                        Index = new CompiledConstantValue()
+                        {
+                            Value = i,
+                            Location = value.Location,
+                            SaveValue = true,
+                            Type = BuiltinType.I32,
+                        },
                         Location = value.Location,
                         SaveValue = true,
-                        Type = BuiltinType.I32,
+                        Type = BuiltinType.Any, // fixme
                     },
                     IsCompoundAssignment = false,
                     Location = value.Location,
@@ -250,16 +256,16 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
-        GenerateCodeForValueSetter(new CompiledVariableSetter()
+        GenerateCodeForValueSetter(new CompiledVariableAccess()
         {
             Variable = newVariable,
-            Value = newVariable.InitialValue,
+            Type = newVariable.Type,
             Location = newVariable.Location,
-            IsCompoundAssignment = false,
-        });
+            SaveValue = true,
+        }, newVariable.InitialValue);
         AddComment("}");
     }
-    void GenerateCodeForStatement(CompiledInstructionLabelDeclaration instructionLabel)
+    void GenerateCodeForStatement(CompiledLabelDeclaration instructionLabel)
     {
         foreach (ControlFlowFrame v in ReturnInstructions) v.IsSkipping = false;
         foreach (ControlFlowFrame v in BreakInstructions) v.IsSkipping = false;
@@ -288,7 +294,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             AddComment(" Param 0:");
 
-            CompiledStatementWithValue returnValue = keywordCall.Value;
+            CompiledExpression returnValue = keywordCall.Value;
             GeneralType returnValueType = returnValue.Type;
 
             GenerateCodeForStatement(returnValue);
@@ -325,10 +331,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledCrash keywordCall)
     {
-        CompiledStatementWithValue throwValue = keywordCall.Value;
+        CompiledExpression throwValue = keywordCall.Value;
         GeneralType throwType = throwValue.Type;
 
-        if (throwValue is CompiledStringInstance literalThrowValue)
+        if (throwValue is CompiledString literalThrowValue)
         {
             _statistics.Optimizations++;
             Diagnostics.Add(Diagnostic.OptimizationNotice("String allocated on stack", throwValue));
@@ -381,13 +387,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Code.Emit(Opcode.Jump, reg.Register);
         }
     }
-    Stack<CompiledCleanup> GenerateCodeForArguments(IReadOnlyList<CompiledPassedArgument> arguments, ICompiledFunctionDefinition compiledFunction, int alreadyPassed = 0)
+    Stack<CompiledCleanup> GenerateCodeForArguments(IReadOnlyList<CompiledArgument> arguments, ICompiledFunctionDefinition compiledFunction, int alreadyPassed = 0)
     {
         Stack<CompiledCleanup> argumentCleanup = new();
 
         for (int i = 0; i < arguments.Count; i++)
         {
-            CompiledPassedArgument argument = arguments[i];
+            CompiledArgument argument = arguments[i];
             GeneralType argumentType = argument.Value.Type;
             CompiledParameter parameter = compiledFunction.Parameters[i + alreadyPassed];
 
@@ -403,7 +409,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         return argumentCleanup;
     }
-    void GenerateCodeForParameterPassing(IReadOnlyList<CompiledPassedArgument> parameters, FunctionType function, Stack<CompiledCleanup> parameterCleanup)
+    void GenerateCodeForParameterPassing(IReadOnlyList<CompiledArgument> parameters, FunctionType function, Stack<CompiledCleanup> parameterCleanup)
     {
         for (int i = 0; i < parameters.Count; i++)
         {
@@ -412,7 +418,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             parameterCleanup.Push(parameters[i].Cleanup);
         }
     }
-    Stack<CompiledCleanup> GenerateCodeForParameterPassing(IReadOnlyList<CompiledPassedArgument> parameters, FunctionType function)
+    Stack<CompiledCleanup> GenerateCodeForParameterPassing(IReadOnlyList<CompiledArgument> parameters, FunctionType function)
     {
         Stack<CompiledCleanup> parameterCleanup = new();
         GenerateCodeForParameterPassing(parameters, function, parameterCleanup);
@@ -688,8 +694,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForStatement(CompiledBinaryOperatorCall @operator)
     {
-        CompiledStatementWithValue Left = @operator.Left;
-        CompiledStatementWithValue Right = @operator.Right;
+        CompiledExpression Left = @operator.Left;
+        CompiledExpression Right = @operator.Right;
 
         if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
             && @operator.Operator
@@ -703,7 +709,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             or CompiledBinaryOperatorCall.CompEQ
             or CompiledBinaryOperatorCall.CompNEQ)
         {
-            if (Left is CompiledEvaluatedValue && Right is not CompiledEvaluatedValue)
+            if (Left is CompiledConstantValue && Right is not CompiledConstantValue)
             {
                 (Left, Right) = (Right, Left);
             }
@@ -744,7 +750,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         RegisterUsage.Auto? regRight;
 
         if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
-            && Right is CompiledEvaluatedValue rightValue)
+            && Right is CompiledConstantValue rightValue)
         {
             rightOperand = new InstructionOperand(rightValue.Value);
             regRight = null;
@@ -982,11 +988,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
     }
-    void GenerateCodeForStatement(CompiledEvaluatedValue literal, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(CompiledConstantValue literal, GeneralType? expectedType = null)
     {
         Push(literal.Value);
     }
-    void GenerateCodeForStatement(CompiledStringInstance stringInstance)
+    void GenerateCodeForStatement(CompiledString stringInstance)
     {
         BuiltinType type = stringInstance.IsASCII ? BuiltinType.U8 : BuiltinType.Char;
 
@@ -1029,7 +1035,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(CompiledStackStringInstance stringInstance)
+    void GenerateCodeForStatement(CompiledStackString stringInstance)
     {
         if (stringInstance.IsNullTerminated)
         {
@@ -1072,7 +1078,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         int size = capturedLocal.Variable.Type.GetSize(this);
                         AddComment($"Capture variable `{capturedLocal.Variable.Identifier}`:");
-                        GenerateCodeForStatement(new CompiledVariableGetter()
+                        GenerateCodeForStatement(new CompiledVariableAccess()
                         {
                             Variable = capturedLocal.Variable,
                             Location = compiledLambda.Location,
@@ -1086,9 +1092,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     {
                         int size = capturedLocal.Parameter.Type.GetSize(this);
                         AddComment($"Capture variable `{capturedLocal.Parameter.Identifier}`:");
-                        GenerateCodeForStatement(new CompiledParameterGetter()
+                        GenerateCodeForStatement(new CompiledParameterAccess()
                         {
-                            Variable = capturedLocal.Parameter,
+                            Parameter = capturedLocal.Parameter,
                             Location = compiledLambda.Location,
                             SaveValue = true,
                             Type = capturedLocal.Parameter.Type,
@@ -1104,28 +1110,28 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
     }
-    void GenerateCodeForStatement(CompilerVariableGetter compilerVariableGetter)
+    void GenerateCodeForStatement(CompiledCompilerVariableAccess compilerVariableGetter)
     {
         Push(false);
     }
-    void GenerateCodeForStatement(RegisterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledRegisterAccess variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         Code.Emit(Opcode.Push, variable.Register);
     }
-    void GenerateCodeForStatement(CompiledParameterGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledParameterAccess variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
-        Address address = GetParameterAddress(variable.Variable);
+        Address address = GetParameterAddress(variable.Parameter);
 
-        if (variable.Variable.IsRef && resolveReference)
+        if (variable.Parameter.IsRef && resolveReference)
         { address = new AddressPointer(address); }
 
-        PushFrom(address, variable.Variable.Type.GetSize(this, Diagnostics, variable.Variable));
+        PushFrom(address, variable.Parameter.Type.GetSize(this, Diagnostics, variable.Parameter));
     }
-    void GenerateCodeForStatement(CompiledVariableGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledVariableAccess variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         PushFrom(GetVariableAddress(variable.Variable), variable.Type.GetSize(this, Diagnostics, variable));
     }
-    void GenerateCodeForStatement(FunctionAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledFunctionReference variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         IHaveInstructionOffset compiledFunction = variable.Function;
         InstructionLabel label = LabelForDefinition(compiledFunction);
@@ -1135,7 +1141,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Push(label.Absolute());
     }
-    void GenerateCodeForStatement(InstructionLabelAddressGetter variable, GeneralType? expectedType = null, bool resolveReference = true)
+    void GenerateCodeForStatement(CompiledLabelReference variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         InstructionLabel label;
 
@@ -1155,7 +1161,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         Push(label.Absolute());
     }
-    void GenerateCodeForStatement(CompiledAddressGetter addressGetter)
+    void GenerateCodeForStatement(CompiledGetReference addressGetter)
     {
         if (!GetAddress(addressGetter.Of, out Address? address, out PossibleDiagnostic? error))
         {
@@ -1164,21 +1170,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         GenerateAddressResolver(address);
     }
-    void GenerateCodeForStatement(CompiledPointer pointer)
+    void GenerateCodeForStatement(CompiledDereference pointer)
     {
-        GenerateCodeForStatement(pointer.To);
+        GenerateCodeForStatement(pointer.Address);
 
-        GeneralType addressType = pointer.To.Type;
+        GeneralType addressType = pointer.Address.Type;
         if (!addressType.Is(out PointerType? pointerType))
         {
-            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer.To));
+            Diagnostics.Add(Diagnostic.Critical($"This isn't a pointer", pointer.Address));
             return;
         }
 
         using (RegisterUsage.Auto reg = Registers.GetFree(pointerType.GetBitWidth(this, Diagnostics, pointer)))
         {
             PopTo(reg.Register);
-            PushFrom(new AddressRegisterPointer(reg.Register), pointerType.To.GetSize(this, Diagnostics, pointer.To));
+            PushFrom(new AddressRegisterPointer(reg.Register), pointerType.To.GetSize(this, Diagnostics, pointer.Address));
         }
     }
     void GenerateCodeForStatement(CompiledWhileLoop whileLoop)
@@ -1216,7 +1222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         AddComment("for (...) {");
 
-        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, forLoop.Initialization is CompiledVariableDeclaration wah ? Enumerable.Repeat(wah, 1) : Enumerable.Empty<CompiledVariableDeclaration>(), false);
+        CompiledScope scope = OnScopeEnter(forLoop.Location.Position, forLoop.Location.File, forLoop.Initialization is CompiledVariableDefinition wah ? Enumerable.Repeat(wah, 1) : Enumerable.Empty<CompiledVariableDefinition>(), false);
 
         if (forLoop.Initialization is not null)
         {
@@ -1369,7 +1375,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("}");
     }
-    void GenerateCodeForStatement(CompiledFieldGetter field)
+    void GenerateCodeForStatement(CompiledFieldAccess field)
     {
         GeneralType prevType = field.Object.Type;
 
@@ -1428,7 +1434,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         // TODO: what the hell is that
 
-        CompiledStatementWithValue? dereference = NeedDerefernce(field);
+        CompiledExpression? dereference = NeedDerefernce(field);
 
         if (!GetAddress(field, out Address? address, out PossibleDiagnostic? error))
         {
@@ -1441,7 +1447,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         { PushFromChecked(address, type.GetSize(this, Diagnostics, field)); }
     }
-    void GenerateCodeForStatement(CompiledIndexGetter index)
+    void GenerateCodeForStatement(CompiledElementAccess index)
     {
         GeneralType prevType = index.Base.Type;
         GeneralType indexType = index.Index.Type;
@@ -1465,7 +1471,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
 
                 if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
-                    && index.Index is CompiledEvaluatedValue evaluatedIndex)
+                    && index.Index is CompiledConstantValue evaluatedIndex)
                 {
                     Code.Emit(Opcode.MathAdd, regPtr.Register, (int)evaluatedIndex.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
                 }
@@ -1543,7 +1549,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 }
 
                 if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
-                    && runtimeIndex.IndexValue is CompiledEvaluatedValue evaluatedIndex)
+                    && runtimeIndex.IndexValue is CompiledConstantValue evaluatedIndex)
                 {
                     int indexValue = (int)evaluatedIndex.Value;
                     using (RegisterUsage.Auto regBase = Registers.GetFree(PointerBitWidth))
@@ -1575,11 +1581,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new NotImplementedException();
         }
     }
-    void GenerateCodeForStatement(CompiledFakeTypeCast typeCast)
+    void GenerateCodeForStatement(CompiledReinterpretation typeCast)
     {
         GenerateCodeForStatement(typeCast.Value);
     }
-    void GenerateCodeForStatement(CompiledTypeCast typeCast)
+    void GenerateCodeForStatement(CompiledCast typeCast)
     {
         GeneralType statementType = typeCast.Value.Type;
         GeneralType targetType = typeCast.Type;
@@ -1703,7 +1709,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.TrimReturnBreak) &&
                 ((ReturnInstructions.Count > 0 && ReturnInstructions.Last.IsSkipping) ||
                 (BreakInstructions.Count > 0 && BreakInstructions.Last.IsSkipping)) &&
-                !StatementCompiler.Visit(v).Any(v => v is CompiledInstructionLabelDeclaration))
+                !StatementCompiler.Visit(v).Any(v => v is CompiledLabelDeclaration))
             {
                 continue;
             }
@@ -1720,7 +1726,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         switch (statement)
         {
-            case CompiledVariableDeclaration v: GenerateCodeForStatement(v); break;
+            case CompiledVariableDefinition v: GenerateCodeForStatement(v); break;
             case CompiledSizeof v: GenerateCodeForStatement(v); break;
             case CompiledReturn v: GenerateCodeForStatement(v); break;
             case CompiledCrash v: GenerateCodeForStatement(v); break;
@@ -1729,40 +1735,35 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledGoto v: GenerateCodeForStatement(v); break;
             case CompiledBinaryOperatorCall v: GenerateCodeForStatement(v); break;
             case CompiledUnaryOperatorCall v: GenerateCodeForStatement(v); break;
-            case CompiledEvaluatedValue v: GenerateCodeForStatement(v, expectedType); break;
-            case RegisterGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case CompiledVariableGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case CompiledParameterGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case FunctionAddressGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case InstructionLabelAddressGetter v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
-            case CompiledFieldGetter v: GenerateCodeForStatement(v); break;
-            case CompiledIndexGetter v: GenerateCodeForStatement(v); break;
-            case CompiledAddressGetter v: GenerateCodeForStatement(v); break;
-            case RegisterSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledVariableSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledParameterSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledIndirectSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledFieldSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledIndexSetter v: GenerateCodeForValueSetter(v); break;
-            case CompiledPointer v: GenerateCodeForStatement(v); break;
+            case CompiledConstantValue v: GenerateCodeForStatement(v, expectedType); break;
+            case CompiledRegisterAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledVariableAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledParameterAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledFunctionReference v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledLabelReference v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledFieldAccess v: GenerateCodeForStatement(v); break;
+            case CompiledElementAccess v: GenerateCodeForStatement(v); break;
+            case CompiledGetReference v: GenerateCodeForStatement(v); break;
+            case CompiledSetter v: GenerateCodeForValueSetter(v); break;
+            case CompiledDereference v: GenerateCodeForStatement(v); break;
             case CompiledWhileLoop v: GenerateCodeForStatement(v); break;
             case CompiledForLoop v: GenerateCodeForStatement(v); break;
             case CompiledIf v: GenerateCodeForStatement(v); break;
             case CompiledStackAllocation v: GenerateCodeForStatement(v); break;
             case CompiledConstructorCall v: GenerateCodeForStatement(v); break;
-            case CompiledTypeCast v: GenerateCodeForStatement(v); break;
-            case CompiledFakeTypeCast v: GenerateCodeForStatement(v); break;
+            case CompiledCast v: GenerateCodeForStatement(v); break;
+            case CompiledReinterpretation v: GenerateCodeForStatement(v); break;
             case CompiledRuntimeCall v: GenerateCodeForStatement(v); break;
             case CompiledFunctionCall v: GenerateCodeForFunctionCall(v); break;
             case CompiledExternalFunctionCall v: GenerateCodeForFunctionCall_External(v); break;
             case CompiledBlock v: GenerateCodeForStatement(v); break;
-            case CompiledInstructionLabelDeclaration v: GenerateCodeForStatement(v); break;
-            case CompiledStatementWithValueThatActuallyDoesntHaveValue v: GenerateCodeForStatement(v.Statement); break;
-            case CompiledStringInstance v: GenerateCodeForStatement(v); break;
-            case CompiledStackStringInstance v: GenerateCodeForStatement(v); break;
+            case CompiledLabelDeclaration v: GenerateCodeForStatement(v); break;
+            case CompiledDummyExpression v: GenerateCodeForStatement(v.Statement); break;
+            case CompiledString v: GenerateCodeForStatement(v); break;
+            case CompiledStackString v: GenerateCodeForStatement(v); break;
             case CompiledLambda v: GenerateCodeForStatement(v); break;
-            case EmptyStatement: break;
-            case CompilerVariableGetter v: GenerateCodeForStatement(v); break;
+            case CompiledEmptyStatement: break;
+            case CompiledCompilerVariableAccess v: GenerateCodeForStatement(v); break;
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
@@ -1776,12 +1777,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    void GenerateCodeForCondition(CompiledStatementWithValue statement, InstructionLabel falseLabel)
+    void GenerateCodeForCondition(CompiledExpression statement, InstructionLabel falseLabel)
     {
         bool v = false;
         GenerateCodeForCondition(statement, falseLabel, ref v);
     }
-    void GenerateCodeForCondition(CompiledStatementWithValue statement, InstructionLabel falseLabel, ref bool didJump)
+    void GenerateCodeForCondition(CompiledExpression statement, InstructionLabel falseLabel, ref bool didJump)
     {
         switch (statement)
         {
@@ -1871,8 +1872,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            CompiledStatementWithValue Left = @operator.Left;
-            CompiledStatementWithValue Right = @operator.Right;
+            CompiledExpression Left = @operator.Left;
+            CompiledExpression Right = @operator.Right;
 
             if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
                 && @operator.Operator
@@ -1886,7 +1887,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 or CompiledBinaryOperatorCall.CompEQ
                 or CompiledBinaryOperatorCall.CompNEQ)
             {
-                if (Left is CompiledEvaluatedValue && Right is not CompiledEvaluatedValue)
+                if (Left is CompiledConstantValue && Right is not CompiledConstantValue)
                 {
                     (Left, Right) = (Right, Left);
                 }
@@ -1898,7 +1899,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             RegisterUsage.Auto? regRight;
 
             if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.BinaryOperatorFetchSkip)
-                && Right is CompiledEvaluatedValue rightValue)
+                && Right is CompiledConstantValue rightValue)
             {
                 rightOperand = new InstructionOperand(rightValue.Value);
                 regRight = null;
@@ -2017,13 +2018,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    ImmutableArray<CompiledCleanup> CompileVariables(IEnumerable<CompiledVariableDeclaration> statements, bool addComments = true)
+    ImmutableArray<CompiledCleanup> CompileVariables(IEnumerable<CompiledVariableDefinition> statements, bool addComments = true)
     {
         if (addComments) AddComment("Variables {");
 
         ImmutableArray<CompiledCleanup>.Builder result = ImmutableArray.CreateBuilder<CompiledCleanup>();
 
-        foreach (CompiledVariableDeclaration statement in statements)
+        foreach (CompiledVariableDefinition statement in statements)
         {
             CompiledCleanup? item = GenerateCodeForLocalVariable(statement);
             if (item is null) continue;
@@ -2053,41 +2054,54 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (!justGenerateCode) CompiledLocalVariables.Pop();
     }
 
-    void GenerateCodeForValueSetter(RegisterSetter registerSetter)
+    void GenerateCodeForValueSetter(CompiledSetter setter)
     {
-        GenerateCodeForStatement(registerSetter.Value);
+        switch (setter.Target)
+        {
+            case CompiledRegisterAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
+            case CompiledVariableAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
+            case CompiledParameterAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
+            case CompiledFieldAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
+            case CompiledElementAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
+            case CompiledDereference v: GenerateCodeForValueSetter(v, setter.Value); break;
+            default: throw new UnreachableException(setter.Target.GetType().Name);
+        }
+    }
+    void GenerateCodeForValueSetter(CompiledRegisterAccess registerSetter, CompiledExpression value)
+    {
+        GenerateCodeForStatement(value);
         PopTo(registerSetter.Register);
     }
-    void GenerateCodeForValueSetter(CompiledVariableSetter localVariableSetter)
+    void GenerateCodeForValueSetter(CompiledVariableAccess localVariableSetter, CompiledExpression value)
     {
-        GenerateCodeForStatement(localVariableSetter.Value, localVariableSetter.Variable.Type);
+        GenerateCodeForStatement(value, localVariableSetter.Variable.Type);
         PopTo(GetVariableAddress(localVariableSetter.Variable), localVariableSetter.Variable.Type.GetSize(this, Diagnostics, localVariableSetter.Variable));
         // localVariableSetter.Variable.Variable.IsInitialized = true;
     }
-    void GenerateCodeForValueSetter(CompiledParameterSetter parameterSetter)
+    void GenerateCodeForValueSetter(CompiledParameterAccess parameterSetter, CompiledExpression value)
     {
-        GenerateCodeForStatement(parameterSetter.Value, parameterSetter.Variable.Type);
+        GenerateCodeForStatement(value, parameterSetter.Parameter.Type);
 
-        Address address = GetParameterAddress(parameterSetter.Variable);
+        Address address = GetParameterAddress(parameterSetter.Parameter);
 
-        if (parameterSetter.Variable.IsRef)
+        if (parameterSetter.Parameter.IsRef)
         { address = new AddressPointer(address); }
 
-        PopTo(address, parameterSetter.Variable.Type.GetSize(this, Diagnostics, parameterSetter));
+        PopTo(address, parameterSetter.Parameter.Type.GetSize(this, Diagnostics, parameterSetter));
         return;
     }
-    void GenerateCodeForValueSetter(CompiledFieldSetter fieldSetter)
+    void GenerateCodeForValueSetter(CompiledFieldAccess fieldSetter, CompiledExpression value)
     {
         GeneralType type = fieldSetter.Type;
-        GeneralType valueType = fieldSetter.Value.Type;
+        GeneralType valueType = value.Type;
 
-        CompiledStatementWithValue? dereference = NeedDerefernce(fieldSetter.ToGetter());
+        CompiledExpression? dereference = NeedDerefernce(fieldSetter);
 
-        if (fieldSetter.Value is CompiledStackStringInstance stackString)
+        if (value is CompiledStackString stackString)
         {
             if (dereference is null)
             {
-                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error2))
+                if (!GetAddress(fieldSetter, out Address? address, out PossibleDiagnostic? error2))
                 {
                     Diagnostics.Add(error2.ToError(fieldSetter));
                     return;
@@ -2106,7 +2120,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
             else
             {
-                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error))
+                if (!GetAddress(fieldSetter, out Address? address, out PossibleDiagnostic? error))
                 {
                     Diagnostics.Add(error.ToError(fieldSetter));
                     return;
@@ -2126,61 +2140,61 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else
         {
-            GenerateCodeForStatement(fieldSetter.Value, type);
+            GenerateCodeForStatement(value, type);
 
             if (dereference is null)
             {
-                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error2))
+                if (!GetAddress(fieldSetter, out Address? address, out PossibleDiagnostic? error2))
                 {
                     Diagnostics.Add(error2.ToError(fieldSetter));
                     return;
                 }
-                PopTo(address, valueType.GetSize(this, Diagnostics, fieldSetter.Value));
+                PopTo(address, valueType.GetSize(this, Diagnostics, value));
             }
             else
             {
-                if (!GetAddress(fieldSetter.ToGetter(), out Address? address, out PossibleDiagnostic? error))
+                if (!GetAddress(fieldSetter, out Address? address, out PossibleDiagnostic? error))
                 {
                     Diagnostics.Add(error.ToError(fieldSetter));
                     return;
                 }
-                PopToChecked(address, valueType.GetSize(this, Diagnostics, fieldSetter.Value));
+                PopToChecked(address, valueType.GetSize(this, Diagnostics, value));
             }
         }
     }
-    void GenerateCodeForValueSetter(CompiledIndexSetter indexSetter)
+    void GenerateCodeForValueSetter(CompiledElementAccess indexSetter, CompiledExpression value)
     {
-        if (!GetAddress(indexSetter.ToGetter(), out Address? _address, out PossibleDiagnostic? _error))
+        if (!GetAddress(indexSetter, out Address? _address, out PossibleDiagnostic? _error))
         {
             Diagnostics.Add(_error.ToError(indexSetter));
             return;
         }
-        GenerateCodeForStatement(indexSetter.Value);
-        PopTo(_address, indexSetter.Value.Type.GetSize(this, Diagnostics, indexSetter.Value));
+        GenerateCodeForStatement(value);
+        PopTo(_address, value.Type.GetSize(this, Diagnostics, value));
     }
-    void GenerateCodeForValueSetter(CompiledIndirectSetter statementToSet)
+    void GenerateCodeForValueSetter(CompiledDereference statementToSet, CompiledExpression value)
     {
-        if (statementToSet.AddressValue.Type.GetBitWidth(this, Diagnostics, statementToSet.AddressValue) != PointerBitWidth)
+        if (statementToSet.Address.Type.GetBitWidth(this, Diagnostics, statementToSet.Address) != PointerBitWidth)
         {
-            Diagnostics.Add(Diagnostic.Critical($"Type \"{statementToSet.AddressValue.Type}\" cant be a pointer", statementToSet.AddressValue));
+            Diagnostics.Add(Diagnostic.Critical($"Type \"{statementToSet.Address.Type}\" cant be a pointer", statementToSet.Address));
             return;
         }
 
-        GenerateCodeForStatement(statementToSet.Value);
+        GenerateCodeForStatement(value);
 
-        GenerateCodeForStatement(statementToSet.AddressValue);
+        GenerateCodeForStatement(statementToSet.Address);
 
         using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
             PopTo(reg.Register);
-            PopTo(new AddressRegisterPointer(reg.Register), statementToSet.Value.Type.GetSize(this, Diagnostics, statementToSet.Value));
+            PopTo(new AddressRegisterPointer(reg.Register), value.Type.GetSize(this, Diagnostics, value));
         }
     }
 
     #endregion
 
-    CompiledScope OnScopeEnter(CompiledBlock block, bool isFunction) => OnScopeEnter(block.Location.Position, block.Location.File, block.Statements.OfType<CompiledVariableDeclaration>(), isFunction);
-    CompiledScope OnScopeEnter(Position position, Uri file, IEnumerable<CompiledVariableDeclaration> variables, bool isFunction)
+    CompiledScope OnScopeEnter(CompiledBlock block, bool isFunction) => OnScopeEnter(block.Location.Position, block.Location.File, block.Statements.OfType<CompiledVariableDefinition>(), isFunction);
+    CompiledScope OnScopeEnter(Position position, Uri file, IEnumerable<CompiledVariableDefinition> variables, bool isFunction)
     {
         CurrentScopeDebug.Push(new ScopeInformation()
         {
@@ -2217,7 +2231,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region GenerateCodeForLocalVariable
 
-    CompiledCleanup? GenerateCodeForLocalVariable(CompiledVariableDeclaration newVariable)
+    CompiledCleanup? GenerateCodeForLocalVariable(CompiledVariableDefinition newVariable)
     {
         // if (newVariable.Getters.Count == 0 &&
         //     newVariable.Setters.Count == 0)
@@ -2247,7 +2261,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int size;
 
-        if (newVariable.InitialValue is CompiledEvaluatedValue evaluatedInitialValue)
+        if (newVariable.InitialValue is CompiledConstantValue evaluatedInitialValue)
         {
             AddComment($"Initial value {{");
 
@@ -2260,7 +2274,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
         else if (newVariable.Type.Is(out ArrayType? arrayType) &&
             arrayType.Of.SameAs(BasicType.U16) &&
-            newVariable.InitialValue is CompiledStringInstance literalStatement &&
+            newVariable.InitialValue is CompiledString literalStatement &&
             arrayType.ComputedLength.HasValue &&
             literalStatement.Value.Length == arrayType.ComputedLength.Value)
         {
@@ -2303,7 +2317,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (CompiledVariableDeclaration variable in CompiledLocalVariables)
+            foreach (CompiledVariableDefinition variable in CompiledLocalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }
@@ -2314,7 +2328,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         get
         {
             int sum = 0;
-            foreach (CompiledVariableDeclaration variable in CompiledGlobalVariables)
+            foreach (CompiledVariableDefinition variable in CompiledGlobalVariables)
             { sum += variable.Type.GetSize(this, Diagnostics, variable); }
             return sum;
         }
@@ -2561,11 +2575,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        IEnumerable<CompiledVariableDeclaration> globalVariableDeclarations = compilerResult.Statements
-            .OfType<CompiledVariableDeclaration>();
+        IEnumerable<CompiledVariableDefinition> globalVariableDeclarations = compilerResult.Statements
+            .OfType<CompiledVariableDefinition>();
 
         Stack<CompiledCleanup> globalVariablesCleanup = new();
-        foreach (CompiledVariableDeclaration variableDeclaration in globalVariableDeclarations)
+        foreach (CompiledVariableDefinition variableDeclaration in globalVariableDeclarations)
         {
             // if (variableDeclaration.Getters.Count == 0 &&
             //     variableDeclaration.Setters.Count == 0)

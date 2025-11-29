@@ -12,7 +12,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     GeneratorStatistics _statistics;
 
-    void GenerateDestructor(CompiledStatementWithValue value, CompiledCleanup cleanup)
+    void GenerateDestructor(CompiledExpression value, CompiledCleanup cleanup)
     {
         GeneralType deallocateableType = value.Type;
 
@@ -24,7 +24,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (cleanup.Destructor is null)
         {
-            if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledPassedArgument.Wrap(value)), null, value);
+            if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
 
             if (!deallocateablePointerType.To.Is<BuiltinType>())
             {
@@ -36,19 +36,19 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        GenerateCodeForFunction(cleanup.Destructor, ImmutableArray.Create(CompiledPassedArgument.Wrap(value)), null, value);
+        GenerateCodeForFunction(cleanup.Destructor, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
 
         if (cleanup.Destructor.ReturnSomething)
         { Stack.Pop(); }
 
-        if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledPassedArgument.Wrap(value)), null, value);
+        if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
     }
 
     void GenerateDestructor(BrainfuckVariable variable)
     {
         if (variable.Cleanup is null) return;
         GenerateDestructor(
-            new CompiledVariableGetter()
+            new CompiledVariableAccess()
             {
                 Variable = variable.Declaration,
                 Location = variable.Declaration.Location,
@@ -73,14 +73,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     int PrecompileVariables(CompiledStatement statement, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
     {
-        if (statement is not CompiledVariableDeclaration instruction)
+        if (statement is not CompiledVariableDefinition instruction)
         { return 0; }
 
         return PrecompileVariable(instruction, ignoreRedefinition, debugInfo);
     }
-    int PrecompileVariable(CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
+    int PrecompileVariable(CompiledVariableDefinition variableDeclaration, bool ignoreRedefinition, List<Runtime.StackElementInformation>? debugInfo = null)
         => PrecompileVariable(CompiledVariables, variableDeclaration, ignoreRedefinition, null, debugInfo);
-    int PrecompileVariable(Stack<BrainfuckVariable> variables, CompiledVariableDeclaration variableDeclaration, bool ignoreRedefinition, GeneralType? type = null, List<Runtime.StackElementInformation>? debugInfo = null)
+    int PrecompileVariable(Stack<BrainfuckVariable> variables, CompiledVariableDefinition variableDeclaration, bool ignoreRedefinition, GeneralType? type = null, List<Runtime.StackElementInformation>? debugInfo = null)
     {
         //if (variables.Any(other =>
         //        other.Identifier == variableDeclaration.Identifier &&
@@ -99,10 +99,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             type = variableDeclaration.Type;
 
             if (type is ArrayType arrayType &&
-                variableDeclaration.InitialValue is CompiledLiteralList literalList &&
+                variableDeclaration.InitialValue is CompiledList literalList &&
                 arrayType.Length is null)
             {
-                arrayType = new ArrayType(arrayType.Of, new CompiledEvaluatedValue()
+                arrayType = new ArrayType(arrayType.Of, new CompiledConstantValue()
                 {
                     Value = literalList.Values.Length,
                     Type = ArrayLengthType,
@@ -125,7 +125,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (type.Is(out ArrayType? arrayType))
             {
                 if (arrayType.Of.SameAs(BasicType.U16) &&
-                    variableDeclaration.InitialValue is CompiledStringInstance literal)
+                    variableDeclaration.InitialValue is CompiledString literal)
                 {
                     if (arrayType.Length is not null)
                     {
@@ -192,7 +192,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return 1;
             }
 
-            if (variableDeclaration.InitialValue is CompiledAddressGetter addressGetter &&
+            if (variableDeclaration.InitialValue is CompiledGetReference addressGetter &&
                 GetVariable(addressGetter.Of, out BrainfuckVariable? shadowingVariable, out _) &&
                 type.Is(out PointerType? pointerType))
             {
@@ -285,7 +285,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return false;
         }
 
-        if (type.Length is not CompiledEvaluatedValue evaluatedStatement)
+        if (type.Length is not CompiledConstantValue evaluatedStatement)
         {
             error = new PossibleDiagnostic($"Can't compute the array type's length");
             return false;
@@ -409,87 +409,106 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     #region GenerateCodeForSetter()
 
-    void GenerateCodeForSetter(CompiledVariableSetter _statement)
+    void GenerateCodeForSetter(CompiledSetter _statement)
     {
-        if (!GetVariable(_statement.Variable.Identifier, _statement.Variable.Location.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+        if (_statement.Target is CompiledVariableAccess targetVariable)
         {
-            Diagnostics.Add(notFoundError.ToError(_statement.Variable));
-            return;
-        }
+            if (!GetVariable(targetVariable.Variable.Identifier, targetVariable.Variable.Location.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+            {
+                Diagnostics.Add(notFoundError.ToError(targetVariable.Variable));
+                return;
+            }
 
-        GenerateCodeForSetter(variable, _statement.Value);
-    }
-    void GenerateCodeForSetter(CompiledParameterSetter _statement)
-    {
-        if (!GetVariable(_statement.Variable.Identifier.Content, _statement.Variable.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+            GenerateCodeForSetter(variable, _statement.Value);
+        }
+        else if (_statement.Target is CompiledParameterAccess targetParameter)
         {
-            Diagnostics.Add(notFoundError.ToError(_statement.Variable));
-            return;
-        }
+            if (!GetVariable(targetParameter.Parameter.Identifier.Content, targetParameter.Parameter.File, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
+            {
+                Diagnostics.Add(notFoundError.ToError(targetParameter.Parameter));
+                return;
+            }
 
-        GenerateCodeForSetter(variable, _statement.Value);
+            GenerateCodeForSetter(variable, _statement.Value);
+        }
+        else if (_statement.Target is CompiledFieldAccess targetField)
+        {
+            GenerateCodeForSetter(targetField, _statement.Value);
+        }
+        else if (_statement.Target is CompiledDereference targetDereference)
+        {
+            GenerateCodeForSetter(targetDereference, _statement.Value);
+        }
+        else if (_statement.Target is CompiledElementAccess targetElement)
+        {
+            GenerateCodeForSetter(targetElement, _statement.Value);
+        }
+        else
+        {
+            throw new NotImplementedException(_statement.Target.GetType().Name);
+        }
     }
-    void GenerateCodeForSetter(CompiledFieldSetter fieldSetter)
+    void GenerateCodeForSetter(CompiledFieldAccess field, CompiledExpression value)
     {
         if ((
-            GetVariable(fieldSetter.Object, out BrainfuckVariable? variable, out _) &&
+            GetVariable(field.Object, out BrainfuckVariable? variable, out _) &&
             variable.IsReference &&
-            fieldSetter.Object.Type.Is(out PointerType? stackPointerType) &&
+            field.Object.Type.Is(out PointerType? stackPointerType) &&
             stackPointerType.To.Is<StructType>()
         ) ||
-            fieldSetter.Object.Type.Is<StructType>())
+            field.Object.Type.Is<StructType>())
         {
-            // if (!fieldSetter.Type.SameAs(fieldSetter.Value.Type))
+            // if (!fieldSetter.Type.SameAs(value.Type))
             // {
-            //     Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{fieldSetter.Value.Type}\" type value to the \"{fieldSetter.Type}\" type field.", fieldSetter.Value));
+            //     Diagnostics.Add(Diagnostic.Critical($"Can not set a \"{value.Type}\" type value to the \"{fieldSetter.Type}\" type field.", value));
             //     return;
             // }
 
-            if (!TryGetAddress(fieldSetter.ToGetter(), out Address? address, out int size))
+            if (!TryGetAddress(field, out Address? address, out int size))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to get field address", fieldSetter.ToGetter()));
+                Diagnostics.Add(Diagnostic.Critical($"Failed to get field address", field));
                 return;
             }
 
-            if (size != fieldSetter.Value.Type.GetSize(this, Diagnostics, fieldSetter.Value))
+            if (size != value.Type.GetSize(this, Diagnostics, value))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", fieldSetter.Value));
+                Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
                 return;
             }
 
-            CompileSetter(address, fieldSetter.Value);
+            CompileSetter(address, value);
             return;
         }
 
-        if (fieldSetter.Object.Type.Is(out PointerType? pointerType))
+        if (field.Object.Type.Is(out PointerType? pointerType))
         {
             if (!pointerType.To.Is(out StructType? structPointerType))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{pointerType}\"", fieldSetter.Object));
+                Diagnostics.Add(Diagnostic.Critical($"Could not get the field offsets of type \"{pointerType}\"", field.Object));
                 return;
             }
 
-            if (!structPointerType.GetField(fieldSetter.Field.Identifier.Content, this, out _, out int fieldOffset, out PossibleDiagnostic? error))
+            if (!structPointerType.GetField(field.Field.Identifier.Content, this, out _, out int fieldOffset, out PossibleDiagnostic? error))
             {
-                Diagnostics.Add(error.ToError(fieldSetter));
+                Diagnostics.Add(error.ToError(field));
                 return;
             }
 
-            if (fieldSetter.Type.GetSize(this, Diagnostics, fieldSetter.ToGetter()) != fieldSetter.Value.Type.GetSize(this, Diagnostics, fieldSetter.Value))
+            if (field.Type.GetSize(this, Diagnostics, field) != value.Type.GetSize(this, Diagnostics, value))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", fieldSetter.Value));
+                Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
                 return;
             }
 
             int _pointerAddress = Stack.NextAddress;
-            using (DebugInfoBlock debugBlock = DebugBlock(fieldSetter.ToGetter()))
+            using (DebugInfoBlock debugBlock = DebugBlock(field))
             {
-                GenerateCodeForStatement(fieldSetter.Object);
+                GenerateCodeForStatement(field.Object);
                 Code.AddValue(_pointerAddress, fieldOffset);
             }
 
             int valueAddress = Stack.NextAddress;
-            GenerateCodeForStatement(fieldSetter.Value);
+            GenerateCodeForStatement(value);
 
             Heap.Set(_pointerAddress, valueAddress);
 
@@ -501,7 +520,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         throw new NotImplementedException();
     }
-    void GenerateCodeForSetter(BrainfuckVariable variable, CompiledStatementWithValue value)
+    void GenerateCodeForSetter(BrainfuckVariable variable, CompiledExpression value)
     {
         if (AllowOtherOptimizations &&
             GetVariable(value, out BrainfuckVariable? valueVariable, out _))
@@ -556,7 +575,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     if (variableInBinaryOperator.IsDiscarded) break;
                     if (variable.Size != 1) break;
 
-                    if (AllowPrecomputing && valueBinaryOperator.Right is CompiledEvaluatedValue constantValue)
+                    if (AllowPrecomputing && valueBinaryOperator.Right is CompiledConstantValue constantValue)
                     {
                         CompiledValue _value = constantValue.Value;
                         if (constantValue.Value.TryCast(variable.Type, out CompiledValue castedValue))
@@ -591,7 +610,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     if (variableInBinaryOperator.IsDiscarded) break;
                     if (variable.Size != 1) break;
 
-                    if (AllowPrecomputing && valueBinaryOperator.Right is CompiledEvaluatedValue constantValue)
+                    if (AllowPrecomputing && valueBinaryOperator.Right is CompiledConstantValue constantValue)
                     {
                         CompiledValue _value = constantValue.Value;
                         if (constantValue.Value.TryCast(variable.Type, out CompiledValue castedValue))
@@ -633,7 +652,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
-                if (value is CompiledStackStringInstance literal)
+                if (value is CompiledStackString literal)
                 {
                     if (!literal.IsASCII)
                     {
@@ -694,7 +713,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         return;
                     }
                 }
-                else if (value is CompiledLiteralList literalList &&
+                else if (value is CompiledList literalList &&
                          arrayType.ComputedLength.HasValue &&
                          arrayType.ComputedLength.Value == literalList.Values.Length &&
                          arrayType.Of.GetSize(this, Diagnostics, value) == 1)
@@ -708,7 +727,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     {
                         for (int i = 0; i < literalList.Values.Length; i++)
                         {
-                            if (literalList.Values[i] is CompiledEvaluatedValue elementValue)
+                            if (literalList.Values[i] is CompiledConstantValue elementValue)
                             {
                                 Code.ARRAY_SET_CONST(variable.Address, i, elementValue.Value);
                                 // Code.SetValue(indexAddress, i);
@@ -748,9 +767,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             variable.IsInitialized = true;
         }
     }
-    void GenerateCodeForSetter(CompiledIndirectSetter indirectSetter)
+    void GenerateCodeForSetter(CompiledDereference dereference, CompiledExpression value)
     {
-        if (indirectSetter.AddressValue is CompiledVariableGetter variableGetter)
+        if (dereference.Address is CompiledVariableAccess variableGetter)
         {
             if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
@@ -772,12 +791,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.IsReference)
             {
-                GenerateCodeForSetter(variable, indirectSetter.Value);
+                GenerateCodeForSetter(variable, value);
                 return;
             }
         }
 
-        if (indirectSetter.AddressValue is CompiledParameterGetter parameterGetter)
+        if (dereference.Address is CompiledParameterAccess parameterGetter)
         {
             if (!GetVariable(parameterGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
@@ -799,14 +818,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.IsReference)
             {
-                GenerateCodeForSetter(variable, indirectSetter.Value);
+                GenerateCodeForSetter(variable, value);
                 return;
             }
         }
 
-        CompileDereferencedSetter(indirectSetter.AddressValue, 0, indirectSetter.Value);
+        CompileDereferencedSetter(dereference.Address, 0, value);
     }
-    void CompileSetter(Address address, CompiledStatementWithValue value)
+    void CompileSetter(Address address, CompiledExpression value)
     {
         switch (address)
         {
@@ -815,11 +834,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             default: throw new NotImplementedException();
         }
     }
-    void CompileSetter(AddressAbsolute address, CompiledStatementWithValue value)
+    void CompileSetter(AddressAbsolute address, CompiledExpression value)
     {
         using (Code.Block(this, $"Set value \"{value}\" to address {address}"))
         {
-            if (AllowPrecomputing && value is CompiledEvaluatedValue constantValue)
+            if (AllowPrecomputing && value is CompiledConstantValue constantValue)
             {
                 Code.SetValue(address.Value, constantValue.Value.U8);
 
@@ -841,7 +860,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             { Stack.PopAndStore(address.Value); }
         }
     }
-    void CompileSetter(AddressOffset address, CompiledStatementWithValue value)
+    void CompileSetter(AddressOffset address, CompiledExpression value)
     {
         if (address.Base is AddressRuntimePointer runtimePointer2)
         {
@@ -907,7 +926,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             throw new NotImplementedException();
         }
     }
-    void CompileDereferencedSetter(CompiledStatementWithValue dereference, int offset, CompiledStatementWithValue value)
+    void CompileDereferencedSetter(CompiledExpression dereference, int offset, CompiledExpression value)
     {
         if (!dereference.Type.Is(out PointerType? _))
         {
@@ -961,20 +980,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         Stack.PopVirtual();
         Stack.PopVirtual();
     }
-    void GenerateCodeForSetter(CompiledIndexSetter indexSetter)
+    void GenerateCodeForSetter(CompiledElementAccess elementAccess, CompiledExpression value)
     {
         if ((
-            GetVariable(indexSetter.Base, out BrainfuckVariable? variable, out _) &&
+            GetVariable(elementAccess.Base, out BrainfuckVariable? variable, out _) &&
             variable.IsReference &&
-            indexSetter.Base.Type.Is(out PointerType? stackPointerType) &&
+            elementAccess.Base.Type.Is(out PointerType? stackPointerType) &&
             stackPointerType.To.Is(out ArrayType? arrayType)
         ) ||
-            indexSetter.Base.Type.Is(out arrayType)
+            elementAccess.Base.Type.Is(out arrayType)
         )
         {
-            if (!TryGetAddress(indexSetter.Base, out Address? arrayAddress, out _))
+            if (!TryGetAddress(elementAccess.Base, out Address? arrayAddress, out _))
             {
-                Diagnostics.Add(Diagnostic.Critical($"Failed to get array address", indexSetter.Base));
+                Diagnostics.Add(Diagnostic.Critical($"Failed to get array address", elementAccess.Base));
                 return;
             }
 
@@ -982,38 +1001,38 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             {
                 if (variable.IsDiscarded)
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", indexSetter.Base));
+                    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variable.Identifier}\" is discarded", elementAccess.Base));
                     return;
                 }
             }
 
-            using (Code.Block(this, $"Set array (\"{indexSetter.Base}\") index (\"{indexSetter.Index}\") (at {arrayAddress}) to \"{indexSetter.Value}\""))
+            using (Code.Block(this, $"Set array (\"{elementAccess.Base}\") index (\"{elementAccess.Index}\") (at {arrayAddress}) to \"{value}\""))
             {
                 GeneralType elementType = arrayType.Of;
 
-                if (!elementType.SameAs(indexSetter.Value.Type))
+                if (!elementType.SameAs(value.Type))
                 {
-                    Diagnostics.Add(Diagnostic.Critical("Bruh", indexSetter.Value));
+                    Diagnostics.Add(Diagnostic.Critical("Bruh", value));
                     return;
                 }
 
-                int elementSize = elementType.GetSize(this, Diagnostics, indexSetter.Base);
+                int elementSize = elementType.GetSize(this, Diagnostics, elementAccess.Base);
 
                 if (elementSize != 1)
-                { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", indexSetter); }
+                { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", elementAccess); }
 
                 int indexAddress = Stack.NextAddress;
                 using (Code.Block(this, $"Compute index"))
-                { GenerateCodeForStatement(indexSetter.Index); }
+                { GenerateCodeForStatement(elementAccess.Index); }
 
                 int valueAddress = Stack.NextAddress;
                 using (Code.Block(this, $"Compute value"))
-                { GenerateCodeForStatement(indexSetter.Value); }
+                { GenerateCodeForStatement(value); }
 
                 if (arrayAddress is not AddressAbsolute arrayAddressAbs)
                 { throw new NotImplementedException(); }
 
-                Code.ARRAY_SET(arrayAddressAbs.Value, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, indexSetter));
+                Code.ARRAY_SET(arrayAddressAbs.Value, indexAddress, valueAddress, v => Stack.GetTemporaryAddress(v, elementAccess));
 
                 Stack.Pop();
                 Stack.Pop();
@@ -1022,34 +1041,34 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (indexSetter.Base.Type.Is(out PointerType? pointerType) &&
+        if (elementAccess.Base.Type.Is(out PointerType? pointerType) &&
             pointerType.To.Is(out arrayType))
         {
             int valueAddress = Stack.NextAddress;
-            GenerateCodeForStatement(indexSetter.Value);
+            GenerateCodeForStatement(value);
 
-            if (!arrayType.Of.SameAs(indexSetter.Value.Type))
+            if (!arrayType.Of.SameAs(value.Type))
             {
-                Diagnostics.Add(Diagnostic.Critical("Bruh", indexSetter.Value));
+                Diagnostics.Add(Diagnostic.Critical("Bruh", value));
                 return;
             }
 
             int pointerAddress = Stack.NextAddress;
-            GenerateCodeForStatement(indexSetter.Base);
+            GenerateCodeForStatement(elementAccess.Base);
 
-            if (!indexSetter.Index.Type.Is<BuiltinType>())
+            if (!elementAccess.Index.Type.Is<BuiltinType>())
             {
-                Diagnostics.Add(Diagnostic.Critical($"Index type must be built-in (ie. \"i32\") and not \"{indexSetter.Index.Type}\"", indexSetter.Index));
+                Diagnostics.Add(Diagnostic.Critical($"Index type must be built-in (ie. \"i32\") and not \"{elementAccess.Index.Type}\"", elementAccess.Index));
                 return;
             }
 
             int indexAddress = Stack.NextAddress;
-            GenerateCodeForStatement(indexSetter.Index);
+            GenerateCodeForStatement(elementAccess.Index);
 
-            if (arrayType.Of.GetSize(this, Diagnostics, indexSetter.Base) != 1)
+            if (arrayType.Of.GetSize(this, Diagnostics, elementAccess.Base) != 1)
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this, Diagnostics, indexSetter.Base));
-                Code.MULTIPLY(indexAddress, multiplierAddress, v => Stack.GetTemporaryAddress(v, indexSetter.Value));
+                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this, Diagnostics, elementAccess.Base));
+                Code.MULTIPLY(indexAddress, multiplierAddress, v => Stack.GetTemporaryAddress(v, value));
             }
 
             Stack.PopAndAdd(pointerAddress); // indexAddress
@@ -1062,7 +1081,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        Diagnostics.Add(Diagnostic.Critical("WHAT", indexSetter));
+        Diagnostics.Add(Diagnostic.Critical("WHAT", elementAccess));
     }
 
     #endregion
@@ -1083,31 +1102,28 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             case CompiledIf v: GenerateCodeForStatement(v); break;
             case CompiledWhileLoop v: GenerateCodeForStatement(v); break;
             case CompiledForLoop v: GenerateCodeForStatement(v); break;
-            case CompiledEvaluatedValue v: GenerateCodeForStatement(v); break;
-            case CompiledVariableGetter v: GenerateCodeForStatement(v); break;
-            case CompiledParameterGetter v: GenerateCodeForStatement(v); break;
+            case CompiledConstantValue v: GenerateCodeForStatement(v); break;
+            case CompiledVariableAccess v: GenerateCodeForStatement(v); break;
+            case CompiledParameterAccess v: GenerateCodeForStatement(v); break;
             case CompiledBinaryOperatorCall v: GenerateCodeForStatement(v); break;
             case CompiledUnaryOperatorCall v: GenerateCodeForStatement(v); break;
-            case CompiledAddressGetter v: GenerateCodeForStatement(v); break;
-            case CompiledPointer v: GenerateCodeForStatement(v); break;
-            case CompiledVariableDeclaration v: GenerateCodeForStatement(v); break;
-            case CompiledFakeTypeCast v: GenerateCodeForStatement(v); break;
-            case CompiledTypeCast v: GenerateCodeForStatement(v); break;
+            case CompiledGetReference v: GenerateCodeForStatement(v); break;
+            case CompiledDereference v: GenerateCodeForStatement(v); break;
+            case CompiledVariableDefinition v: GenerateCodeForStatement(v); break;
+            case CompiledReinterpretation v: GenerateCodeForStatement(v); break;
+            case CompiledCast v: GenerateCodeForStatement(v); break;
             case CompiledStackAllocation v: GenerateCodeForStatement(v); break;
             case CompiledConstructorCall v: GenerateCodeForStatement(v); break;
-            case CompiledFieldGetter v: GenerateCodeForStatement(v); break;
-            case CompiledIndexGetter v: GenerateCodeForStatement(v); break;
+            case CompiledFieldAccess v: GenerateCodeForStatement(v); break;
+            case CompiledElementAccess v: GenerateCodeForStatement(v); break;
             case CompiledRuntimeCall v: GenerateCodeForStatement(v); break;
             case CompiledBlock v: GenerateCodeForStatement(v); break;
-            case CompiledVariableSetter v: GenerateCodeForSetter(v); break;
-            case CompiledParameterSetter v: GenerateCodeForSetter(v); break;
-            case CompiledFieldSetter v: GenerateCodeForSetter(v); break;
-            case CompiledIndexSetter v: GenerateCodeForSetter(v); break;
-            case CompiledIndirectSetter v: GenerateCodeForSetter(v); break;
-            case CompiledStatementWithValueThatActuallyDoesntHaveValue v: GenerateCodeForStatement(v.Statement); break;
-            case CompiledStringInstance v: GenerateCodeForStatement(v, expectedType); break;
-            case CompiledStackStringInstance v: GenerateCodeForStatement(v, expectedType); break;
-            case EmptyStatement: break;
+            case CompiledSetter v: GenerateCodeForSetter(v); break;
+            case CompiledDummyExpression v: GenerateCodeForStatement(v.Statement); break;
+            case CompiledString v: GenerateCodeForStatement(v, expectedType); break;
+            case CompiledStackString v: GenerateCodeForStatement(v, expectedType); break;
+            case CompiledEmptyStatement: break;
+            case CompiledGoto v: GenerateCodeForStatement(v); break;
             default:
                 Diagnostics.Add(Diagnostic.Critical($"Unknown statement \"{statement.GetType().Name}\"", statement));
                 return;
@@ -1117,7 +1133,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         throw new NotSupportedException($"Function pointers not supported by brainfuck", anyCall);
     }
-    void GenerateCodeForStatement(CompiledIndexGetter indexCall)
+    void GenerateCodeForStatement(CompiledGoto statement)
+    {
+        throw new NotSupportedException($"Goto statements not supported by brainfuck", statement);
+    }
+    void GenerateCodeForStatement(CompiledElementAccess indexCall)
     {
         using DebugInfoBlock debugBlock = DebugBlock(indexCall);
 
@@ -1393,7 +1413,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                Code.SetValue(conditionAddress, true);
+                Stack.Push(true, @for);
             }
 
             Code.CommentLine($"Condition result at {conditionAddress}");
@@ -1532,7 +1552,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         Code += "[]";
         Stack.PopVirtual();
     }
-    void GenerateCodeForStatement(CompiledVariableDeclaration statement)
+    void GenerateCodeForStatement(CompiledVariableDefinition statement)
     {
         if (statement.InitialValue == null) return;
 
@@ -1584,7 +1604,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             bool canPrint = true;
 
-            foreach (CompiledPassedArgument parameter in functionCall.Arguments)
+            foreach (CompiledArgument parameter in functionCall.Arguments)
             {
                 if (!CanGenerateCodeForPrinter(parameter.Value))
                 {
@@ -1595,7 +1615,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (canPrint)
             {
-                foreach (CompiledPassedArgument parameter in functionCall.Arguments)
+                foreach (CompiledArgument parameter in functionCall.Arguments)
                 { GenerateCodeForPrinter(parameter.Value); }
                 return;
             }
@@ -1631,7 +1651,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         using DebugInfoBlock debugBlock = DebugBlock(constructorCall);
         GenerateCodeForFunction(constructorCall.Function, constructorCall.Arguments, null, constructorCall);
     }
-    void GenerateCodeForStatement(CompiledStringInstance statement, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(CompiledString statement, GeneralType? expectedType = null)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
@@ -1650,13 +1670,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
     }
-    void GenerateCodeForStatement(CompiledStackStringInstance statement, GeneralType? expectedType = null)
+    void GenerateCodeForStatement(CompiledStackString statement, GeneralType? expectedType = null)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
         throw new NotImplementedException();
     }
-    void GenerateCodeForStatement(CompiledEvaluatedValue evaluatedValue)
+    void GenerateCodeForStatement(CompiledConstantValue evaluatedValue)
     {
         using DebugInfoBlock debugBlock = DebugBlock(evaluatedValue);
 
@@ -1665,7 +1685,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Stack.Push(evaluatedValue.Value);
         }
     }
-    void GenerateCodeForStatement(CompiledVariableGetter statement)
+    void GenerateCodeForStatement(CompiledVariableAccess statement)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
@@ -1674,7 +1694,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         GenerateCodeForStatement(variable, statement);
     }
-    void GenerateCodeForStatement(CompiledParameterGetter statement)
+    void GenerateCodeForStatement(CompiledParameterAccess statement)
     {
         using DebugInfoBlock debugBlock = DebugBlock(statement);
 
@@ -1980,7 +2000,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     using (Code.Block(this, "Compute left-side value"))
                     { GenerateCodeForStatement(statement.Left); }
 
-                    if (statement.Right is not CompiledEvaluatedValue offsetConst)
+                    if (statement.Right is not CompiledConstantValue offsetConst)
                     {
                         Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement));
                         return;
@@ -2008,7 +2028,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     using (Code.Block(this, "Compute left-side value"))
                     { GenerateCodeForStatement(statement.Left); }
 
-                    if (statement.Right is not CompiledEvaluatedValue offsetConst)
+                    if (statement.Right is not CompiledConstantValue offsetConst)
                     {
                         Diagnostics.Add(Diagnostic.Critical($"I can't make \"{statement.Operator}\" operators to work in brainfuck", statement));
                         return;
@@ -2040,7 +2060,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                         leftType.SameAs(BasicType.I16) ||
                         leftType.SameAs(BasicType.U32) ||
                         leftType.SameAs(BasicType.I32)) &&
-                        statement.Right is CompiledEvaluatedValue right)
+                        statement.Right is CompiledConstantValue right)
                     {
                         if (right.Value == 1)
                         {
@@ -2177,16 +2197,16 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         if (branchDepth != Code.BranchDepth)
         { Diagnostics.Add(Diagnostic.Internal($"Unbalanced branches", block)); }
     }
-    void GenerateCodeForStatement(CompiledAddressGetter addressGetter)
+    void GenerateCodeForStatement(CompiledGetReference addressGetter)
     {
         Diagnostics.Add(Diagnostic.Critical($"This is when pointers to the stack isn't work in brainfuck", addressGetter));
         return;
     }
-    void GenerateCodeForStatement(CompiledPointer pointer)
+    void GenerateCodeForStatement(CompiledDereference pointer)
     {
         using DebugInfoBlock debugBlock = DebugBlock(pointer);
 
-        if (pointer.To is CompiledVariableGetter variableGetter)
+        if (pointer.Address is CompiledVariableAccess variableGetter)
         {
             if (!GetVariable(variableGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
@@ -2202,12 +2222,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.IsReference)
             {
-                GenerateCodeForStatement(variable, pointer.To);
+                GenerateCodeForStatement(variable, pointer.Address);
                 return;
             }
         }
 
-        if (pointer.To is CompiledParameterGetter compiledParameterGetter)
+        if (pointer.Address is CompiledParameterAccess compiledParameterGetter)
         {
             if (!GetVariable(compiledParameterGetter, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
             {
@@ -2223,13 +2243,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (variable.IsReference)
             {
-                GenerateCodeForStatement(variable, pointer.To);
+                GenerateCodeForStatement(variable, pointer.Address);
                 return;
             }
         }
 
         int pointerAddress = Stack.NextAddress;
-        GenerateCodeForStatement(pointer.To);
+        GenerateCodeForStatement(pointer.Address);
 
         Heap.Get(pointerAddress, pointerAddress);
     }
@@ -2246,7 +2266,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Code.SetValue(offsettedAddress, 0);
         }
     }
-    void GenerateCodeForStatement(CompiledFieldGetter field)
+    void GenerateCodeForStatement(CompiledFieldAccess field)
     {
         using DebugInfoBlock debugBlock = DebugBlock(field);
 
@@ -2318,13 +2338,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         Diagnostics.Add(Diagnostic.Critical($"Failed to get field memory address", field));
     }
-    void GenerateCodeForStatement(CompiledFakeTypeCast typeCast)
+    void GenerateCodeForStatement(CompiledReinterpretation typeCast)
     {
         GenerateCodeForStatement(typeCast.Value);
     }
-    void GenerateCodeForStatement(CompiledTypeCast typeCast)
+    void GenerateCodeForStatement(CompiledCast typeCast)
     {
-        if (typeCast.Value is CompiledEvaluatedValue evaluatedValue &&
+        if (typeCast.Value is CompiledConstantValue evaluatedValue &&
             evaluatedValue.Value.TryCast(typeCast.Type, out CompiledValue casted))
         {
             Stack.Push(casted);
@@ -2392,15 +2412,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     #region GenerateCodeForPrinter()
 
-    void GenerateCodeForPrinter(CompiledStatementWithValue value)
+    void GenerateCodeForPrinter(CompiledExpression value)
     {
-        if (value is CompiledStringInstance literal1)
+        if (value is CompiledString literal1)
         {
             GenerateCodeForPrinter(literal1.Value, literal1);
             return;
         }
 
-        if (value is CompiledStackStringInstance literal2)
+        if (value is CompiledStackString literal2)
         {
             GenerateCodeForPrinter(literal2.Value, literal2);
             return;
@@ -2445,15 +2465,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             Code.SetPointer(0);
         }
     }
-    void GenerateCodeForValuePrinter(CompiledStatementWithValue value, GeneralType valueType)
+    void GenerateCodeForValuePrinter(CompiledExpression value, GeneralType valueType)
     {
-        if (value is CompiledStringInstance literalValue1)
+        if (value is CompiledString literalValue1)
         {
             GenerateCodeForPrinter(literalValue1.Value, literalValue1);
             return;
         }
 
-        if (value is CompiledStackStringInstance literalValue2)
+        if (value is CompiledStackString literalValue2)
         {
             GenerateCodeForPrinter(literalValue2.Value, literalValue2);
             return;
@@ -2487,10 +2507,10 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
     }
 
-    bool CanGenerateCodeForPrinter(CompiledStatementWithValue value)
+    bool CanGenerateCodeForPrinter(CompiledExpression value)
     {
-        if (value is CompiledStringInstance) return true;
-        if (value is CompiledStackStringInstance) return true;
+        if (value is CompiledString) return true;
+        if (value is CompiledStackString) return true;
 
         return CanGenerateCodeForValuePrinter(value.Type);
     }
@@ -2500,7 +2520,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     #endregion
 
-    int GenerateCodeForLiteralString(CompiledStringInstance stringInstance)
+    int GenerateCodeForLiteralString(CompiledString stringInstance)
     {
         if (!stringInstance.IsASCII)
         { throw new NotImplementedException(); }
@@ -2550,15 +2570,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
     }
 
-    bool IsFunctionInlineable(FunctionThingDefinition function, IEnumerable<CompiledPassedArgument> parameters)
+    bool IsFunctionInlineable(FunctionThingDefinition function, IEnumerable<CompiledArgument> parameters)
     {
         if (function.Block is null ||
             !function.IsInlineable)
         { return false; }
 
-        foreach (CompiledPassedArgument parameter in parameters)
+        foreach (CompiledArgument parameter in parameters)
         {
-            if (parameter.Value is CompiledEvaluatedValue)
+            if (parameter.Value is CompiledConstantValue)
             { continue; }
             return false;
         }
@@ -2566,7 +2586,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         return true;
     }
 
-    void GenerateCodeForFunction(CompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
+    void GenerateCodeForFunction(CompiledFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
     {
         if (!AllowFunctionInlining ||
             !IsFunctionInlineable(function, parameters))
@@ -2578,7 +2598,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         GenerateCodeForFunction_(function, parameters, typeArguments, caller);
     }
 
-    void GenerateCodeForFunction(ICompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
+    void GenerateCodeForFunction(ICompiledFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated caller)
     {
         switch (function)
         {
@@ -2589,12 +2609,12 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
     }
 
-    void GenerateCodeForParameterPassing<TFunction>(TFunction function, ImmutableArray<CompiledPassedArgument> parameters, Stack<BrainfuckVariable> compiledParameters, Dictionary<string, GeneralType>? typeArguments)
+    void GenerateCodeForParameterPassing<TFunction>(TFunction function, ImmutableArray<CompiledArgument> parameters, Stack<BrainfuckVariable> compiledParameters, Dictionary<string, GeneralType>? typeArguments)
         where TFunction : ICompiledFunctionDefinition, ISimpleReadable
     {
         for (int i = 0; i < parameters.Length; i++)
         {
-            CompiledPassedArgument passed = parameters[i];
+            CompiledArgument passed = parameters[i];
             var defined = function.Parameters[i];
 
             GeneralType definedType = defined.Type;
@@ -2615,7 +2635,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             if (defined.Modifiers.Contains(ModifierKeywords.Ref) && defined.Modifiers.Contains(ModifierKeywords.Const))
             { Diagnostics.Add(Diagnostic.Critical($"Bruh", defined.Identifier, defined.File)); }
 
-            if (passed.Value is CompiledAddressGetter addressGetter)
+            if (passed.Value is CompiledGetReference addressGetter)
             {
                 if (!GetVariable(addressGetter.Of, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                 {
@@ -2639,7 +2659,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     }
                 }
 
-                CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
+                CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                 PointerType parameterType = new(v.Type);
                 compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                 {
@@ -2648,7 +2668,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 continue;
             }
 
-            if (definedType.Is<PointerType>() && passed.Value is CompiledParameterGetter _parameterGetter)
+            if (definedType.Is<PointerType>() && passed.Value is CompiledParameterAccess _parameterGetter)
             {
                 if (!GetVariable(_parameterGetter, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                 {
@@ -2658,7 +2678,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (v.IsReference)
                 {
-                    CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
+                    CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                     PointerType parameterType = new(v.Type);
                     compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                     {
@@ -2668,7 +2688,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
             }
 
-            if (definedType.Is<PointerType>() && passed.Value is CompiledVariableGetter _variableGetter)
+            if (definedType.Is<PointerType>() && passed.Value is CompiledVariableAccess _variableGetter)
             {
                 if (!GetVariable(_variableGetter, out BrainfuckVariable? v, out PossibleDiagnostic? notFoundError))
                 {
@@ -2678,7 +2698,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 if (v.IsReference)
                 {
-                    CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
+                    CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                     PointerType parameterType = new(v.Type);
                     compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
                     {
@@ -2720,7 +2740,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
 
             {
-                CompiledVariableDeclaration variableDeclaration = defined.ToVariable(definedType, passed);
+                CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                 using (TypeArgumentsScope g = SetTypeArgumentsScope(typeArguments))
                 { PrecompileVariable(compiledParameters, variableDeclaration, false, definedType); }
 
@@ -2756,7 +2776,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
     }
 
-    void GenerateCodeForFunction_(CompiledFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
+    void GenerateCodeForFunction_(CompiledFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
         using DebugFunctionBlock<CompiledFunctionDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -2764,7 +2784,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             bool canPrint = true;
 
-            foreach (CompiledPassedArgument parameter in parameters)
+            foreach (CompiledArgument parameter in parameters)
             {
                 if (!CanGenerateCodeForPrinter(parameter))
                 {
@@ -2775,7 +2795,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (canPrint)
             {
-                foreach (CompiledPassedArgument parameter in parameters)
+                foreach (CompiledArgument parameter in parameters)
                 { GenerateCodeForPrinter(parameter); }
                 return;
             }
@@ -2823,7 +2843,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ReturnSomething)
         {
-            CompiledVariableDeclaration variableDeclaration = new()
+            CompiledVariableDefinition variableDeclaration = new()
             {
                 Identifier = ReturnVariableName,
                 InitialValue = null,
@@ -2936,7 +2956,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledOperatorDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
+    void GenerateCodeForFunction(CompiledOperatorDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
         using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -2944,7 +2964,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             bool canPrint = true;
 
-            foreach (CompiledPassedArgument parameter in parameters)
+            foreach (CompiledArgument parameter in parameters)
             {
                 if (!CanGenerateCodeForPrinter(parameter))
                 {
@@ -2955,7 +2975,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             if (canPrint)
             {
-                foreach (CompiledPassedArgument parameter in parameters)
+                foreach (CompiledArgument parameter in parameters)
                 { GenerateCodeForPrinter(parameter); }
                 return;
             }
@@ -3003,7 +3023,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (true) // always returns something
         {
-            CompiledVariableDeclaration variableDeclaration = new()
+            CompiledVariableDefinition variableDeclaration = new()
             {
                 Identifier = ReturnVariableName,
                 InitialValue = null,
@@ -3116,7 +3136,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledGeneralFunctionDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
+    void GenerateCodeForFunction(CompiledGeneralFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
         using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -3130,7 +3150,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         if (function.ReturnSomething)
         {
-            CompiledVariableDeclaration variableDeclaration = new()
+            CompiledVariableDefinition variableDeclaration = new()
             {
                 Identifier = ReturnVariableName,
                 InitialValue = null,
@@ -3211,7 +3231,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         CurrentMacro.Pop();
     }
 
-    void GenerateCodeForFunction(CompiledConstructorDefinition function, ImmutableArray<CompiledPassedArgument> parameters, Dictionary<string, GeneralType>? typeArguments, CompiledConstructorCall callerPosition)
+    void GenerateCodeForFunction(CompiledConstructorDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, CompiledConstructorCall callerPosition)
     {
         using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
 
@@ -3250,7 +3270,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, false, false, null, PointerSize, new CompiledVariableDeclaration()
+            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, false, false, null, PointerSize, new CompiledVariableDefinition()
             {
                 Identifier = function.Parameters[0].Identifier.Content,
                 InitialValue = null,
@@ -3266,7 +3286,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         }
         else if (newInstanceType.Is<StructType>())
         {
-            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, true, false, null, PointerSize, new CompiledVariableDeclaration()
+            compiledParameters.Add(new BrainfuckVariable(newInstanceAddress, true, false, null, PointerSize, new CompiledVariableDefinition()
             {
                 Identifier = function.Parameters[0].Identifier.Content,
                 InitialValue = null,
@@ -3288,7 +3308,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         for (int i = 1; i < function.Parameters.Length; i++)
         {
-            CompiledPassedArgument passed = parameters[i - 1];
+            CompiledArgument passed = parameters[i - 1];
             var defined = function.Parameters[i];
 
             GeneralType definedType = defined.Type;
@@ -3327,7 +3347,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            CompiledVariableDeclaration variableDeclaration2 = defined.ToVariable(definedType, passed);
+            CompiledVariableDefinition variableDeclaration2 = defined.ToVariable(definedType, passed);
             PrecompileVariable(compiledParameters, variableDeclaration2, false);
 
             BrainfuckVariable? compiledParameter = null;

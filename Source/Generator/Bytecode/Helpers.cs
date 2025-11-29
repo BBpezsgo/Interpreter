@@ -160,7 +160,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Helper Functions
 
-    void CallRuntime(CompiledStatementWithValue address)
+    void CallRuntime(CompiledExpression address)
     {
         if (!address.Type.Is(out FunctionType? addressType))
         {
@@ -232,7 +232,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    AddressOffset GetVariableAddress(CompiledVariableDeclaration variable)
+    AddressOffset GetVariableAddress(CompiledVariableDefinition variable)
     {
         GeneratedVariable? generatedVariable;
 
@@ -780,14 +780,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     #region Memory Helpers
 
-    bool GetAddress(CompiledStatementWithValue value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetAddress(CompiledExpression value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         switch (value)
         {
-            case CompiledVariableGetter v: return GetAddress(v, out address, out error);
-            case CompiledParameterGetter v: return GetAddress(v, out address, out error);
-            case CompiledIndexGetter v: return GetAddress(v, out address, out error);
-            case CompiledFieldGetter v: return GetAddress(v, out address, out error);
+            case CompiledVariableAccess v: return GetAddress(v, out address, out error);
+            case CompiledParameterAccess v: return GetAddress(v, out address, out error);
+            case CompiledElementAccess v: return GetAddress(v, out address, out error);
+            case CompiledFieldAccess v: return GetAddress(v, out address, out error);
             default:
                 address = null;
                 error = new PossibleDiagnostic($"Can't get the address of {value.GetType().Name}", value);
@@ -795,21 +795,21 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    bool GetAddress(CompiledVariableGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetAddress(CompiledVariableAccess value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         address = GetVariableAddress(value.Variable);
         error = null;
         return true;
     }
 
-    bool GetAddress(CompiledParameterGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetAddress(CompiledParameterAccess value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        address = GetParameterAddress(value.Variable);
+        address = GetParameterAddress(value.Parameter);
         error = null;
         return true;
     }
 
-    bool GetAddress(CompiledIndexGetter indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetAddress(CompiledElementAccess indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = default;
         address = default;
@@ -840,7 +840,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         int elementSize = array.Of.GetSize(this, Diagnostics, indexCall);
 
-        if (indexCall.Index is CompiledEvaluatedValue evaluatedStatement)
+        if (indexCall.Index is CompiledConstantValue evaluatedStatement)
         {
             int offset = (int)evaluatedStatement.Value * array.Of.GetSize(this, Diagnostics, indexCall);
             address = new AddressOffset(baseAddress, offset);
@@ -853,7 +853,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         }
     }
 
-    bool GetAddress(CompiledFieldGetter value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GetAddress(CompiledFieldAccess value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         address = default;
 
@@ -890,30 +890,30 @@ public partial class CodeGeneratorForMain : CodeGenerator
         return true;
     }
 
-    CompiledStatementWithValue? NeedDerefernce(CompiledStatementWithValue value) => value switch
+    CompiledExpression? NeedDerefernce(CompiledExpression value) => value switch
     {
-        CompiledVariableGetter => null,
-        CompiledParameterGetter => null,
-        CompiledIndexGetter v => NeedDerefernce(v),
-        CompiledFieldGetter v => NeedDerefernce(v),
+        CompiledVariableAccess => null,
+        CompiledParameterAccess => null,
+        CompiledElementAccess v => NeedDerefernce(v),
+        CompiledFieldAccess v => NeedDerefernce(v),
         CompiledFunctionCall v => NeedDerefernce(v),
         _ => throw new NotImplementedException()
     };
-    CompiledStatementWithValue? NeedDerefernce(CompiledFunctionCall functionCall)
+    CompiledExpression? NeedDerefernce(CompiledFunctionCall functionCall)
     {
         if (functionCall.Type.Is<PointerType>())
         { return functionCall; }
 
         return null;
     }
-    CompiledStatementWithValue? NeedDerefernce(CompiledIndexGetter indexCall)
+    CompiledExpression? NeedDerefernce(CompiledElementAccess indexCall)
     {
         if (indexCall.Base.Type.Is<PointerType>())
         { return indexCall.Base; }
 
         return NeedDerefernce(indexCall.Base);
     }
-    CompiledStatementWithValue? NeedDerefernce(CompiledFieldGetter field)
+    CompiledExpression? NeedDerefernce(CompiledFieldAccess field)
     {
         if (field.Object.Type.Is<PointerType>())
         { return field.Object; }

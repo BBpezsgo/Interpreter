@@ -32,7 +32,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     readonly Type GlobalContextType;
     readonly FieldInfo GlobalContextType_Targets;
     readonly List<object> DelegateTargets = new();
-    readonly Dictionary<CompiledVariableDeclaration, FieldInfo> EmittedGlobalVariables = new();
+    readonly Dictionary<CompiledVariableDefinition, FieldInfo> EmittedGlobalVariables = new();
 
     public CodeGeneratorForIL(CompilerResult compilerResult, DiagnosticsCollection diagnostics, ILGeneratorSettings settings, ModuleBuilder? module) : base(compilerResult, diagnostics)
     {
@@ -72,9 +72,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
         //globalContextType.DefineField(memoryFieldName, typeof(byte), FieldAttributes.Assembly);
         //definedFields.Add(memoryFieldName);
 
-        Dictionary<CompiledVariableDeclaration, string> variableFieldMap = new();
+        Dictionary<CompiledVariableDefinition, string> variableFieldMap = new();
 
-        foreach (CompiledVariableDeclaration globalVariable in compilerResult.Statements.OfType<CompiledVariableDeclaration>())
+        foreach (CompiledVariableDefinition globalVariable in compilerResult.Statements.OfType<CompiledVariableDefinition>())
         {
             if (!globalVariable.IsGlobal) continue;
 
@@ -94,7 +94,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         GlobalContextType_Targets = GlobalContextType.GetField(targetsFieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static) ?? throw new NullReferenceException();
         GlobalContextType_Targets.SetValue(null, Array.Empty<object>());
 
-        foreach (KeyValuePair<CompiledVariableDeclaration, string> item in variableFieldMap)
+        foreach (KeyValuePair<CompiledVariableDefinition, string> item in variableFieldMap)
         {
             EmittedGlobalVariables.Add(item.Key, GlobalContextType.GetField(item.Value, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static) ?? throw new NullReferenceException());
         }

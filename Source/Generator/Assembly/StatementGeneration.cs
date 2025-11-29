@@ -282,13 +282,13 @@ public partial class CodeGeneratorForNative : CodeGenerator
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate int JitFn();
 
-    readonly List<(Register Register, CompiledStatementWithValue Expression)> ExpressionInRegisters = new();
+    readonly List<(Register Register, CompiledExpression Expression)> ExpressionInRegisters = new();
     readonly HashSet<Register> UsedRegisters = new();
     bool DidReturn;
 
     class StackFrame
     {
-        public readonly Stack<(CompiledVariableDeclaration Variable, int Offset)> Variables = new();
+        public readonly Stack<(CompiledVariableDefinition Variable, int Offset)> Variables = new();
     }
 
     readonly Stack<StackFrame> Frames = new();
@@ -314,7 +314,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
         public static implicit operator Register(AllocatedRegister reg) => reg.Register;
     }
 
-    void SaveExpression(CompiledStatementWithValue value, Register register)
+    void SaveExpression(CompiledExpression value, Register register)
     {
         for (int i = 0; i < ExpressionInRegisters.Count; i++)
         {
@@ -394,9 +394,9 @@ public partial class CodeGeneratorForNative : CodeGenerator
         return false;
     }
 
-    AllocatedRegister PutExpressionIntoRegister(CompiledStatementWithValue expression)
+    AllocatedRegister PutExpressionIntoRegister(CompiledExpression expression)
     {
-        foreach ((Register register, CompiledStatementWithValue? _expression) in ExpressionInRegisters)
+        foreach ((Register register, CompiledExpression? _expression) in ExpressionInRegisters)
         {
             if (expression == _expression)
             {
@@ -414,9 +414,9 @@ public partial class CodeGeneratorForNative : CodeGenerator
         return result;
     }
 
-    void PutExpressionIntoRegister(CompiledStatementWithValue expression, Register register)
+    void PutExpressionIntoRegister(CompiledExpression expression, Register register)
     {
-        foreach ((Register _register, CompiledStatementWithValue? _expression) in ExpressionInRegisters)
+        foreach ((Register _register, CompiledExpression? _expression) in ExpressionInRegisters)
         {
             if (expression == _expression)
             {
@@ -431,9 +431,9 @@ public partial class CodeGeneratorForNative : CodeGenerator
         Code.AppendInstruction("pop", register.ToString());
     }
 
-    void PushExpressionOnStack(CompiledStatementWithValue expression)
+    void PushExpressionOnStack(CompiledExpression expression)
     {
-        foreach ((Register _register, CompiledStatementWithValue? _expression) in ExpressionInRegisters)
+        foreach ((Register _register, CompiledExpression? _expression) in ExpressionInRegisters)
         {
             if (expression == _expression)
             {
@@ -443,7 +443,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
         }
     }
 
-    void EmitExpression(CompiledEvaluatedValue statement)
+    void EmitExpression(CompiledConstantValue statement)
     {
         if (TryAllocateRegister(statement.Value.BitWidth, out AllocatedRegister reg))
         {
@@ -459,7 +459,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
         }
     }
 
-    void EmitExpression(CompiledVariableGetter statement)
+    void EmitExpression(CompiledVariableAccess statement)
     {
         var variable = Frames.Last.Variables.FirstOrDefault(v => v.Variable == statement.Variable);
 
@@ -480,12 +480,12 @@ public partial class CodeGeneratorForNative : CodeGenerator
         }} [ebp-{bpRelativeAddress}]");
     }
 
-    void EmitExpression(CompiledStatementWithValue statement)
+    void EmitExpression(CompiledExpression statement)
     {
         switch (statement)
         {
-            case CompiledEvaluatedValue v: EmitExpression(v); break;
-            case CompiledVariableGetter v: EmitExpression(v); break;
+            case CompiledConstantValue v: EmitExpression(v); break;
+            case CompiledVariableAccess v: EmitExpression(v); break;
             default:
                 throw new NotImplementedException($"Expression of type {statement.GetType().Name} is not implemented");
         }
@@ -504,7 +504,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
         DidReturn = true;
     }
 
-    void EmitStatement(CompiledVariableDeclaration statement)
+    void EmitStatement(CompiledVariableDefinition statement)
     {
         int offset = Frames.Last.Variables.Sum(v => v.Offset);
         if (statement.InitialValue is not null)
@@ -524,8 +524,8 @@ public partial class CodeGeneratorForNative : CodeGenerator
         switch (statement)
         {
             case CompiledReturn v: EmitStatement(v); break;
-            case CompiledStatementWithValue v: EmitExpression(v); break;
-            case CompiledVariableDeclaration v: EmitStatement(v); break;
+            case CompiledExpression v: EmitExpression(v); break;
+            case CompiledVariableDefinition v: EmitStatement(v); break;
             default:
                 throw new NotImplementedException($"Statement of type {statement.GetType().Name} is not implemented");
         }
@@ -535,7 +535,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
     {
         while (frame.Variables.Count > 0)
         {
-            (CompiledVariableDeclaration v, _) = frame.Variables.Pop();
+            (CompiledVariableDefinition v, _) = frame.Variables.Pop();
             Code.AppendInstruction("add", "esp", v.Type.GetSize(this).ToString());
         }
     }

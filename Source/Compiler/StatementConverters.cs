@@ -92,7 +92,7 @@ public static class StatementConverters
         Semicolon = constructorCall.Semicolon,
     };
 
-    public static CompiledVariableDeclaration ToVariable(this ParameterDefinition parameterDefinition, GeneralType type, CompiledPassedArgument? initialValue = null)
+    public static CompiledVariableDefinition ToVariable(this ParameterDefinition parameterDefinition, GeneralType type, CompiledArgument? initialValue = null)
         => new()
         {
             Identifier = parameterDefinition.Identifier.Content,

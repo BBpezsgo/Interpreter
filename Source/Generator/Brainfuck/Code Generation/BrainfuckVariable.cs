@@ -8,7 +8,7 @@ public class BrainfuckVariable :
     IHaveCompiledType,
     IInFile
 {
-    public readonly CompiledVariableDeclaration Declaration;
+    public readonly CompiledVariableDefinition Declaration;
     public readonly int Address;
     public readonly bool IsReference;
     public readonly bool HaveToClean;
@@ -21,7 +21,7 @@ public class BrainfuckVariable :
     public GeneralType Type => Declaration.Type;
     public Uri File => Declaration.Location.File;
 
-    public BrainfuckVariable(int address, bool isReference, bool haveToClean, CompiledCleanup? cleanup, int size, CompiledVariableDeclaration declaration)
+    public BrainfuckVariable(int address, bool isReference, bool haveToClean, CompiledCleanup? cleanup, int size, CompiledVariableDefinition declaration)
     {
         Declaration = declaration;
         Address = address;

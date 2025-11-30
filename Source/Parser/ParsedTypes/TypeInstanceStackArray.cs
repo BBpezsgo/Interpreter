@@ -30,13 +30,6 @@ public class TypeInstanceStackArray : TypeInstance, IEquatable<TypeInstanceStack
 
     public override Position Position => new(StackArrayOf, StackArraySize);
 
-    public override void SetAnalyzedType(GeneralType type)
-    {
-        if (!type.Is(out ArrayType? arrayType)) return;
-
-        StackArrayOf.SetAnalyzedType(arrayType.Of);
-    }
-
     public override string ToString() => $"{StackArrayOf}[{StackArraySize}]";
     public override string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments) => $"{StackArrayOf.ToString(typeArguments)}[{StackArraySize}]";
 }

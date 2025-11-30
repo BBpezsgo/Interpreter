@@ -3,9 +3,9 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Parser.Statements;
 
-public class KeywordCallStatement : Statement, IReadable
+public class KeywordCallStatement : Statement, IReadable, IReferenceableTo<CompiledCleanup>
 {
-    public CompiledCleanup? Reference { get; internal set; }
+    public CompiledCleanup? Reference { get; set; }
 
     public Token Keyword { get; }
     public ImmutableArray<Expression> Arguments { get; }

@@ -48,6 +48,7 @@ public partial class StatementCompiler
                 Diagnostics.Add(error.ToError(field.Type));
                 continue;
             }
+            SetTypeType(field.Type, fieldType);
             compiledFields.Add(new CompiledField(fieldType, null! /* CompiledStruct constructor will set this */, field));
         }
 
@@ -282,6 +283,7 @@ public partial class StatementCompiler
             Diagnostics.Add(typeError.ToError(function.Type));
             return false;
         }
+        SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
@@ -291,6 +293,7 @@ public partial class StatementCompiler
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
             }
+            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -355,6 +358,7 @@ public partial class StatementCompiler
             Diagnostics.Add(typeError.ToError(function.Type));
             return false;
         }
+        SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
@@ -364,6 +368,7 @@ public partial class StatementCompiler
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
             }
+            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -391,6 +396,7 @@ public partial class StatementCompiler
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
             }
+            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -422,6 +428,7 @@ public partial class StatementCompiler
             Diagnostics.Add(typeError.ToError(function.Type));
             return false;
         }
+        SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
@@ -431,6 +438,7 @@ public partial class StatementCompiler
                 Diagnostics.Add(typeError.ToError(item.Type));
                 return false;
             }
+            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -793,12 +801,13 @@ public partial class StatementCompiler
                 Diagnostics.Add(typeError.ToError(aliasDefinition.Value));
                 continue;
             }
+            SetTypeType(aliasDefinition.Value, aliasType);
 
             CompiledAlias alias = new(
                 aliasType,
                 aliasDefinition
             );
-            aliasDefinition.Value.SetAnalyzedType(alias.Value);
+            SetTypeType(aliasDefinition.Value, alias.Value);
             CompiledAliases.Add(alias);
         }
 

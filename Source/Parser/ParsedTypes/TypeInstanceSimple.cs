@@ -40,18 +40,6 @@ public class TypeInstanceSimple : TypeInstance, IEquatable<TypeInstanceSimple?>,
 
     public override int GetHashCode() => HashCode.Combine((byte)3, Identifier, TypeArguments);
 
-    public override void SetAnalyzedType(GeneralType type)
-    {
-        Identifier.AnalyzedType = type.FinalValue switch
-        {
-            StructType => TokenAnalyzedType.Struct,
-            GenericType => TokenAnalyzedType.TypeParameter,
-            BuiltinType => TokenAnalyzedType.BuiltinType,
-            AliasType => TokenAnalyzedType.Type,
-            _ => Identifier.AnalyzedType,
-        };
-    }
-
     public static TypeInstanceSimple CreateAnonymous(string name, Uri file, ImmutableArray<TypeInstance>? typeArguments = null)
         => new(Token.CreateAnonymous(name), file, typeArguments);
 

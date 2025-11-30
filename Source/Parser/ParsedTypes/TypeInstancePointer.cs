@@ -26,12 +26,6 @@ public class TypeInstancePointer : TypeInstance, IEquatable<TypeInstancePointer?
 
     public override int GetHashCode() => HashCode.Combine((byte)4, To);
 
-    public override void SetAnalyzedType(GeneralType type)
-    {
-        if (!type.Is(out PointerType? pointerType)) return;
-        To.SetAnalyzedType(pointerType.To);
-    }
-
     public override string ToString() => $"{To}{Operator}";
     public override string ToString(IReadOnlyDictionary<string, GeneralType>? typeArguments) => $"{To.ToString(typeArguments)}{Operator}";
 

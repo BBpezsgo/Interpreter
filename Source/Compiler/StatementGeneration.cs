@@ -131,7 +131,7 @@ public partial class StatementCompiler
 
         if (deallocateableType.Is(out PointerType? deallocateablePointerType))
         {
-            if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out var result, out PossibleDiagnostic? error, AddCompilable))
+            if (!GetGeneralFunction(deallocateablePointerType.To, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out FunctionQueryResult<CompiledGeneralFunctionDefinition>? result, out PossibleDiagnostic? error, AddCompilable))
             {
                 if (deallocateablePointerType.To.Is<StructType>())
                 {
@@ -147,7 +147,7 @@ public partial class StatementCompiler
         }
         else
         {
-            if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out var result, out PossibleDiagnostic? error, AddCompilable))
+            if (!GetGeneralFunction(deallocateableType, argumentTypes, BuiltinFunctionIdentifiers.Destructor, location.File, out FunctionQueryResult<CompiledGeneralFunctionDefinition>? result, out PossibleDiagnostic? error, AddCompilable))
             {
                 if (deallocateableType.Is<StructType>())
                 {
@@ -519,7 +519,7 @@ public partial class StatementCompiler
         }
 
         compiledStatement = null;
-        OnGotStatementType(caller, callee.Type);
+        SetStatementType(caller, callee.Type);
 
         if (!callee.CanUse(caller.File))
         {
@@ -611,7 +611,7 @@ public partial class StatementCompiler
             returnValue.HasValue &&
             runtimeStatements.Length == 0)
         {
-            caller.PredictedValue = returnValue.Value;
+            SetPredictedValue(caller, returnValue.Value);
             Diagnostics.Add(Diagnostic.OptimizationNotice($"Function evaluated with result \"{returnValue.Value}\"", caller));
             compiledStatement = new CompiledConstantValue()
             {
@@ -849,8 +849,8 @@ public partial class StatementCompiler
                     }
                 }
 
-                newVariable.Type.SetAnalyzedType(type);
-                newVariable.CompiledType = type;
+                SetTypeType(newVariable.Type, type);
+                if (!Frames.Last.IsTemplate) newVariable.CompiledType = type;
             }
         }
 
@@ -915,18 +915,18 @@ public partial class StatementCompiler
             type = BuiltinType.Any;
         }
 
-        if (!type.AllGenericsDefined())
-        {
-            Diagnostics.Add(Diagnostic.Internal($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\" (what edge case is this???)", newVariable.Type, newVariable.File));
-        }
+        //if (!type.AllGenericsDefined())
+        //{
+        //    Diagnostics.Add(Diagnostic.Internal($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\" (what edge case is this???)", newVariable.Type, newVariable.File));
+        //}
 
-        newVariable.Type.SetAnalyzedType(type);
+        SetTypeType(newVariable.Type, type);
 
         CompiledCleanup? compiledCleanup = null;
         if (newVariable.Modifiers.Contains(ModifierKeywords.Temp))
         {
             CompileCleanup(type, newVariable.Location, out compiledCleanup);
-            newVariable.CleanupReference = compiledCleanup;
+            if (!Frames.Last.IsTemplate) newVariable.CleanupReference = compiledCleanup;
         }
 
         bool isGlobal = Frames.Last.IsTopLevel && Frames.Last.Scopes.Count <= 1;
@@ -1186,7 +1186,7 @@ public partial class StatementCompiler
 
             if (!CompileCleanup(value.Type, keywordCall.Arguments[0].Location, out CompiledCleanup? compiledCleanup)) return false;
 
-            keywordCall.Reference = compiledCleanup;
+            SetStatementReference(keywordCall, compiledCleanup);
 
             compiledStatement = new CompiledDelete()
             {
@@ -1472,7 +1472,7 @@ public partial class StatementCompiler
             else if (argument is IdentifierExpression identifier)
             {
                 if (FindType(identifier.Identifier, identifier.File, out paramType, out PossibleDiagnostic? typeError))
-                { paramType = OnGotStatementType(identifier, paramType); }
+                { paramType = SetStatementType(identifier, paramType); }
                 else
                 {
                     Diagnostics.Add(typeError.ToError(identifier));
@@ -1492,7 +1492,7 @@ public partial class StatementCompiler
                 resultType = expectedType;
             }
 
-            OnGotStatementType(anyCall, resultType);
+            SetStatementType(anyCall, resultType);
 
             compiledStatement = new CompiledSizeof()
             {
@@ -1513,15 +1513,14 @@ public partial class StatementCompiler
             if (anyCall.Expression is FieldExpression _field)
             { _field.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName; }
 
-            anyCall.Reference = result.OriginalFunction;
-            if (anyCall.Expression is IReferenceableTo _ref1)
-            { _ref1.Reference = result.OriginalFunction; }
+            SetStatementReference(anyCall, result.OriginalFunction);
+            TrySetStatementReference(anyCall.Expression, result.OriginalFunction);
 
             result.Function.References.Add(new(anyCall, anyCall.File));
             result.OriginalFunction.References.Add(new(anyCall, anyCall.File));
 
             if (functionCall.CompiledType is not null)
-            { OnGotStatementType(anyCall, functionCall.CompiledType); }
+            { SetStatementType(anyCall, functionCall.CompiledType); }
 
             return CompileFunctionCall(functionCall, functionCall.MethodArguments, result, out compiledStatement);
         }
@@ -1576,7 +1575,7 @@ public partial class StatementCompiler
             return false;
         }
 
-        OnGotStatementType(anyCall, functionType.ReturnType);
+        SetStatementType(anyCall, functionType.ReturnType);
 
         if (anyCall.Arguments.Length != functionType.Parameters.Length)
         {
@@ -1626,7 +1625,7 @@ public partial class StatementCompiler
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperatorDefinition>? result, out PossibleDiagnostic? notFoundError))
         {
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            @operator.Reference = result.OriginalFunction;
+            SetStatementReference(@operator, result.OriginalFunction);
 
             if (result.DidReplaceArguments) throw new UnreachableException();
 
@@ -1637,7 +1636,7 @@ public partial class StatementCompiler
                 Frames.LastRef.IsMsilCompatible = false;
             }
 
-            OnGotStatementType(@operator, operatorDefinition.Type);
+            SetStatementType(@operator, operatorDefinition.Type);
 
             if (!CompileFunctionCall(@operator, @operator.Arguments.ToImmutableArray(ArgumentExpression.Wrap), result, out compiledStatement)) return false;
 
@@ -1647,7 +1646,7 @@ public partial class StatementCompiler
             {
                 compiledStatement = CompiledConstantValue.Create(evaluated, compiledStatement);
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
-                @operator.PredictedValue = evaluated;
+                SetPredictedValue(@operator, evaluated);
                 result.Function.References.Add(new Reference<Expression>(@operator, @operator.File, true));
                 result.OriginalFunction.References.Add(new Reference<Expression>(@operator, @operator.File, true));
             }
@@ -1772,7 +1771,7 @@ public partial class StatementCompiler
                             return false;
                     }
 
-                    resultType = OnGotStatementType(@operator, resultType);
+                    resultType = SetStatementType(@operator, resultType);
 
                     goto OK;
                 }
@@ -1831,7 +1830,7 @@ public partial class StatementCompiler
                 resultType = expectedType;
             }
 
-            OnGotStatementType(@operator, resultType);
+            SetStatementType(@operator, resultType);
 
             compiledStatement = new CompiledBinaryOperatorCall()
             {
@@ -1849,7 +1848,7 @@ public partial class StatementCompiler
             {
                 compiledStatement = CompiledConstantValue.Create(casted, compiledStatement);
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                @operator.PredictedValue = casted;
+                SetPredictedValue(@operator, casted);
             }
 
             return true;
@@ -1870,14 +1869,14 @@ public partial class StatementCompiler
 
         if (GetOperator(@operator, @operator.File, out FunctionQueryResult<CompiledOperatorDefinition>? result, out PossibleDiagnostic? operatorNotFoundError))
         {
-            @operator.Reference = result.OriginalFunction;
+            SetStatementReference(@operator, result.OriginalFunction);
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
 
             if (result.DidReplaceArguments) throw new UnreachableException();
 
             CompiledOperatorDefinition? operatorDefinition = result.Function;
 
-            OnGotStatementType(@operator, operatorDefinition.Type);
+            SetStatementType(@operator, operatorDefinition.Type);
 
             if (operatorDefinition.Attributes.Any(v => v.Identifier.Content == AttributeConstants.MSILIncompatibleIdentifier))
             {
@@ -1927,7 +1926,7 @@ public partial class StatementCompiler
             {
                 compiledStatement = CompiledConstantValue.Create(casted, compiledStatement);
                 Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                @operator.PredictedValue = casted;
+                SetPredictedValue(@operator, casted);
                 operatorDefinition.References.Add(new Reference<Expression>(@operator, @operator.File, true));
             }
             else
@@ -1960,7 +1959,7 @@ public partial class StatementCompiler
                     {
                         compiledStatement = CompiledConstantValue.Create(casted, compiledStatement);
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        SetPredictedValue(@operator, casted);
                     }
 
                     return true;
@@ -1984,7 +1983,7 @@ public partial class StatementCompiler
                     {
                         compiledStatement = CompiledConstantValue.Create(casted, compiledStatement);
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        SetPredictedValue(@operator, casted);
                     }
 
                     return true;
@@ -2008,7 +2007,7 @@ public partial class StatementCompiler
                     {
                         compiledStatement = CompiledConstantValue.Create(casted, compiledStatement);
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        SetPredictedValue(@operator, casted);
                     }
 
                     return true;
@@ -2032,7 +2031,7 @@ public partial class StatementCompiler
                     {
                         compiledStatement = CompiledConstantValue.Create(casted, compiledStatement);
                         Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{casted}\"", @operator));
-                        @operator.PredictedValue = casted;
+                        SetPredictedValue(@operator, casted);
                     }
 
                     return true;
@@ -2085,7 +2084,9 @@ public partial class StatementCompiler
 
         using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
-            TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
+            TypeArguments = Frames.Last.TypeArguments,
+            IsTemplate = Frames.Last.IsTemplate,
+            TypeParameters = Frames.Last.TypeParameters,
             CompiledParameters = compiledParameters.ToImmutable(),
             InstructionLabels = localInstructionLabels.ToImmutable(),
             Scopes = new(),
@@ -2189,7 +2190,7 @@ public partial class StatementCompiler
                 }
                 closureSize += PointerSize;
                 if (!CompileAllocation(LiteralExpression.CreateAnonymous(closureSize, lambdaStatement.Position, lambdaStatement.File), out allocator)) return false;
-                lambdaStatement.AllocatorReference = allocator is CompiledFunctionCall cfc ? cfc.Function : null;
+                if (!Frames.Last.IsTemplate) lambdaStatement.AllocatorReference = allocator is CompiledFunctionCall cfc ? cfc.Function : null;
             }
 
             if (!frame.Value.CapturesGlobalVariables.HasValue) Frames.Last.CapturesGlobalVariables = null;
@@ -2226,7 +2227,7 @@ public partial class StatementCompiler
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2241,7 +2242,7 @@ public partial class StatementCompiler
                     {
                         if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2256,7 +2257,7 @@ public partial class StatementCompiler
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2271,7 +2272,7 @@ public partial class StatementCompiler
                     {
                         if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2284,7 +2285,7 @@ public partial class StatementCompiler
                     }
                     else if (expectedType.SameAs(BasicType.U32))
                     {
-                        OnGotStatementType(literal, expectedType);
+                        SetStatementType(literal, expectedType);
                         compiledStatement = new CompiledConstantValue()
                         {
                             Location = literal.Location,
@@ -2296,7 +2297,7 @@ public partial class StatementCompiler
                     }
                     else if (expectedType.SameAs(BasicType.I32))
                     {
-                        OnGotStatementType(literal, expectedType);
+                        SetStatementType(literal, expectedType);
                         compiledStatement = new CompiledConstantValue()
                         {
                             Location = literal.Location,
@@ -2308,7 +2309,7 @@ public partial class StatementCompiler
                     }
                     else if (expectedType.SameAs(BasicType.F32))
                     {
-                        OnGotStatementType(literal, expectedType);
+                        SetStatementType(literal, expectedType);
                         compiledStatement = new CompiledConstantValue()
                         {
                             Location = literal.Location,
@@ -2323,7 +2324,7 @@ public partial class StatementCompiler
                 if (!GetLiteralType(literal.Type, out GeneralType? literalType))
                 { literalType = BuiltinType.I32; }
 
-                OnGotStatementType(literal, literalType);
+                SetStatementType(literal, literalType);
                 compiledStatement = new CompiledConstantValue()
                 {
                     Location = literal.Location,
@@ -2338,7 +2339,7 @@ public partial class StatementCompiler
                 if (!GetLiteralType(literal.Type, out GeneralType? literalType))
                 { literalType = BuiltinType.F32; }
 
-                OnGotStatementType(literal, literalType);
+                SetStatementType(literal, literalType);
                 compiledStatement = new CompiledConstantValue()
                 {
                     Location = literal.Location,
@@ -2355,7 +2356,7 @@ public partial class StatementCompiler
                     pointerType.To.Is(out ArrayType? arrayType) &&
                     arrayType.Of.SameAs(BasicType.U8))
                 {
-                    OnGotStatementType(literal, expectedType);
+                    SetStatementType(literal, expectedType);
 
                     compiledStatement = null;
                     if (!CompileAllocation(LiteralExpression.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.U8.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledExpression? allocator)) return false;
@@ -2376,7 +2377,7 @@ public partial class StatementCompiler
                     pointerType2.To.Is(out ArrayType? arrayType2) &&
                     arrayType2.Of.SameAs(BasicType.U16))
                 {
-                    OnGotStatementType(literal, expectedType);
+                    SetStatementType(literal, expectedType);
 
                     compiledStatement = null;
                     if (!CompileAllocation(LiteralExpression.CreateAnonymous((1 + literal.Value.Length) * BuiltinType.Char.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledExpression? allocator)) return false;
@@ -2396,7 +2397,7 @@ public partial class StatementCompiler
                     expectedType.Is(out ArrayType? arrayType3) &&
                     arrayType3.Of.SameAs(BasicType.U8))
                 {
-                    OnGotStatementType(literal, expectedType);
+                    SetStatementType(literal, expectedType);
 
                     compiledStatement = new CompiledStackString()
                     {
@@ -2413,7 +2414,7 @@ public partial class StatementCompiler
                     expectedType.Is(out ArrayType? arrayType4) &&
                     arrayType4.Of.SameAs(BasicType.U16))
                 {
-                    OnGotStatementType(literal, expectedType);
+                    SetStatementType(literal, expectedType);
 
                     compiledStatement = new CompiledStackString()
                     {
@@ -2444,7 +2445,7 @@ public partial class StatementCompiler
                         }));
                     }
 
-                    OnGotStatementType(literal, stringType);
+                    SetStatementType(literal, stringType);
 
                     compiledStatement = new CompiledString()
                     {
@@ -2472,7 +2473,7 @@ public partial class StatementCompiler
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2487,7 +2488,7 @@ public partial class StatementCompiler
                     {
                         if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2500,7 +2501,7 @@ public partial class StatementCompiler
                     }
                     else if (expectedType.SameAs(BasicType.U16))
                     {
-                        OnGotStatementType(literal, expectedType);
+                        SetStatementType(literal, expectedType);
                         compiledStatement = new CompiledConstantValue()
                         {
                             Location = literal.Location,
@@ -2514,7 +2515,7 @@ public partial class StatementCompiler
                     {
                         if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2529,7 +2530,7 @@ public partial class StatementCompiler
                     {
                         if (literal.Value[0] >= uint.MinValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2544,7 +2545,7 @@ public partial class StatementCompiler
                     {
                         if (literal.Value[0] >= int.MinValue)
                         {
-                            OnGotStatementType(literal, expectedType);
+                            SetStatementType(literal, expectedType);
                             compiledStatement = new CompiledConstantValue()
                             {
                                 Location = literal.Location,
@@ -2557,7 +2558,7 @@ public partial class StatementCompiler
                     }
                     else if (expectedType.SameAs(BasicType.F32))
                     {
-                        OnGotStatementType(literal, expectedType);
+                        SetStatementType(literal, expectedType);
                         compiledStatement = new CompiledConstantValue()
                         {
                             Location = literal.Location,
@@ -2572,7 +2573,7 @@ public partial class StatementCompiler
                 if (!GetLiteralType(literal.Type, out GeneralType? literalType))
                 { literalType = BuiltinType.Char; }
 
-                OnGotStatementType(literal, literalType);
+                SetStatementType(literal, literalType);
                 compiledStatement = new CompiledConstantValue()
                 {
                     Location = literal.Location,
@@ -2630,9 +2631,9 @@ public partial class StatementCompiler
 
         if (GetConstant(variable.Content, variable.File, out CompiledVariableConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
-            OnGotStatementType(variable, constant.Type);
-            variable.PredictedValue = constant.Value;
-            variable.Reference = constant;
+            SetStatementType(variable, constant.Type);
+            SetPredictedValue(variable, constant.Value);
+            SetStatementReference(variable, constant);
             variable.AnalyzedType = TokenAnalyzedType.ConstantName;
 
             CompiledValue value = constant.Value;
@@ -2664,8 +2665,8 @@ public partial class StatementCompiler
         {
             if (variable.Content != StatementKeywords.This)
             { variable.AnalyzedType = TokenAnalyzedType.ParameterName; }
-            variable.Reference = param;
-            OnGotStatementType(variable, param.Type);
+            SetStatementReference(variable, param);
+            SetStatementType(variable, param.Type);
 
             compiledStatement = new CompiledParameterAccess()
             {
@@ -2680,8 +2681,8 @@ public partial class StatementCompiler
         if (GetVariable(variable.Content, out CompiledVariableDefinition? val, out PossibleDiagnostic? variableNotFoundError))
         {
             variable.AnalyzedType = TokenAnalyzedType.VariableName;
-            variable.Reference = val;
-            OnGotStatementType(variable, val.Type);
+            SetStatementReference(variable, val);
+            SetStatementType(variable, val.Type);
 
             if (val.IsGlobal)
             { Diagnostics.Add(Diagnostic.Internal($"Trying to get local variable \"{val.Identifier}\" but it was compiled as a global variable.", variable)); }
@@ -2732,8 +2733,8 @@ public partial class StatementCompiler
         if (GetGlobalVariable(variable.Content, variable.File, out CompiledVariableDefinition? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             variable.AnalyzedType = TokenAnalyzedType.VariableName;
-            variable.Reference = globalVariable;
-            OnGotStatementType(variable, globalVariable.Type);
+            SetStatementReference(variable, globalVariable);
+            SetStatementType(variable, globalVariable.Type);
             Frames.Last.CapturesGlobalVariables = true;
 
             if (!globalVariable.IsGlobal)
@@ -2760,8 +2761,8 @@ public partial class StatementCompiler
 
             compiledFunction.References.AddReference(variable, variable.File);
             variable.AnalyzedType = TokenAnalyzedType.FunctionName;
-            variable.Reference = compiledFunction;
-            OnGotStatementType(variable, new FunctionType(compiledFunction));
+            SetStatementReference(variable, compiledFunction);
+            SetStatementType(variable, new FunctionType(compiledFunction));
 
             compiledStatement = new CompiledFunctionReference()
             {
@@ -2775,9 +2776,9 @@ public partial class StatementCompiler
 
         if (GetInstructionLabel(variable.Content, out CompiledLabelDeclaration? instructionLabel, out PossibleDiagnostic? instructionLabelError))
         {
-            variable.Reference = instructionLabel;
+            SetStatementReference(variable, instructionLabel);
             variable.AnalyzedType = TokenAnalyzedType.InstructionLabel;
-            OnGotStatementType(variable, CompiledLabelDeclaration.Type);
+            SetStatementType(variable, CompiledLabelDeclaration.Type);
 
             compiledStatement = new CompiledLabelReference()
             {
@@ -2794,8 +2795,8 @@ public partial class StatementCompiler
             if (GetParameter(variable.Content, Frames[i], out CompiledParameter? outerParameter, out _))
             {
                 variable.AnalyzedType = TokenAnalyzedType.VariableName;
-                variable.Reference = outerParameter;
-                OnGotStatementType(variable, outerParameter.Type);
+                SetStatementReference(variable, outerParameter);
+                SetStatementType(variable, outerParameter.Type);
 
                 compiledStatement = new CompiledParameterAccess()
                 {
@@ -2814,8 +2815,8 @@ public partial class StatementCompiler
             if (GetVariable(variable.Content, Frames[i], out CompiledVariableDefinition? outerLocal, out _))
             {
                 variable.AnalyzedType = TokenAnalyzedType.VariableName;
-                variable.Reference = outerLocal;
-                OnGotStatementType(variable, outerLocal.Type);
+                SetStatementReference(variable, outerLocal);
+                SetStatementType(variable, outerLocal.Type);
 
                 if (outerLocal.IsGlobal)
                 { Diagnostics.Add(Diagnostic.Internal($"Trying to get local variable \"{outerLocal.Identifier}\" but it was compiled as a global variable.", variable)); }
@@ -2898,8 +2899,8 @@ public partial class StatementCompiler
             return false;
         }
 
-        newInstance.Type.SetAnalyzedType(instanceType);
-        OnGotStatementType(newInstance, instanceType);
+        SetTypeType(newInstance.Type, instanceType);
+        SetStatementType(newInstance, instanceType);
 
         switch (instanceType)
         {
@@ -2914,7 +2915,7 @@ public partial class StatementCompiler
                 ), out compiledStatement))
                 { return false; }
 
-                newInstance.Reference = compiledStatement is CompiledFunctionCall cfc ? cfc.Function : null;
+                SetStatementReference(newInstance, compiledStatement is CompiledFunctionCall cfc ? cfc.Function : null);
 
                 compiledStatement = new CompiledReinterpretation()
                 {
@@ -2983,10 +2984,10 @@ public partial class StatementCompiler
 
         result.Function.References.AddReference(constructorCall);
         result.OriginalFunction.References.AddReference(constructorCall);
-        constructorCall.Reference = result.OriginalFunction;
+        SetStatementReference(constructorCall, result.OriginalFunction);
 
         CompiledConstructorDefinition? compiledFunction = result.Function;
-        OnGotStatementType(constructorCall, compiledFunction.Type);
+        SetStatementType(constructorCall, compiledFunction.Type);
 
         if (!compiledFunction.CanUse(constructorCall.File))
         {
@@ -3027,8 +3028,8 @@ public partial class StatementCompiler
                 return false;
             }
 
-            OnGotStatementType(field, ArrayLengthType);
-            field.PredictedValue = arrayType.ComputedLength.Value;
+            SetStatementType(field, ArrayLengthType);
+            SetPredictedValue(field, arrayType.ComputedLength.Value);
 
             compiledStatement = new CompiledConstantValue()
             {
@@ -3061,8 +3062,8 @@ public partial class StatementCompiler
                 return false;
             }
 
-            field.CompiledType = fieldDefinition.Type;
-            field.Reference = fieldDefinition;
+            SetStatementType(field, fieldDefinition.Type);
+            SetStatementReference(field, fieldDefinition);
 
             compiledStatement = new CompiledFieldAccess()
             {
@@ -3083,8 +3084,8 @@ public partial class StatementCompiler
             return false;
         }
 
-        field.CompiledType = compiledField.Type;
-        field.Reference = compiledField;
+        SetStatementType(field, compiledField.Type);
+        SetStatementReference(field, compiledField);
 
         compiledStatement = new CompiledFieldAccess()
         {
@@ -3107,7 +3108,7 @@ public partial class StatementCompiler
         {
             indexer.Function.References.Add(new(index, index.File));
             indexer.OriginalFunction.References.Add(new(index, index.File));
-            index.Reference = indexer.OriginalFunction;
+            SetStatementReference(index, indexer.OriginalFunction);
 
             return CompileFunctionCall(index, ImmutableArray.Create(ArgumentExpression.Wrap(index.Object), index.Index), indexer, out compiledStatement);
         }
@@ -3116,7 +3117,7 @@ public partial class StatementCompiler
         {
             if (TryCompute(indexStatement, out CompiledValue computedIndexData))
             {
-                index.Index.PredictedValue = computedIndexData;
+                SetPredictedValue(index.Index, computedIndexData);
 
                 if (computedIndexData < 0 || (arrayType.ComputedLength.HasValue && computedIndexData >= arrayType.ComputedLength.Value))
                 { Diagnostics.Add(Diagnostic.Warning($"Index out of range", index.Index)); }
@@ -3226,8 +3227,8 @@ public partial class StatementCompiler
             return true;
         }
 
-        typeCast.Type.SetAnalyzedType(targetType);
-        OnGotStatementType(typeCast, targetType);
+        SetTypeType(typeCast.Type, targetType);
+        SetStatementType(typeCast, targetType);
 
         compiledStatement = new CompiledReinterpretation()
         {
@@ -3246,8 +3247,8 @@ public partial class StatementCompiler
             Diagnostics.Add(typeError.ToError(typeCast.Type));
             return false;
         }
-        typeCast.Type.SetAnalyzedType(targetType);
-        OnGotStatementType(typeCast, targetType);
+        SetTypeType(typeCast.Type, targetType);
+        SetStatementType(typeCast, targetType);
 
         if (!CompileExpression(typeCast.Expression, out CompiledExpression? prev, targetType)) return false;
 
@@ -3385,7 +3386,7 @@ public partial class StatementCompiler
         if (GetConstant(target.Content, target.File, out CompiledVariableConstant? constant, out _))
         {
             target.AnalyzedType = TokenAnalyzedType.ConstantName;
-            target.Reference = constant;
+            SetStatementReference(target, constant);
 
             Diagnostics.Add(Diagnostic.Critical($"Can not set constant value: it is readonly", target));
             return false;
@@ -3395,8 +3396,8 @@ public partial class StatementCompiler
         {
             if (target.Content != StatementKeywords.This)
             { target.AnalyzedType = TokenAnalyzedType.ParameterName; }
-            target.CompiledType = parameter.Type;
-            target.Reference = parameter;
+            SetStatementType(target, parameter.Type);
+            SetStatementReference(target, parameter);
 
             if (!CompileExpression(value, out CompiledExpression? _value, parameter.Type)) return false;
 
@@ -3429,8 +3430,8 @@ public partial class StatementCompiler
         if (GetVariable(target.Content, out CompiledVariableDefinition? variable, out PossibleDiagnostic? variableNotFoundError))
         {
             target.AnalyzedType = TokenAnalyzedType.VariableName;
-            target.CompiledType = variable.Type;
-            target.Reference = variable;
+            SetStatementType(target, variable.Type);
+            SetStatementReference(target, variable);
 
             if (!CompileExpression(value, out CompiledExpression? _value, variable.Type)) return false;
 
@@ -3501,8 +3502,8 @@ public partial class StatementCompiler
         if (GetGlobalVariable(target.Content, target.File, out CompiledVariableDefinition? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             target.AnalyzedType = TokenAnalyzedType.VariableName;
-            target.CompiledType = globalVariable.Type;
-            target.Reference = globalVariable;
+            SetStatementType(target, globalVariable.Type);
+            SetStatementReference(target, globalVariable);
             Frames.Last.CapturesGlobalVariables = true;
 
             if (!CompileExpression(value, out CompiledExpression? _value, globalVariable.Type)) return false;
@@ -3581,8 +3582,8 @@ public partial class StatementCompiler
                 Diagnostics.Add(castError2.ToError(value));
             }
 
-            target.CompiledType = compiledField.Type;
-            target.Reference = compiledField;
+            SetStatementType(target, compiledField.Type);
+            SetStatementReference(target, compiledField);
 
             compiledStatement = new CompiledSetter()
             {
@@ -3617,8 +3618,8 @@ public partial class StatementCompiler
                 Diagnostics.Add(castError2.ToError(value));
             }
 
-            target.CompiledType = compiledField.Type;
-            target.Reference = compiledField;
+            SetStatementType(target, compiledField.Type);
+            SetStatementReference(target, compiledField);
 
             compiledStatement = new CompiledSetter()
             {
@@ -3666,7 +3667,7 @@ public partial class StatementCompiler
 
         if (_base.Type.Is(out ArrayType? arrayType))
         {
-            itemType = OnGotStatementType(target, arrayType.Of);
+            itemType = SetStatementType(target, arrayType.Of);
         }
         else if (_base.Type.Is(out PointerType? pointerType) &&
             pointerType.To.Is(out arrayType))
@@ -3708,9 +3709,9 @@ public partial class StatementCompiler
 
         GeneralType targetType;
         if (prev.Type.Is(out PointerType? pointerType))
-        { targetType = OnGotStatementType(target, pointerType.To); }
+        { targetType = SetStatementType(target, pointerType.To); }
         else
-        { targetType = OnGotStatementType(target, BuiltinType.Any); }
+        { targetType = SetStatementType(target, BuiltinType.Any); }
 
         if (!CompileExpression(value, out CompiledExpression? _value, targetType)) return false;
 
@@ -3808,13 +3809,13 @@ public partial class StatementCompiler
         {
             CompileExpression(type.StackArraySize, out CompiledExpression? stackArraySizeStatement);
             result = new ArrayType(of, stackArraySizeStatement);
-            type.SetAnalyzedType(result);
+            SetTypeType(type, result);
             return true;
         }
         else
         {
             result = new ArrayType(of, null);
-            type.SetAnalyzedType(result);
+            SetTypeType(type, result);
             return true;
         }
     }
@@ -3830,7 +3831,7 @@ public partial class StatementCompiler
         if (!CompileTypes(type.FunctionParameterTypes, out ImmutableArray<GeneralType> parameters, out error)) return false;
 
         result = new FunctionType(returnType, parameters, type.ClosureModifier is not null);
-        type.SetAnalyzedType(result);
+        SetTypeType(type, result);
 
         return true;
     }
@@ -3845,7 +3846,7 @@ public partial class StatementCompiler
         if (!CompileType(type.To, out GeneralType? to, out error)) return false;
 
         result = new PointerType(to);
-        type.SetAnalyzedType(result);
+        SetTypeType(type, result);
 
         return true;
     }
@@ -3860,7 +3861,7 @@ public partial class StatementCompiler
         if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);
-            type.SetAnalyzedType(result);
+            SetTypeType(type, result);
             return true;
         }
 
@@ -3891,7 +3892,7 @@ public partial class StatementCompiler
             }
         }
 
-        type.SetAnalyzedType(result);
+        SetTypeType(type, result);
         return true;
     }
 
@@ -4090,6 +4091,8 @@ public partial class StatementCompiler
         using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = typeArguments ?? ImmutableDictionary<string, GeneralType>.Empty,
+            IsTemplate = typeArguments is not null,
+            TypeParameters = function.Template?.Parameters ?? ImmutableArray<Token>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
             InstructionLabels = localInstructionLabels.ToImmutable(),
             Scopes = new(),
@@ -4161,17 +4164,12 @@ public partial class StatementCompiler
         bool compiledAnything = false;
         foreach (TFunction function in functions)
         {
-            if (function.IsTemplate) continue;
             if (function.InstructionOffset >= 0) continue;
-            if (!Settings.CompileEverything && !function.References.Any())
+            if (function.IsTemplate) continue;
+            if (!Settings.CompileEverything)
             {
-                if (function is IExposeable exposeable &&
-                    exposeable.ExposedFunctionName is not null)
-                { }
-                else
-                {
-                    continue;
-                }
+                if (!function.References.Any() && (function is not IExposeable exposeable || exposeable.ExposedFunctionName is null))
+                { continue; }
             }
 
             if (CompileFunction(function, null))
@@ -4259,6 +4257,8 @@ public partial class StatementCompiler
         using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
+            IsTemplate = false,
+            TypeParameters = ImmutableArray<Token>.Empty,
             CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
             InstructionLabels = globalInstructionLabels.ToImmutable(),
             Scopes = new(),

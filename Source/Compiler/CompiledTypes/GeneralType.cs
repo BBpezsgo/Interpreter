@@ -50,10 +50,10 @@ public abstract class GeneralType :
         [NotNullWhen(false)] out PossibleDiagnostic? error,
         ComputeValue? constComputer = null) => type switch
         {
-            TypeInstanceSimple simpleType => GeneralType.From(simpleType, typeFinder, out result, out error, constComputer),
-            TypeInstanceFunction functionType => GeneralType.From(functionType, typeFinder, out result, out error, constComputer),
-            TypeInstanceStackArray stackArrayType => GeneralType.From(stackArrayType, typeFinder, out result, out error, constComputer),
-            TypeInstancePointer pointerType => GeneralType.From(pointerType, typeFinder, out result, out error, constComputer),
+            TypeInstanceSimple simpleType => From(simpleType, typeFinder, out result, out error, constComputer),
+            TypeInstanceFunction functionType => From(functionType, typeFinder, out result, out error, constComputer),
+            TypeInstanceStackArray stackArrayType => From(stackArrayType, typeFinder, out result, out error, constComputer),
+            TypeInstancePointer pointerType => From(pointerType, typeFinder, out result, out error, constComputer),
             _ => throw new UnreachableException(),
         };
 
@@ -81,7 +81,7 @@ public abstract class GeneralType :
                 { stackArraySize = _stackArraySize; }
             }
 
-            if (!GeneralType.From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
+            if (!From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
 
             result = new ArrayType(of, stackArraySize.HasValue ? new CompiledConstantValue()
             {
@@ -90,14 +90,14 @@ public abstract class GeneralType :
                 SaveValue = true,
                 Type = BuiltinType.I32,
             } : null);
-            type.SetAnalyzedType(result);
+            //type.SetAnalyzedType(result);
             return true;
         }
         else
         {
-            if (!GeneralType.From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
+            if (!From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
             result = new ArrayType(of, null);
-            type.SetAnalyzedType(result);
+            //type.SetAnalyzedType(result);
             return true;
         }
     }
@@ -111,11 +111,11 @@ public abstract class GeneralType :
     {
         result = null;
 
-        if (!GeneralType.From(type.FunctionReturnType, typeFinder, out GeneralType? returnType, out error, constComputer)) return false;
-        if (!GeneralType.FromArray(type.FunctionParameterTypes, typeFinder, out ImmutableArray<GeneralType> parameters, out error, constComputer)) return false;
+        if (!From(type.FunctionReturnType, typeFinder, out GeneralType? returnType, out error, constComputer)) return false;
+        if (!FromArray(type.FunctionParameterTypes, typeFinder, out ImmutableArray<GeneralType> parameters, out error, constComputer)) return false;
 
         result = new FunctionType(returnType, parameters, type.ClosureModifier is not null);
-        type.SetAnalyzedType(result);
+        //type.SetAnalyzedType(result);
         return true;
     }
 
@@ -128,10 +128,10 @@ public abstract class GeneralType :
     {
         result = null;
 
-        if (!GeneralType.From(type.To, typeFinder, out GeneralType? to, out error, constComputer)) return false;
+        if (!From(type.To, typeFinder, out GeneralType? to, out error, constComputer)) return false;
 
         result = new PointerType(to);
-        type.SetAnalyzedType(result);
+        //type.SetAnalyzedType(result);
 
         return true;
     }
@@ -143,13 +143,13 @@ public abstract class GeneralType :
         [NotNullWhen(false)] out PossibleDiagnostic? error,
         ComputeValue? constComputer = null)
     {
-        result = null;
+        //result = null;
         error = null;
 
         if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
         {
             result = new BuiltinType(builtinType);
-            type.SetAnalyzedType(result);
+            //type.SetAnalyzedType(result);
             return true;
         }
 
@@ -163,7 +163,7 @@ public abstract class GeneralType :
         {
             if (type.TypeArguments.HasValue)
             {
-                if (!GeneralType.FromArray(type.TypeArguments.Value, typeFinder, out ImmutableArray<GeneralType> typeParameters, out error, constComputer)) return false;
+                if (!FromArray(type.TypeArguments.Value, typeFinder, out ImmutableArray<GeneralType> typeParameters, out error, constComputer)) return false;
                 result = new StructType(resultStructType.Struct, type.File, typeParameters);
             }
             else
@@ -180,7 +180,7 @@ public abstract class GeneralType :
             }
         }
 
-        type.SetAnalyzedType(result);
+        //type.SetAnalyzedType(result);
         return true;
     }
 
@@ -204,28 +204,7 @@ public abstract class GeneralType :
         ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (TypeInstance item in types)
         {
-            if (!GeneralType.From(item, typeFinder, out GeneralType? _item, out error, constComputer)) return false;
-            _result.Add(_item);
-        }
-        result = _result.MoveToImmutable();
-        return true;
-    }
-
-    public static bool FromArray<T>(
-        ImmutableArray<T> types,
-        FindType typeFinder,
-        [NotNullWhen(true)] out ImmutableArray<GeneralType> result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null)
-        where T : IHaveType
-    {
-        result = default;
-        error = null;
-
-        ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
-        foreach (T item in types)
-        {
-            if (!GeneralType.From(item.Type, typeFinder, out GeneralType? _item, out error, constComputer)) return false;
+            if (!From(item, typeFinder, out GeneralType? _item, out error, constComputer)) return false;
             _result.Add(_item);
         }
         result = _result.MoveToImmutable();
@@ -472,7 +451,7 @@ public abstract class GeneralType :
         ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
         foreach (GeneralType type in types)
         {
-            result.Add(GeneralType.InsertTypeParameters(type, typeArguments) ?? type);
+            result.Add(InsertTypeParameters(type, typeArguments) ?? type);
         }
         return result.MoveToImmutable();
     }

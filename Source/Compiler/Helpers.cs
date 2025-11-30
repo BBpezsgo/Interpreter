@@ -748,7 +748,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
             }
         }
-        variableDeclaration.Type.SetAnalyzedType(constantType);
+        SetTypeType(variableDeclaration.Type, constantType);
 
         result = new CompiledVariableConstant(constantValue, constantType, variableDeclaration);
         return true;
@@ -1415,6 +1415,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
+        {
+            int i = Frames.Last.TypeParameters.IndexOf(name.Content);
+            if (i != -1)
+            {
+                result = new GenericType(Frames.Last.TypeParameters[i], relevantFile);
+                error = null;
+                return true;
+            }
+        }
+
         for (int i = 0; i < GenericParameters.Count; i++)
         {
             for (int j = 0; j < GenericParameters[i].Length; j++)
@@ -1547,11 +1557,78 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return type is not null;
     }
 
-    static TType OnGotStatementType<TType>(Expression statement, TType type)
+    void SetPredictedValue(Expression expression, CompiledValue value)
+    {
+        if (!Frames.Last.IsTemplate) expression.PredictedValue = value;
+    }
+    TType SetStatementType<TType>(Expression expression, TType type)
         where TType : GeneralType
     {
-        statement.CompiledType = type;
+        if (!Frames.Last.IsTemplate) expression.CompiledType = type;
         return type;
+    }
+    void TrySetStatementReference<TRef>(Statement statement, TRef? reference)
+    {
+        if (statement is IReferenceableTo<TRef> v1) SetStatementReference(v1, reference);
+        else if (statement is IReferenceableTo v2) SetStatementReference(v2, reference);
+    }
+    void SetStatementReference<TRef>(IReferenceableTo<TRef> statement, TRef? reference)
+    {
+        if (!Frames.Last.IsTemplate) statement.Reference = reference;
+    }
+    void SetStatementReference(IReferenceableTo statement, object? reference)
+    {
+        if (!Frames.Last.IsTemplate) statement.Reference = reference;
+    }
+    void SetTypeType(TypeInstance typeInstance, GeneralType type)
+    {
+        if (Frames.Last.IsTemplate) return;
+
+        switch (typeInstance)
+        {
+            case TypeInstanceFunction v:
+            {
+
+                if (!type.Is(out FunctionType? functionType)) return;
+
+                SetTypeType(v.FunctionReturnType, functionType.ReturnType);
+
+                if (v.FunctionParameterTypes.Length != functionType.Parameters.Length) return;
+
+                for (int i = 0; i < functionType.Parameters.Length; i++)
+                {
+                    SetTypeType(v.FunctionParameterTypes[i], functionType.Parameters[i]);
+                }
+                break;
+            }
+            case TypeInstancePointer v:
+            {
+                if (!type.Is(out PointerType? pointerType)) return;
+                SetTypeType(v.To, pointerType.To);
+                break;
+            }
+            case TypeInstanceSimple v:
+            {
+                v.Identifier.AnalyzedType = type.FinalValue switch
+                {
+                    StructType => TokenAnalyzedType.Struct,
+                    GenericType => TokenAnalyzedType.TypeParameter,
+                    BuiltinType => TokenAnalyzedType.BuiltinType,
+                    AliasType => TokenAnalyzedType.Type,
+                    _ => v.Identifier.AnalyzedType,
+                };
+                break;
+            }
+            case TypeInstanceStackArray v:
+            {
+                if (!type.Is(out ArrayType? arrayType)) return;
+
+                SetTypeType(v.StackArrayOf, arrayType.Of);
+                break;
+            }
+            default:
+                throw new UnreachableException(typeInstance.GetType().Name);
+        }
     }
 
     bool FindStatementType(AnyCallExpression anyCall, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -1559,7 +1636,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         DiagnosticsCollection subdiagnostics = new();
         if (anyCall.ToFunctionCall(out FunctionCallExpression? functionCall) && FindStatementType(functionCall, out type, subdiagnostics))
         {
-            OnGotStatementType(anyCall, type);
+            SetStatementType(anyCall, type);
             return true;
         }
 
@@ -1579,7 +1656,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
 
         type = functionType.ReturnType;
-        OnGotStatementType(anyCall, functionType.ReturnType);
+        SetStatementType(anyCall, functionType.ReturnType);
         return true;
     }
     bool FindStatementType(ListExpression list, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -1624,13 +1701,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (GetIndexGetter(prevType, indexType, index.File, out FunctionQueryResult<CompiledFunctionDefinition>? indexer, out PossibleDiagnostic? notFoundError))
         {
-            OnGotStatementType(index, type = indexer.Function.Type);
+            SetStatementType(index, type = indexer.Function.Type);
             return true;
         }
 
         if (prevType.Is(out ArrayType? arrayType))
         {
-            OnGotStatementType(index, type = arrayType.Of);
+            SetStatementType(index, type = arrayType.Of);
             return true;
         }
 
@@ -1668,7 +1745,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         // Diagnostics.Add(notFoundError?.SubErrors.FirstOrDefault()?.ToWarning(functionCall));
         functionCall.Identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-        OnGotStatementType(functionCall, type = result.Function.Type);
+        SetStatementType(functionCall, type = result.Function.Type);
         return true;
     }
     bool FindStatementType(BinaryOperatorCallExpression @operator, GeneralType? expectedType, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -1677,7 +1754,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             if (_result.DidReplaceArguments) throw new UnreachableException();
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            OnGotStatementType(@operator, type = _result.Function.Type);
+            SetStatementType(@operator, type = _result.Function.Type);
             return true;
         }
 
@@ -1747,7 +1824,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     CanCastImplicitly(type, expectedType, null, out _))
                 { type = expectedType; }
 
-                OnGotStatementType(@operator, type);
+                SetStatementType(@operator, type);
                 return true;
             }
         }
@@ -1800,12 +1877,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             if (type.SameAs(BasicType.I32) &&
                 expectedType.Is<PointerType>())
             {
-                OnGotStatementType(@operator, type = expectedType);
+                SetStatementType(@operator, type = expectedType);
                 return true;
             }
         }
 
-        OnGotStatementType(@operator, type);
+        SetStatementType(@operator, type);
         return true;
     }
     bool FindStatementType(UnaryOperatorCallExpression @operator, GeneralType? expectedType, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -1814,7 +1891,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             if (result_.DidReplaceArguments) throw new UnreachableException();
             @operator.Operator.AnalyzedType = TokenAnalyzedType.FunctionName;
-            OnGotStatementType(@operator, type = result_.Function.Type);
+            SetStatementType(@operator, type = result_.Function.Type);
             return true;
         }
 
@@ -1852,11 +1929,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (expectedType is not null && expectedType.Is<PointerType>() && type.SameAs(BasicType.I32))
         {
-            OnGotStatementType(@operator, type = expectedType);
+            SetStatementType(@operator, type = expectedType);
             return true;
         }
 
-        OnGotStatementType(@operator, type);
+        SetStatementType(@operator, type);
         return true;
     }
     bool FindStatementType(LiteralExpression literal, GeneralType? expectedType, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -1870,7 +1947,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if (literal.GetInt() is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
@@ -1878,7 +1955,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if (literal.GetInt() is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
@@ -1886,7 +1963,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if (literal.GetInt() is >= ushort.MinValue and <= ushort.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
@@ -1894,7 +1971,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if (literal.GetInt() is >= short.MinValue and <= short.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
@@ -1902,13 +1979,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if (literal.GetInt() >= (int)uint.MinValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
                     else if (expectedType.SameAs(BasicType.F32))
                     {
-                        OnGotStatementType(literal, type = expectedType);
+                        SetStatementType(literal, type = expectedType);
                         return true;
                     }
                 }
@@ -1920,7 +1997,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
 
                 diagnostics.Add(Diagnostic.Warning($"No type defined for integer literals, using the default i32", literal));
-                OnGotStatementType(literal, type = BuiltinType.I32);
+                SetStatementType(literal, type = BuiltinType.I32);
                 return true;
             case LiteralType.Float:
 
@@ -1931,7 +2008,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
 
                 diagnostics.Add(Diagnostic.Warning($"No type defined for float literals, using the default f32", literal));
-                OnGotStatementType(literal, type = BuiltinType.F32);
+                SetStatementType(literal, type = BuiltinType.F32);
                 return true;
             case LiteralType.String:
                 if (expectedType is not null &&
@@ -1939,7 +2016,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     pointerType.To.Is(out ArrayType? arrayType) &&
                     arrayType.Of.SameAs(BasicType.U8))
                 {
-                    OnGotStatementType(literal, type = expectedType);
+                    SetStatementType(literal, type = expectedType);
                     return true;
                 }
 
@@ -1950,7 +2027,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
 
                 diagnostics.Add(Diagnostic.Warning($"No type defined for string literals, using the default u16[]*", literal));
-                OnGotStatementType(literal, type = new PointerType(new ArrayType(BuiltinType.Char, new CompiledConstantValue()
+                SetStatementType(literal, type = new PointerType(new ArrayType(BuiltinType.Char, new CompiledConstantValue()
                 {
                     Value = literal.Value.Length + 1,
                     Location = literal.Location,
@@ -1965,7 +2042,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if ((int)literal.Value[0] is >= byte.MinValue and <= byte.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
@@ -1973,7 +2050,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if ((int)literal.Value[0] is >= sbyte.MinValue and <= sbyte.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
@@ -1981,13 +2058,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     {
                         if ((int)literal.Value[0] is >= short.MinValue and <= short.MaxValue)
                         {
-                            OnGotStatementType(literal, type = expectedType);
+                            SetStatementType(literal, type = expectedType);
                             return true;
                         }
                     }
                     else if (expectedType.SameAs(BasicType.F32))
                     {
-                        OnGotStatementType(literal, type = expectedType);
+                        SetStatementType(literal, type = expectedType);
                         return true;
                     }
                 }
@@ -1999,7 +2076,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
 
                 diagnostics.Add(Diagnostic.Warning($"No type defined for character literals, using the default u16", literal));
-                OnGotStatementType(literal, type = BuiltinType.Char);
+                SetStatementType(literal, type = BuiltinType.Char);
                 return true;
             default:
                 throw new UnreachableException($"Unknown literal type \"{literal.Type}\"");
@@ -2011,7 +2088,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             identifier.Reference = null;
             identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
-            OnGotStatementType(identifier, type = BooleanType);
+            SetStatementType(identifier, type = BooleanType);
             return true;
         }
 
@@ -2023,9 +2100,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (GetConstant(identifier.Content, identifier.File, out CompiledVariableConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
-            identifier.Reference = constant;
+            SetStatementReference(identifier, constant);
             identifier.AnalyzedType = TokenAnalyzedType.ConstantName;
-            OnGotStatementType(identifier, type = constant.Type);
+            SetStatementType(identifier, type = constant.Type);
             return true;
         }
 
@@ -2033,43 +2110,43 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             if (identifier.Content != StatementKeywords.This)
             { identifier.AnalyzedType = TokenAnalyzedType.ParameterName; }
-            identifier.Reference = parameter;
-            OnGotStatementType(identifier, type = parameter.Type);
+            SetStatementReference(identifier, parameter);
+            SetStatementType(identifier, type = parameter.Type);
             return true;
         }
 
         if (GetVariable(identifier.Content, out CompiledVariableDefinition? variable, out PossibleDiagnostic? variableNotFoundError))
         {
             identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-            identifier.Reference = variable;
-            OnGotStatementType(identifier, type = variable.Type);
+            SetStatementReference(identifier, variable);
+            SetStatementType(identifier, type = variable.Type);
             return true;
         }
 
         if (GetGlobalVariable(identifier.Content, identifier.File, out CompiledVariableDefinition? globalVariable, out PossibleDiagnostic? globalVariableNotFoundError))
         {
             identifier.AnalyzedType = TokenAnalyzedType.VariableName;
-            identifier.Reference = globalVariable;
-            OnGotStatementType(identifier, type = globalVariable.Type);
+            SetStatementReference(identifier, globalVariable);
+            SetStatementType(identifier, type = globalVariable.Type);
             return true;
         }
 
         if (GetLocalSymbolType(identifier, out type))
         {
-            OnGotStatementType(identifier, type);
+            SetStatementType(identifier, type);
             return true;
         }
 
         if (GetFunction(identifier.Content, expectedType, out FunctionQueryResult<CompiledFunctionDefinition>? function, out PossibleDiagnostic? functionNotFoundError))
         {
             identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-            OnGotStatementType(identifier, type = new FunctionType(function.Function));
+            SetStatementType(identifier, type = new FunctionType(function.Function));
             return true;
         }
 
         if (GetInstructionLabel(identifier.Content, out _, out PossibleDiagnostic? instructionLabelNotFound))
         {
-            OnGotStatementType(identifier, type = new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty, false));
+            SetStatementType(identifier, type = new FunctionType(BuiltinType.Void, ImmutableArray<GeneralType>.Empty, false));
             return true;
         }
 
@@ -2077,14 +2154,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             if (GetVariable(identifier.Content, Frames[i], out variable, out _))
             {
-                OnGotStatementType(identifier, type = variable.Type);
+                SetStatementType(identifier, type = variable.Type);
                 return true;
             }
         }
 
         if (FindType(identifier.Identifier, identifier.File, out GeneralType? result, out PossibleDiagnostic? typeError))
         {
-            OnGotStatementType(identifier, type = result);
+            SetStatementType(identifier, type = result);
             return true;
         }
 
@@ -2104,7 +2181,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         type = null;
         if (!FindStatementType(addressGetter.Expression, out GeneralType? to, diagnostics)) return false;
-        OnGotStatementType(addressGetter, type = new PointerType(to));
+        SetStatementType(addressGetter, type = new PointerType(to));
         return true;
     }
     bool FindStatementType(DereferenceExpression pointer, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -2113,10 +2190,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (!FindStatementType(pointer.Expression, out GeneralType? to, diagnostics)) return false;
 
         if (!to.Is(out PointerType? pointerType))
-        { OnGotStatementType(pointer, type = BuiltinType.Any); }
+        { SetStatementType(pointer, type = BuiltinType.Any); }
         else
         {
-            OnGotStatementType(pointer, type = pointerType.To);
+            SetStatementType(pointer, type = pointerType.To);
         }
         return true;
     }
@@ -2127,7 +2204,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             diagnostics.Add(typeError.ToError(newInstance.Type));
             return false;
         }
-        OnGotStatementType(newInstance, type);
+        SetTypeType(newInstance.Type, type);
+        SetStatementType(newInstance, type);
         return true;
     }
     bool FindStatementType(ConstructorCallExpression constructorCall, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -2137,12 +2215,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             diagnostics.Add(typeError.ToError(constructorCall.Type));
             return false;
         }
+        SetTypeType(constructorCall.Type, type);
         FindStatementTypes(constructorCall.Arguments, out ImmutableArray<GeneralType> parameters, diagnostics);
 
         if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructorDefinition>? result, out PossibleDiagnostic? notFound))
         {
-            constructorCall.Type.SetAnalyzedType(result.Function.Type);
-            OnGotStatementType(constructorCall, type = result.Function.Type);
+            SetTypeType(constructorCall.Type, result.Function.Type);
+            SetStatementType(constructorCall, type = result.Function.Type);
             return true;
         }
 
@@ -2157,7 +2236,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (prevStatementType.Is<ArrayType>() && field.Identifier.Content == "Length")
         {
             field.Identifier.AnalyzedType = TokenAnalyzedType.FieldName;
-            OnGotStatementType(field, type = ArrayLengthType);
+            SetStatementType(field, type = ArrayLengthType);
             return true;
         }
 
@@ -2196,8 +2275,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             diagnostics.Add(typeError.ToError(@as.Type));
             return false;
         }
-        @as.Type.SetAnalyzedType(type);
-        OnGotStatementType(@as, type);
+        SetTypeType(@as.Type, type);
+        SetStatementType(@as, type);
         return true;
     }
     bool FindStatementType(ManagedTypeCastExpression @as, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -2207,8 +2286,8 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             diagnostics.Add(typeError.ToError(@as.Type));
             return false;
         }
-        @as.Type.SetAnalyzedType(type);
-        OnGotStatementType(@as, type);
+        SetTypeType(@as.Type, type);
+        SetStatementType(@as, type);
         return true;
     }
     bool FindStatementType(ArgumentExpression modifiedStatement, GeneralType? expectedType, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)

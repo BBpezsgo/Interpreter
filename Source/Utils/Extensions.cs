@@ -31,4 +31,14 @@ public static class Extensions
         }
         return false;
     }
+
+    public static int IndexOf(this ImmutableArray<Token> tokens, string value)
+    {
+        for (int i = 0; i < tokens.Length; i++)
+        {
+            if (string.Equals(tokens[i].Content, value))
+            { return i; }
+        }
+        return -1;
+    }
 }

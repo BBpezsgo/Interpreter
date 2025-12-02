@@ -1,4 +1,4 @@
-﻿namespace Tests;
+﻿namespace LanguageCore.Tests;
 
 public sealed class ExpectedExceptionWithMessageAttribute : ExpectedExceptionBaseAttribute
 {

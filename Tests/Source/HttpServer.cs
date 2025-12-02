@@ -3,7 +3,7 @@ using System.Collections.Frozen;
 using System.Net;
 using System.Text;
 
-namespace Tests;
+namespace LanguageCore.Tests;
 
 public class HttpServer : IDisposable
 {

@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Tests;
+namespace LanguageCore.Tests;
 
 [TestClass, TestCategory("Examples"), DoNotParallelize]
 public class ExampleTests

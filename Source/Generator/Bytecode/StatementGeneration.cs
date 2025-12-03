@@ -130,7 +130,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool GenerateSize(PointerType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
-        Code.Emit(Opcode.MathAdd, result, PointerSize);
+        Code.Emit(Opcode.MathAdd, result, InstructionOperand.Immediate(PointerSize, result.BitWidth()));
         return true;
     }
     bool GenerateSize(ArrayType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -139,7 +139,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (FindSize(type, out int size, out _))
         {
-            Code.Emit(Opcode.MathAdd, result, size);
+            Code.Emit(Opcode.MathAdd, result, InstructionOperand.Immediate(size, result.BitWidth()));
             return true;
         }
 
@@ -171,7 +171,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto lengthRegister = Registers.GetFree(lengthType.GetBitWidth(this)))
         {
             PopTo(lengthRegister.Register);
-            Code.Emit(Opcode.MathMultU, lengthRegister.Register, elementSize);
+            Code.Emit(Opcode.MathMultU, lengthRegister.Register, InstructionOperand.Immediate(elementSize, lengthRegister.Register.BitWidth()));
             Code.Emit(Opcode.MathAdd, result, lengthRegister.Register);
         }
         return true;
@@ -179,14 +179,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
     bool GenerateSize(FunctionType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
-        Code.Emit(Opcode.MathAdd, result, PointerSize);
+        Code.Emit(Opcode.MathAdd, result, InstructionOperand.Immediate(PointerSize, result.BitWidth()));
         return true;
     }
     bool GenerateSize(StructType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         if (!FindSize(type, out int size, out error))
         { return false; }
-        Code.Emit(Opcode.MathAdd, result, size);
+        Code.Emit(Opcode.MathAdd, result, InstructionOperand.Immediate(size, result.BitWidth()));
         return true;
     }
     bool GenerateSize(GenericType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
@@ -194,7 +194,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (!FindSize(type, out int size, out error))
         { return false; }
-        Code.Emit(Opcode.MathAdd, result, size);
+        Code.Emit(Opcode.MathAdd, result, InstructionOperand.Immediate(size, result.BitWidth()));
         return true;
     }
     bool GenerateSize(AliasType type, Register result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GenerateSize(type.Value, result, out error);
@@ -453,12 +453,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment(" .:");
 
-        Code.Emit(Opcode.CallMSIL, caller.Function.Id);
+        Code.Emit(Opcode.CallMSIL, InstructionOperand.Immediate(caller.Function.Id));
         InstructionLabel skipLabel = Code.DefineLabel();
         using (RegisterUsage.Auto reg = Registers.GetFree(BitWidth._8))
         {
             PopTo(reg.Register);
-            Code.Emit(Opcode.Compare, reg.Register, 0);
+            Code.Emit(Opcode.Compare, reg.Register, InstructionOperand.Immediate(0, reg.Register.BitWidth()));
             Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
         }
 
@@ -469,7 +469,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             UndefinedFunctionOffsets.Add(new(label, caller, caller.Declaration));
         }
-        Code.Emit(Opcode.HotFuncEnd, caller.Function.Id);
+        Code.Emit(Opcode.HotFuncEnd, InstructionOperand.Immediate(caller.Function.Id));
 
         Code.MarkLabel(skipLabel);
 
@@ -497,7 +497,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Stack<CompiledCleanup> parameterCleanup = GenerateCodeForArguments(caller.Arguments, caller.Declaration);
 
         AddComment(" .:");
-        Code.Emit(Opcode.CallExternal, caller.Function.Id);
+        Code.Emit(Opcode.CallExternal, InstructionOperand.Immediate(caller.Function.Id));
 
         GenerateCodeForParameterCleanup(parameterCleanup);
 
@@ -616,7 +616,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         else
         {
             using RegisterUsage.Auto reg = Registers.GetFree(BuiltinType.I32.GetBitWidth(this));
-            Code.Emit(Opcode.Move, reg.Register, 0);
+            Code.Emit(Opcode.Move, reg.Register, InstructionOperand.Immediate(0, reg.Register.BitWidth()));
             if (!GenerateSize(paramType, reg.Register, out PossibleDiagnostic? generateSizeError))
             { Diagnostics.Add(generateSizeError.ToError(anyCall)); }
             Push(reg.Register);
@@ -730,7 +730,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto regLeft = Registers.GetFree(leftBitWidth))
             {
                 PopTo(regLeft.Register);
-                Code.Emit(Opcode.Compare, regLeft.Register, 0);
+                Code.Emit(Opcode.Compare, regLeft.Register, InstructionOperand.Immediate(0, regLeft.Register.BitWidth()));
                 Code.Emit(Opcode.JumpIfEqual, endLabel.Relative());
             }
         }
@@ -741,7 +741,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto regLeft = Registers.GetFree(leftBitWidth))
             {
                 PopTo(regLeft.Register);
-                Code.Emit(Opcode.Compare, regLeft.Register, 0);
+                Code.Emit(Opcode.Compare, regLeft.Register, InstructionOperand.Immediate(0, leftBitWidth));
                 Code.Emit(Opcode.JumpIfNotEqual, endLabel.Relative());
             }
         }
@@ -933,7 +933,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     InstructionLabel labelSkipFalse = Code.DefineLabel();
                     InstructionLabel labelSkipTrue = Code.DefineLabel();
                     PopTo(reg.Register);
-                    Code.Emit(Opcode.Compare, reg.Register, 0);
+                    Code.Emit(Opcode.Compare, reg.Register, InstructionOperand.Immediate(0, reg.Register.BitWidth()));
                     Code.Emit(Opcode.JumpIfEqual, labelSkipFalse.Relative());
                     Push(false);
                     Code.Emit(Opcode.Jump, labelSkipTrue.Relative());
@@ -1015,19 +1015,19 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 for (int i = 0; i < stringInstance.Value.Length; i++)
                 {
-                    Code.Emit(Opcode.Move, reg.Register.ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), (byte)stringInstance.Value[i]);
+                    Code.Emit(Opcode.Move, reg.Register.ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), InstructionOperand.Immediate((byte)stringInstance.Value[i], BitWidth._8));
                 }
 
-                Code.Emit(Opcode.Move, reg.Register.ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), (byte)'\0');
+                Code.Emit(Opcode.Move, reg.Register.ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), InstructionOperand.Immediate((byte)'\0', BitWidth._8));
             }
             else
             {
                 for (int i = 0; i < stringInstance.Value.Length; i++)
                 {
-                    Code.Emit(Opcode.Move, reg.Register.ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), stringInstance.Value[i]);
+                    Code.Emit(Opcode.Move, reg.Register.ToPtr(i * type.GetSize(this), type.GetBitWidth(this)), InstructionOperand.Immediate(stringInstance.Value[i], BitWidth._16));
                 }
 
-                Code.Emit(Opcode.Move, reg.Register.ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), '\0');
+                Code.Emit(Opcode.Move, reg.Register.ToPtr(stringInstance.Value.Length * type.GetSize(this), type.GetBitWidth(this)), InstructionOperand.Immediate('\0', BitWidth._16));
             }
         }
 
@@ -1152,7 +1152,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 InstructionOffset = InvalidFunctionAddress,
             };
             label = LabelForDefinition(instructionLabel);
-            UndefinedInstructionLabels.Add(new UndefinedOffset(label, variable, instructionLabel));
         }
         else
         {
@@ -1473,7 +1472,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
                     && index.Index is CompiledConstantValue evaluatedIndex)
                 {
-                    Code.Emit(Opcode.MathAdd, regPtr.Register, (int)evaluatedIndex.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                    Code.Emit(Opcode.MathAdd, regPtr.Register, InstructionOperand.Immediate((int)evaluatedIndex.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base), regPtr.Register.BitWidth()));
                 }
                 else
                 {
@@ -1481,7 +1480,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     using (RegisterUsage.Auto regIndex = Registers.GetFree(indexType.GetBitWidth(this, Diagnostics, index.Index)))
                     {
                         PopTo(regIndex.Register);
-                        Code.Emit(Opcode.MathMultU, regIndex.Register, arrayType.Of.GetSize(this, Diagnostics, index.Base));
+                        Code.Emit(Opcode.MathMultU, regIndex.Register, InstructionOperand.Immediate(arrayType.Of.GetSize(this, Diagnostics, index.Base), regIndex.Register.BitWidth()));
                         Code.Emit(Opcode.MathAdd, regPtr.Register, regIndex.Register);
                     }
                 }
@@ -1525,7 +1524,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
                 {
                     PopTo(reg.Register);
-                    Code.Emit(Opcode.MathAdd, reg.Register, addressOffset.Offset);
+                    Code.Emit(Opcode.MathAdd, reg.Register, InstructionOperand.Immediate(addressOffset.Offset, reg.Register.BitWidth()));
                     Push(reg.Register);
                 }
                 break;
@@ -1555,7 +1554,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     using (RegisterUsage.Auto regBase = Registers.GetFree(PointerBitWidth))
                     {
                         PopTo(regBase.Register);
-                        Code.Emit(Opcode.MathAdd, regBase.Register, indexValue * runtimeIndex.ElementSize);
+                        Code.Emit(Opcode.MathAdd, regBase.Register, InstructionOperand.Immediate(indexValue * runtimeIndex.ElementSize, regBase.Register.BitWidth()));
                         Push(regBase.Register);
                     }
                 }
@@ -1566,7 +1565,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     using (RegisterUsage.Auto regIndex = Registers.GetFree(indexType.GetBitWidth(this, Diagnostics, runtimeIndex.IndexValue)))
                     {
                         PopTo(regIndex.Register);
-                        Code.Emit(Opcode.MathMultU, regIndex.Register, runtimeIndex.ElementSize);
+                        Code.Emit(Opcode.MathMultU, regIndex.Register, InstructionOperand.Immediate(runtimeIndex.ElementSize, regIndex.Register.BitWidth()));
                         using (RegisterUsage.Auto regBase = Registers.GetFree(PointerBitWidth))
                         {
                             PopTo(regBase.Register);
@@ -1636,65 +1635,107 @@ public partial class CodeGeneratorForMain : CodeGenerator
             {
                 throw new NotImplementedException();
             }
+
+            throw new UnreachableException();
         }
 
-        int statementSize = statementType.GetSize(this, Diagnostics, typeCast.Value);
-        int targetSize = targetType.GetSize(this, Diagnostics, typeCast);
-
-        if (statementSize != targetSize)
+        /*
+        if (statementType.Is(out BuiltinType? statementBuiltinType)
+            && targetType.Is(out BuiltinType? targetbuiltinType))
         {
-            if (statementSize < targetSize)
+            if (!statementBuiltinType.Type.IsInteger())
             {
-                AddComment($"Grow \"{statementType}\" ({statementSize} bytes) to \"{targetType}\" ({targetSize}) {{");
-
-                AddComment("Make space");
-
-                StackAlloc(targetSize, true);
-
-                AddComment("Value");
-
-                GenerateCodeForStatement(typeCast.Value);
-
-                AddComment("Save");
-
-                for (int i = 0; i < statementSize; i++)
-                { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -ProcessorState.StackDirection, BitWidth._8), BitWidth._8); }
-
-                AddComment("}");
-
+                Diagnostics.Add(Diagnostic.Critical($"Invalid integer type {statementBuiltinType} to resize from", typeCast));
                 return;
             }
-            else if (statementSize > targetSize)
+            if (!targetbuiltinType.Type.IsInteger())
             {
-                AddComment($"Shrink \"{statementType}\" ({statementSize} bytes) to \"{targetType}\" ({targetSize}) {{");
-
-                AddComment("Make space");
-
-                StackAlloc(targetSize, false);
-
-                AddComment("Value");
-
-                GenerateCodeForStatement(typeCast.Value);
-
-                AddComment("Save");
-
-                for (int i = 0; i < targetSize; i++)
-                { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -ProcessorState.StackDirection, BitWidth._8), BitWidth._8); }
-
-                AddComment("Discard excess");
-
-                int excess = statementSize - targetSize;
-                Pop(excess);
-
-                AddComment("}");
-
+                Diagnostics.Add(Diagnostic.Critical($"Invalid integer type {targetbuiltinType} to resize from", typeCast));
                 return;
             }
 
-            Diagnostics.Add(Diagnostic.Critical($"Can't modify the size of the value. You tried to convert from \"{statementType}\" (size of {statementSize}) to \"{targetType}\" (size of {targetSize})", typeCast));
+            BitWidth statementBw = statementBuiltinType.GetBitWidth(this, Diagnostics, typeCast.Value);
+            BitWidth targetBw = targetbuiltinType.GetBitWidth(this, Diagnostics, typeCast);
+
+            if (statementBw == targetBw)
+            {
+                GenerateCodeForStatement(typeCast.Value);
+                return;
+            }
+
+            using (RegisterUsage.Auto reg = Registers.GetFree(statementBw > targetBw ? statementBw : targetBw))
+            {
+                GenerateCodeForStatement(typeCast.Value);
+                Code.Emit(Opcode.Move, reg.Register, InstructionOperand.Immediate(0, reg.Register.BitWidth()));
+                PopTo(reg.Register.GetSized(statementBw), statementBw);
+                Push(reg.Register.GetSized(targetBw));
+            }
             return;
         }
+        */
 
+        if (statementType.Is(out BuiltinType? statementBuiltinType)
+            && targetType.Is(out BuiltinType? targetbuiltinType))
+        {
+            int statementSize = statementBuiltinType.GetSize(this, Diagnostics, typeCast.Value);
+            int targetSize = targetbuiltinType.GetSize(this, Diagnostics, typeCast);
+
+            if (statementSize != targetSize)
+            {
+                if (statementSize < targetSize)
+                {
+                    AddComment($"Grow \"{statementBuiltinType}\" ({statementSize} bytes) to \"{targetbuiltinType}\" ({targetSize}) {{");
+
+                    AddComment("Make space");
+
+                    StackAlloc(targetSize, true);
+
+                    AddComment("Value");
+
+                    GenerateCodeForStatement(typeCast.Value);
+
+                    AddComment("Save");
+
+                    for (int i = 0; i < statementSize; i++)
+                    { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -ProcessorState.StackDirection, BitWidth._8), BitWidth._8); }
+
+                    AddComment("}");
+
+                    return;
+                }
+                else if (statementSize > targetSize)
+                {
+                    AddComment($"Shrink \"{statementBuiltinType}\" ({statementSize} bytes) to \"{targetbuiltinType}\" ({targetSize}) {{");
+
+                    AddComment("Make space");
+
+                    StackAlloc(targetSize, false);
+
+                    AddComment("Value");
+
+                    GenerateCodeForStatement(typeCast.Value);
+
+                    AddComment("Save");
+
+                    for (int i = 0; i < targetSize; i++)
+                    { PopTo(Register.StackPointer.ToPtr((statementSize - 1) * -ProcessorState.StackDirection, BitWidth._8), BitWidth._8); }
+
+                    AddComment("Discard excess");
+
+                    int excess = statementSize - targetSize;
+                    Pop(excess);
+
+                    AddComment("}");
+
+                    return;
+                }
+
+                Diagnostics.Add(Diagnostic.Critical($"Can't modify the size of the value. You tried to convert from \"{statementBuiltinType}\" (size of {statementSize}) to \"{targetbuiltinType}\" (size of {targetSize})", typeCast));
+                return;
+            }
+        }
+
+        Diagnostics.Add(Diagnostic.Warning($"Ignoring invalid type cast ({statementType} -> {targetType})", typeCast));
         GenerateCodeForStatement(typeCast.Value, targetType);
     }
     void GenerateCodeForStatement(CompiledBlock block, bool ignoreScope = false)
@@ -1802,7 +1843,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             using (RegisterUsage.Auto reg = Registers.GetFree(statement.Type.GetBitWidth(this, Diagnostics, statement)))
             {
                 PopTo(reg.Register);
-                Code.Emit(Opcode.Compare, reg.Register, 0);
+                Code.Emit(Opcode.Compare, reg.Register, InstructionOperand.Immediate(0, reg.Register.BitWidth()));
                 Code.Emit(Opcode.JumpIfEqual, falseLabel.Relative());
                 didJump = true;
             }
@@ -2463,8 +2504,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             });
         }
 
-        SetUndefinedFunctionOffsets(UndefinedInstructionLabels, false);
-
         while (CompiledInstructionLabels.Count > savedInstructionLabelCount)
         {
             CompiledInstructionLabels.Pop();
@@ -2692,8 +2731,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
     failed:
-
-        SetUndefinedFunctionOffsets(UndefinedInstructionLabels, true);
 
         // {
         //     ScopeInformation scope = CurrentScopeDebug.Pop();

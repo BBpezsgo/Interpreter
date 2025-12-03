@@ -25,4 +25,6 @@ public class ArgumentExpression : Expression
         if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
         foreach (Statement v in Value.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis)) yield return v;
     }
+
+    public override string ToString() => Value.ToString();
 }

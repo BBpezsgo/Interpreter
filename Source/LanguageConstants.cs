@@ -211,12 +211,14 @@ public static class AttributeConstants
     public const string ExposeIdentifier = "Expose";
     public const string BuiltinIdentifier = "Builtin";
     public const string MSILIncompatibleIdentifier = "MSILIncompatible";
+    public const string InternalType = "InternalType";
 
     public static readonly ImmutableArray<string> List = ImmutableArray.Create(
         ExternalIdentifier,
         ExposeIdentifier,
         BuiltinIdentifier,
-        MSILIncompatibleIdentifier
+        MSILIncompatibleIdentifier,
+        InternalType
     );
 }
 

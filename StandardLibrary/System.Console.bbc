@@ -189,20 +189,6 @@ i32 find_max_pow_of_10(i32 num)
     return result;
 }
 
-#if BRAINFUCK
-
-export inline void print(byte message)
-{
-    print(message as u8);
-}
-
-export inline void print(int message)
-{
-    print(message as u8);
-}
-
-#endif
-
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions
  */
@@ -217,6 +203,18 @@ export void print(u8 message)
         pow10 /= (u8)10;
     }
 }
+
+export void print(bool message)
+{
+    if (message) print("true");
+    else print("false");
+}
+
+export inline void print(byte message) { print((u8)message); }
+
+#if BRAINFUCK
+export inline void print(int message) { print(message as u8); }
+#endif
 
 /*
  * Source: https://copyprogramming.com/howto/print-an-int-in-c-without-printf-or-any-functions

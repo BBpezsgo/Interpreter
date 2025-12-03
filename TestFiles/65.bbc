@@ -1,9 +1,0 @@
-using System.Memory;
-
-byte header = 0b_1_1000001;
-
-byte size;
-byte allocated;
-GetHeader(&header, &size, &allocated);
-
-return (int)(size - allocated);

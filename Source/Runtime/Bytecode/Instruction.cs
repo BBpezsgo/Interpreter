@@ -276,6 +276,17 @@ public readonly struct InstructionOperand
         => Type == other.Type && Value == other.Value;
 
     public override int GetHashCode() => HashCode.Combine(Type, Value);
+
+    public static InstructionOperand Immediate(int value, BitWidth bitWidth) => bitWidth switch
+    {
+        BitWidth._8 => new(value, InstructionOperandType.Immediate8),
+        BitWidth._16 => new(value, InstructionOperandType.Immediate16),
+        BitWidth._32 => new(value, InstructionOperandType.Immediate32),
+        BitWidth._64 => new(value, InstructionOperandType.Immediate64),
+        _ => throw new UnreachableException(),
+    };
+
+    public static InstructionOperand Immediate(int value) => new(value, InstructionOperandType.Immediate32);
 }
 
 public readonly struct Instruction

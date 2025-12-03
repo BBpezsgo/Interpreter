@@ -64,57 +64,5 @@ public abstract class FunctionThingDefinition :
     }
 
     string ISimpleReadable.ToReadable() => ToReadable();
-    public string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
-    {
-        StringBuilder result = new();
-        result.Append(Identifier.ToString());
-        result.Append('(');
-        for (int i = 0; i < Parameters.Count; i++)
-        {
-            if (i > 0) result.Append(", ");
-            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[i].Modifiers.Length > 0)
-            {
-                result.AppendJoin(' ', Parameters[i].Modifiers);
-                result.Append(' ');
-            }
-
-            result.Append(Parameters[i].Type.ToString());
-
-            if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
-            {
-                result.Append(' ');
-                result.Append(Parameters[i].Identifier.ToString());
-            }
-        }
-        result.Append(')');
-        return result.ToString();
-    }
-
-    public string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
-    {
-        if (typeArguments is null) return ToReadable(flags);
-        StringBuilder result = new();
-        result.Append(Identifier.ToString());
-
-        result.Append('(');
-        for (int i = 0; i < Parameters.Count; i++)
-        {
-            if (i > 0) { result.Append(", "); }
-            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[i].Modifiers.Length > 0)
-            {
-                result.AppendJoin(' ', Parameters[i].Modifiers);
-                result.Append(' ');
-            }
-
-            result.Append(Parameters[i].Type.ToString(typeArguments));
-
-            if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
-            {
-                result.Append(' ');
-                result.Append(Parameters[i].Identifier.ToString());
-            }
-        }
-        result.Append(')');
-        return result.ToString();
-    }
+    public abstract string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments = null);
 }

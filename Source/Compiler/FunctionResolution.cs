@@ -309,7 +309,7 @@ public partial class StatementCompiler
             {
                 if (functionMatches[0].CompareTo(functionMatches[1]) == 0)
                 {
-                    error = new PossibleDiagnostic($"Multiple functions matched");
+                    error = new PossibleDiagnostic($"Multiple functions matched ({functionMatches[0]} and {functionMatches[1]})");
                     return false;
                 }
             }

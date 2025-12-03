@@ -28,7 +28,7 @@ public struct InstructionLabel : IEquatable<InstructionLabel>
     public readonly PreparationInstructionOperand Relative(int additionalOffset = 0) => new(this, false, additionalOffset);
     public readonly PreparationInstructionOperand Absolute(int additionalOffset = 0) => new(this, true, additionalOffset);
 
-    public override string ToString() => Id.ToString();
+    public override readonly string ToString() => Id.ToString();
 }
 
 record struct CompiledScope(ImmutableArray<CompiledCleanup> Variables, bool IsFunction);
@@ -192,7 +192,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     readonly BytecodeEmitter Code;
 
     readonly List<UndefinedOffset> UndefinedFunctionOffsets;
-    readonly List<UndefinedOffset> UndefinedInstructionLabels;
 
     readonly RegisterUsage Registers;
 
@@ -246,7 +245,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         ReturnInstructions = new();
         BreakInstructions = new();
         UndefinedFunctionOffsets = new();
-        UndefinedInstructionLabels = new();
         Settings = settings;
         Registers = new(this);
         PointerSize = settings.PointerSize;
@@ -263,39 +261,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Optimizations = settings.Optimizations,
             DebugInfo = DebugInfo,
         };
-    }
-
-    void SetUndefinedFunctionOffsets(IEnumerable<UndefinedOffset> undefinedOffsets, bool addDiagnostics)
-    {
-        foreach (UndefinedOffset item in undefinedOffsets)
-        {
-            if (item.Called.InstructionOffset == InvalidFunctionAddress)
-            {
-                if (addDiagnostics)
-                {
-                    string thingName = item.Called switch
-                    {
-                        CompiledOperatorDefinition => "Operator",
-                        CompiledConstructorDefinition => "Constructor",
-                        CompiledFunctionDefinition => "Function",
-                        CompiledGeneralFunctionDefinition v => v.Identifier.Content switch
-                        {
-                            BuiltinFunctionIdentifiers.Destructor => "Destructor",
-                            BuiltinFunctionIdentifiers.IndexerGet => "Index getter",
-                            BuiltinFunctionIdentifiers.IndexerSet => "Index setter",
-                            _ => "???",
-                        },
-                        GeneratedInstructionLabel v => $"Label",
-                        _ => "???",
-                    };
-
-                    Diagnostics.Add(Diagnostic.Internal($"{thingName} \"{(item.Called is ISimpleReadable readable ? readable.ToReadable() : item.Called.ToString())}\" does not have instruction offset (the compiler is messed up)", item.CallerLocation));
-                }
-                continue;
-            }
-
-            Code.MarkLabel(item.Label);
-        }
     }
 
     public static BBLangGeneratorResult Generate(

@@ -6,6 +6,7 @@ class CompiledFrame
 {
     public required ImmutableDictionary<string, GeneralType> TypeArguments { get; init; }
     public required ImmutableArray<Token> TypeParameters { get; init; }
+    public required bool IsTemplateInstance { get; init; }
     public required bool IsTemplate { get; init; }
     public required ImmutableArray<CompiledParameter> CompiledParameters { get; init; }
     public required ImmutableArray<CompiledLabelDeclaration> InstructionLabels { get; init; }
@@ -22,6 +23,7 @@ class CompiledFrame
     {
         TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
         TypeParameters = ImmutableArray<Token>.Empty,
+        IsTemplateInstance = false,
         IsTemplate = false,
         CompiledParameters = ImmutableArray<CompiledParameter>.Empty,
         InstructionLabels = ImmutableArray<CompiledLabelDeclaration>.Empty,

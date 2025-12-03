@@ -1495,42 +1495,42 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return false;
     }
 
-    bool GetLiteralType(LiteralType literal, [NotNullWhen(true)] out GeneralType? type)
+    bool GetLiteralType(LiteralType literal, [NotNullWhen(true)] out GeneralType? type, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        LiteralType ParseLiteralType(AttributeUsage attribute)
+        return GetUsedBy(literal switch
+        {
+            LiteralType.Integer => "integer",
+            LiteralType.Float => "float",
+            LiteralType.String => "string",
+            LiteralType.Char => "char",
+            _ => throw new UnreachableException(),
+        }, out type, out error);
+    }
+
+    bool GetUsedBy(string by, [NotNullWhen(true)] out GeneralType? type, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        string? ParseAttribute(AttributeUsage attribute)
         {
             if (!attribute.TryGetValue(out string? literalTypeName))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Attribute \"{attribute.Identifier}\" needs one string argument", attribute));
                 return default;
             }
-            switch (literalTypeName)
-            {
-                case "char": return LiteralType.Char;
-                case "integer": return LiteralType.Integer;
-                case "float": return LiteralType.Float;
-                case "string": return LiteralType.String;
-                default:
-                {
-                    Diagnostics.Add(Diagnostic.Critical($"Invalid literal type \"{literalTypeName}\"", attribute.Parameters[0]));
-                    return default;
-                }
-            }
+            return literalTypeName;
         }
 
         type = null;
 
         foreach (CompiledAlias alias in CompiledAliases)
         {
-            if (alias.Attributes.TryGetAttribute("UsedByLiteral", out AttributeUsage? attribute))
+            if (alias.Attributes.TryGetAttribute(AttributeConstants.InternalType, out AttributeUsage? attribute))
             {
-                LiteralType literalType = ParseLiteralType(attribute);
-                if (literalType == literal)
+                if (ParseAttribute(attribute) == by)
                 {
                     if (type is not null)
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Multiple type definitions defined with attribute [{"UsedByLiteral"}(\"{attribute.Parameters[0].Value}\")]", attribute));
-                        return default;
+                        error = new PossibleDiagnostic($"Multiple type definitions marked as an internal type `{by}`", attribute);
+                        return false;
                     }
                     type = new AliasType(alias.Value, alias);
                 }
@@ -1539,32 +1539,40 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         foreach (CompiledStruct @struct in CompiledStructs)
         {
-            if (@struct.Attributes.TryGetAttribute("UsedByLiteral", out AttributeUsage? attribute))
+            if (@struct.Attributes.TryGetAttribute(AttributeConstants.InternalType, out AttributeUsage? attribute))
             {
-                LiteralType literalType = ParseLiteralType(attribute);
-                if (literalType == literal)
+                if (ParseAttribute(attribute) == by)
                 {
                     if (type is not null)
                     {
-                        Diagnostics.Add(Diagnostic.Critical($"Multiple type definitions defined with attribute [{"UsedByLiteral"}(\"{attribute.Parameters[0].Value}\")]", attribute));
-                        return default;
+                        error = new PossibleDiagnostic($"Multiple type definitions marked as an internal type `{by}`", attribute);
+                        return false;
                     }
                     type = new StructType(@struct, @struct.File);
                 }
             }
         }
 
-        return type is not null;
+        if (type is null)
+        {
+            error = new PossibleDiagnostic($"No type definition found with attribute `{AttributeConstants.InternalType}`");
+            return false;
+        }
+        else
+        {
+            error = null;
+            return true;
+        }
     }
 
     void SetPredictedValue(Expression expression, CompiledValue value)
     {
-        if (!Frames.Last.IsTemplate) expression.PredictedValue = value;
+        if (!Frames.Last.IsTemplateInstance) expression.PredictedValue = value;
     }
     TType SetStatementType<TType>(Expression expression, TType type)
         where TType : GeneralType
     {
-        if (!Frames.Last.IsTemplate) expression.CompiledType = type;
+        if (!Frames.Last.IsTemplateInstance) expression.CompiledType = type;
         return type;
     }
     void TrySetStatementReference<TRef>(Statement statement, TRef? reference)
@@ -1574,15 +1582,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     void SetStatementReference<TRef>(IReferenceableTo<TRef> statement, TRef? reference)
     {
-        if (!Frames.Last.IsTemplate) statement.Reference = reference;
+        if (!Frames.Last.IsTemplateInstance) statement.Reference = reference;
     }
     void SetStatementReference(IReferenceableTo statement, object? reference)
     {
-        if (!Frames.Last.IsTemplate) statement.Reference = reference;
+        if (!Frames.Last.IsTemplateInstance) statement.Reference = reference;
     }
     void SetTypeType(TypeInstance typeInstance, GeneralType type)
     {
-        if (Frames.Last.IsTemplate) return;
+        if (Frames.Last.IsTemplateInstance) return;
 
         switch (typeInstance)
         {
@@ -1725,14 +1733,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (functionCall.Identifier.Content == "sizeof")
         {
-            if (GetLiteralType(LiteralType.Integer, out GeneralType? integerType))
+            if (GetLiteralType(LiteralType.Integer, out GeneralType? integerType, out PossibleDiagnostic? internalTypeError))
             {
                 type = integerType;
-                return true;
             }
-
-            diagnostics.Add(Diagnostic.Warning($"No type defined for integer literals, using the default i32", functionCall));
-            type = SizeofStatementType;
+            else
+            {
+                type = SizeofStatementType;
+                diagnostics.Add(Diagnostic.Warning($"No type defined for integer literals, using the default {type}", functionCall).WithSuberrors(internalTypeError.ToError(functionCall)));
+            }
             return true;
         }
 
@@ -1793,7 +1802,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     case BinaryOperatorCallExpression.CompGEQ:
                     case BinaryOperatorCallExpression.CompEQ:
                     case BinaryOperatorCallExpression.CompNEQ:
-                        type = BooleanType;
+                        if (!GetUsedBy("boolean", out GeneralType? booleanType, out PossibleDiagnostic? internalTypeError))
+                        {
+                            type = BooleanType;
+                            diagnostics.Add(Diagnostic.Warning($"No type defined for booleans, using the default {type}", @operator).WithSuberrors(internalTypeError.ToError(@operator)));
+                        }
+                        else
+                        {
+                            type = booleanType;
+                        }
                         break;
 
                     case BinaryOperatorCallExpression.LogicalOR:
@@ -1902,7 +1919,15 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             case UnaryOperatorCallExpression.LogicalNOT:
             {
-                type = BooleanType;
+                if (!GetUsedBy("boolean", out GeneralType? booleanType, out PossibleDiagnostic? internalTypeError))
+                {
+                    type = BooleanType;
+                    diagnostics.Add(Diagnostic.Warning($"No type defined for booleans, using the default {type}", @operator).WithSuberrors(internalTypeError.ToError(@operator)));
+                }
+                else
+                {
+                    type = booleanType;
+                }
                 break;
             }
             case UnaryOperatorCallExpression.BinaryNOT:
@@ -1941,6 +1966,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         switch (literal.Type)
         {
             case LiteralType.Integer:
+            {
                 if (expectedType is not null)
                 {
                     if (expectedType.SameAs(BasicType.U8))
@@ -1990,27 +2016,30 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     }
                 }
 
-                if (GetLiteralType(literal.Type, out GeneralType? literalType))
+                if (GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 {
                     type = literalType;
                     return true;
                 }
 
-                diagnostics.Add(Diagnostic.Warning($"No type defined for integer literals, using the default i32", literal));
                 SetStatementType(literal, type = BuiltinType.I32);
+                diagnostics.Add(Diagnostic.Warning($"No type defined for integer literals, using the default {type}", literal).WithSuberrors(internalTypeError.ToError(literal)));
                 return true;
+            }
             case LiteralType.Float:
-
-                if (GetLiteralType(literal.Type, out literalType))
+            {
+                if (GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 {
                     type = literalType;
                     return true;
                 }
 
-                diagnostics.Add(Diagnostic.Warning($"No type defined for float literals, using the default f32", literal));
                 SetStatementType(literal, type = BuiltinType.F32);
+                diagnostics.Add(Diagnostic.Warning($"No type defined for float literals, using the default {type}", literal).WithSuberrors(internalTypeError.ToError(literal)));
                 return true;
+            }
             case LiteralType.String:
+            {
                 if (expectedType is not null &&
                     expectedType.Is(out PointerType? pointerType) &&
                     pointerType.To.Is(out ArrayType? arrayType) &&
@@ -2020,22 +2049,30 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     return true;
                 }
 
-                if (GetLiteralType(literal.Type, out literalType))
+                if (GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 {
                     type = literalType;
                     return true;
                 }
 
-                diagnostics.Add(Diagnostic.Warning($"No type defined for string literals, using the default u16[]*", literal));
-                SetStatementType(literal, type = new PointerType(new ArrayType(BuiltinType.Char, new CompiledConstantValue()
+                if (!GetLiteralType(LiteralType.Char, out GeneralType? charType, out PossibleDiagnostic? charInternalTypeError))
+                {
+                    charType = BuiltinType.Char;
+                    diagnostics.Add(Diagnostic.Warning($"No type defined for characters, using the default {charType}", literal).WithSuberrors(charInternalTypeError.ToError(literal)));
+                }
+
+                SetStatementType(literal, type = new PointerType(new ArrayType(charType, new CompiledConstantValue()
                 {
                     Value = literal.Value.Length + 1,
                     Location = literal.Location,
                     Type = BuiltinType.I32,
                     SaveValue = true
                 })));
+                diagnostics.Add(Diagnostic.Warning($"No type defined for string literals, using the default {type}", literal).WithSuberrors(internalTypeError.ToError(literal)));
                 return true;
+            }
             case LiteralType.Char:
+            {
                 if (expectedType is not null)
                 {
                     if (expectedType.SameAs(BasicType.U8))
@@ -2069,15 +2106,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     }
                 }
 
-                if (GetLiteralType(literal.Type, out literalType))
+                if (GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 {
                     type = literalType;
                     return true;
                 }
 
-                diagnostics.Add(Diagnostic.Warning($"No type defined for character literals, using the default u16", literal));
                 SetStatementType(literal, type = BuiltinType.Char);
+                diagnostics.Add(Diagnostic.Warning($"No type defined for character literals, using the default {type}", literal).WithSuberrors(internalTypeError.ToError(literal)));
                 return true;
+            }
             default:
                 throw new UnreachableException($"Unknown literal type \"{literal.Type}\"");
         }

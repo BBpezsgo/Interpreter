@@ -93,7 +93,7 @@ public static partial class LibC
 #endif
 }
 
-static class Assembler
+public static class Assembler
 {
     public static byte[] Assemble(string assembly, DiagnosticsCollection diagnostics)
     {

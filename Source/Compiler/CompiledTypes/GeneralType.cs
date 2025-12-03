@@ -270,9 +270,6 @@ public abstract class GeneralType :
 
     public static bool TryGetTypeParameters(GeneralType defined, GeneralType passed, Dictionary<string, GeneralType> typeParameters)
     {
-        defined = defined.FinalValue;
-        passed = passed.FinalValue;
-
         if (passed.Is(out GenericType? passedGenericType))
         {
             if (typeParameters.ContainsKey(passedGenericType.Identifier))

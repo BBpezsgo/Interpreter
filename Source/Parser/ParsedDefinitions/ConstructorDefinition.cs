@@ -57,55 +57,15 @@ public class ConstructorDefinition : FunctionThingDefinition,
     }
 
     string ISimpleReadable.ToReadable() => ToReadable();
-    public new string ToReadable(ToReadableFlags flags = ToReadableFlags.None)
+    public override string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments = null)
     {
         StringBuilder result = new();
-        result.Append(Type.ToString());
+        result.Append(Type.ToString(typeArguments));
         result.Append('(');
         for (int j = 0; j < Parameters.Count; j++)
         {
             if (j > 0) result.Append(", ");
-            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
-            {
-                result.AppendJoin(' ', Parameters[j].Modifiers);
-                result.Append(' ');
-            }
-
-            result.Append(Parameters[j].Type.ToString());
-
-            if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
-            {
-                result.Append(' ');
-                result.Append(Parameters[j].Identifier.ToString());
-            }
-        }
-        result.Append(')');
-        return result.ToString();
-    }
-
-    public new string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments, ToReadableFlags flags = ToReadableFlags.None)
-    {
-        if (typeArguments == null) return ToReadable(flags);
-        StringBuilder result = new();
-        result.Append(Type.ToString(typeArguments));
-
-        result.Append('(');
-        for (int j = 0; j < Parameters.Count; j++)
-        {
-            if (j > 0) { result.Append(", "); }
-            if (flags.HasFlag(ToReadableFlags.Modifiers) && Parameters[j].Modifiers.Length > 0)
-            {
-                result.AppendJoin(' ', Parameters[j].Modifiers);
-                result.Append(' ');
-            }
-
             result.Append(Parameters[j].Type.ToString(typeArguments));
-
-            if (flags.HasFlag(ToReadableFlags.ParameterIdentifiers))
-            {
-                result.Append(' ');
-                result.Append(Parameters[j].Identifier.ToString());
-            }
         }
         result.Append(')');
         return result.ToString();

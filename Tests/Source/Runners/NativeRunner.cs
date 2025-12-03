@@ -41,6 +41,7 @@ static class NativeRunner
         CompilerResult compiled = StatementCompiler.CompileFile(file, new CompilerSettings(Utils.GetCompilerSettings(CodeGeneratorForMain.DefaultCompilerSettings))
         {
             CompileEverything = true,
+            Optimizations = OptimizationSettings.None,
         }, diagnostics);
 
         using NativeFunction f = CodeGeneratorForNative.Generate(compiled, diagnostics);

@@ -24,12 +24,12 @@ public static class Entry
             {
                 if (parserResult.Value.ThrowErrors)
                 {
-                    return Entry.Run(parserResult.Value);
+                    return Run(parserResult.Value);
                 }
 
                 try
                 {
-                    return Entry.Run(parserResult.Value);
+                    return Run(parserResult.Value);
                 }
                 catch (Exception exception)
                 {
@@ -678,8 +678,6 @@ public static class Entry
             }
             case "assembly-old":
             {
-                Output.LogDebug($"Executing \"{arguments.Source}\" ...");
-
                 List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)
@@ -697,76 +695,39 @@ public static class Entry
                             },
                         }
                     ),
+                    PointerSize = nint.Size,
                 };
                 MainGeneratorSettings mainGeneratorSettings = new(MainGeneratorSettings.Default)
                 {
                     CheckNullPointers = !arguments.NoNullcheck,
                     Optimizations = arguments.DontOptimize ? GeneratorOptimizationSettings.None : GeneratorOptimizationSettings.All,
                     StackSize = arguments.StackSize ?? MainGeneratorSettings.Default.StackSize,
-                };
-                BrainfuckGeneratorSettings brainfuckGeneratorSettings = new(BrainfuckGeneratorSettings.Default)
-                {
-                    DontOptimize = arguments.DontOptimize,
-                    GenerateDebugInformation = !arguments.NoDebugInfo,
-                    GenerateComments = !arguments.NoDebugInfo,
-                    GenerateSmallComments = !arguments.NoDebugInfo,
-                    StackSize = arguments.StackSize ?? BrainfuckGeneratorSettings.Default.StackSize,
-                    HeapSize = arguments.HeapSize ?? BrainfuckGeneratorSettings.Default.HeapSize,
-                };
-                BytecodeInterpreterSettings bytecodeInterpreterSettings = new(BytecodeInterpreterSettings.Default)
-                {
-                    StackSize = arguments.StackSize ?? BytecodeInterpreterSettings.Default.StackSize,
-                    HeapSize = arguments.HeapSize ?? BytecodeInterpreterSettings.Default.HeapSize,
+                    PointerSize = nint.Size,
                 };
 
-                BBLangGeneratorResult generatedCode;
                 DiagnosticsCollection diagnostics = new();
 
-                BitWidth bits = BitWidth._64;
+                CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
+                diagnostics.Print();
+                if (diagnostics.HasErrors) return 1;
 
-                mainGeneratorSettings.PointerSize = (int)bits;
+                diagnostics.Clear();
+                BBLangGeneratorResult generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, null, diagnostics);
+                diagnostics.Print();
+                if (diagnostics.HasErrors) return 1;
 
-                try
-                {
-                    CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
-                    generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
-                    diagnostics.Print();
-                    if (diagnostics.HasErrors) return 1;
-                }
-                catch (LanguageException ex)
-                {
-                    diagnostics.Print();
-                    Output.LogError(ex);
-                    return 1;
-                }
-                catch (Exception ex)
-                {
-                    diagnostics.Print();
-                    Output.LogError(ex);
-                    return 1;
-                }
-
-                string asm = Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, bits);
-                string outputFile = arguments.Source + "_executable";
+                string asm = Assembly.Generator.ConverterForAsm.Convert(generatedCode.Code.AsSpan(), generatedCode.DebugInfo, (BitWidth)nint.Size);
 
                 Output.LogDebug("Assembling and linking ...");
 
-                Assembly.Assembler.Assemble(asm, outputFile);
+                diagnostics.Clear();
+                byte[] code = Assembler.Assemble(asm, diagnostics);
+                diagnostics.Print();
+                if (diagnostics.HasErrors) return 1;
 
-                Output.LogInfo($"Output: \"{outputFile}\"");
+                using NativeFunction f = NativeFunction.Allocate(code);
 
-                if (File.Exists(outputFile))
-                {
-                    Process process = Process.Start(new ProcessStartInfo(outputFile)) ?? throw new Exception($"Failed to start process \"{outputFile}\"");
-                    process.WaitForExit();
-                    Console.WriteLine();
-                    Console.WriteLine($"Exit code: {process.ExitCode}");
-
-                    if (ProcessRuntimeException.TryGetFromExitCode(process.ExitCode, out ProcessRuntimeException? runtimeException))
-                    { throw runtimeException; }
-                }
-
-                break;
+                return f.AsDelegate<CodeGeneratorForNative.JitFn>()();
             }
             case "assembly":
             {

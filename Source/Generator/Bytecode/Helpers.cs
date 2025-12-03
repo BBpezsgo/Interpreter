@@ -346,7 +346,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void Pop(int size)
     {
-        Code.Emit(Opcode.MathAdd, Register.StackPointer, size);
+        Code.Emit(Opcode.MathAdd, Register.StackPointer, InstructionOperand.Immediate(size));
         ScopeSizes.LastRef -= size;
     }
 
@@ -354,7 +354,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (!initializeZero)
         {
-            Code.Emit(Opcode.MathSub, Register.StackPointer, size);
+            Code.Emit(Opcode.MathSub, Register.StackPointer, InstructionOperand.Immediate(size));
             ScopeSizes.LastRef += size;
             if (ScopeSizes.Last >= Settings.StackSize)
             { Diagnostics.Add(new DiagnosticWithoutContext(DiagnosticsLevel.Warning, "Stack will overflow")); }
@@ -719,7 +719,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         using (RegisterUsage.Auto reg = Registers.GetFree(PointerBitWidth))
         {
             PopTo(reg.Register);
-            Code.Emit(Opcode.Compare, reg.Register, 0);
+            Code.Emit(Opcode.Compare, reg.Register, InstructionOperand.Immediate(0, reg.Register.BitWidth()));
         }
 
         InstructionLabel skipLabel = Code.DefineLabel();
@@ -727,7 +727,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         //using (RegisterUsage.Auto reg = Registers.GetFree())
         //{
-        Code.Emit(Opcode.Crash, 0);
+        Code.Emit(Opcode.Crash, InstructionOperand.Immediate(0));
         //}
 
         Code.MarkLabel(skipLabel);
@@ -741,11 +741,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment($"Check for pointer zero (in {register}) {{");
 
-        Code.Emit(Opcode.Compare, register, 0);
+        Code.Emit(Opcode.Compare, register, InstructionOperand.Immediate(0, register.BitWidth()));
 
         InstructionLabel skipLabel = Code.DefineLabel();
         Code.Emit(Opcode.JumpIfNotEqual, skipLabel.Relative());
-        Code.Emit(Opcode.Crash, 0);
+        Code.Emit(Opcode.Crash, InstructionOperand.Immediate(0));
         Code.MarkLabel(skipLabel);
 
         AddComment($"}}");

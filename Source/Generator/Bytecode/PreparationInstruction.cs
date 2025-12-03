@@ -31,7 +31,7 @@ public readonly struct LabelInstructionOperand : IEquatable<LabelInstructionOper
         StringBuilder result = new();
         if (IsAbsoluteLabelAddress) result.Append('<');
         result.Append('<');
-        result.Append(Label.ToString(   ));
+        result.Append(Label.ToString());
         if (AdditionalLabelOffset > 0)
         {
             result.Append('+');
@@ -70,12 +70,17 @@ public struct PreparationInstructionOperand : IEquatable<PreparationInstructionO
         IsLabelAddress == other.IsLabelAddress
         && Value.Equals(other.Value)
         && LabelValue.Equals(other.LabelValue);
-    public override int GetHashCode() => IsLabelAddress ? HashCode.Combine(IsLabelAddress, LabelValue) : HashCode.Combine(IsLabelAddress, Value);
+    public override readonly int GetHashCode() => IsLabelAddress ? HashCode.Combine(IsLabelAddress, LabelValue) : HashCode.Combine(IsLabelAddress, Value);
 
     public static bool operator ==(PreparationInstructionOperand left, PreparationInstructionOperand right) => left.Equals(right);
     public static bool operator !=(PreparationInstructionOperand left, PreparationInstructionOperand right) => !left.Equals(right);
 
-    public static implicit operator PreparationInstructionOperand(int value) => new(new InstructionOperand(value, InstructionOperandType.Immediate32));
+    //public static implicit operator PreparationInstructionOperand(sbyte value) => new(new InstructionOperand(value, InstructionOperandType.Immediate8));
+    //public static implicit operator PreparationInstructionOperand(byte value) => new(new InstructionOperand(value, InstructionOperandType.Immediate8));
+    //public static implicit operator PreparationInstructionOperand(short value) => new(new InstructionOperand(value, InstructionOperandType.Immediate16));
+    //public static implicit operator PreparationInstructionOperand(ushort value) => new(new InstructionOperand(value, InstructionOperandType.Immediate16));
+    //public static implicit operator PreparationInstructionOperand(int value) => new(new InstructionOperand(value, InstructionOperandType.Immediate32));
+    //public static implicit operator PreparationInstructionOperand(uint value) => new(new InstructionOperand(value.I32(), InstructionOperandType.Immediate32));
     public static implicit operator PreparationInstructionOperand(InstructionOperand value) => new(value);
     public static implicit operator PreparationInstructionOperand(Register register) => new(new InstructionOperand((int)register, InstructionOperandType.Register));
     public static explicit operator PreparationInstructionOperand(AddressRegisterPointer address) => new(address.Register.ToPtr(0, BitWidth._32));
@@ -91,7 +96,7 @@ public struct PreparationInstructionOperand : IEquatable<PreparationInstructionO
         _ => throw new NotImplementedException()
     };
 
-    public override string ToString() => IsLabelAddress ? LabelValue.ToString() : Value.ToString();
+    public override readonly string ToString() => IsLabelAddress ? LabelValue.ToString() : Value.ToString();
 }
 
 public class PreparationInstruction

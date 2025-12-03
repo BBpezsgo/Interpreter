@@ -120,6 +120,32 @@ public static class RegisterExtensions
         _ => throw new UnreachableException(),
     };
 
+    public static Register GetSized(this Register register, BitWidth size)
+    {
+        ReadOnlySpan<Register> generalPurposeRegisters = stackalloc Register[]
+        {
+            Register._A,
+            Register._B,
+            Register._C,
+            Register._D,
+        };
+        foreach (Register item in generalPurposeRegisters)
+        {
+            if ((register & item) == item)
+            {
+                return (register & item) | (size switch
+                {
+                    Runtime.BitWidth._8 => Register._L,
+                    Runtime.BitWidth._16 => Register._2,
+                    Runtime.BitWidth._32 => Register._4,
+                    Runtime.BitWidth._64 => Register._8,
+                    _ => throw new UnreachableException(),
+                });
+            }
+        }
+        throw new InvalidOperationException($"Can't resize register {register}");
+    }
+
     public static bool IsImmediate(this InstructionOperandType type) => type
         is InstructionOperandType.Immediate8
         or InstructionOperandType.Immediate16
@@ -275,4 +301,132 @@ public static class RegisterExtensions
         InstructionOperandType.PointerRDX64 => Runtime.BitWidth._64,
         _ => throw new UnreachableException(),
     };
+
+    public static InstructionOperandType ChangeRegisterBitwidth(this InstructionOperandType type, BitWidth bitWidth)
+    {
+        if (type.IsPointer())
+        {
+            return bitWidth switch
+            {
+                Runtime.BitWidth._8 => InstructionOperandType.Pointer8,
+                Runtime.BitWidth._16 => InstructionOperandType.Pointer16,
+                Runtime.BitWidth._32 => InstructionOperandType.Pointer32,
+                Runtime.BitWidth._64 => throw new NotImplementedException(),
+                _ => throw new UnreachableException(),
+            };
+        }
+        else if (type.IsRegisterPointer())
+        {
+            return type.RegisterOfPointer() switch
+            {
+                Register.CodePointer => throw new NotImplementedException(),
+                Register.StackPointer => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerSP8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerSP16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerSP32,
+                    Runtime.BitWidth._64 => throw new NotImplementedException(),
+                    _ => throw new NotImplementedException(),
+                },
+                Register.BasePointer => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerBP8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerBP16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerBP32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerBP64,
+                    _ => throw new NotImplementedException(),
+                },
+                Register.RAX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerRAX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerRAX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerRAX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerRAX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.EAX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerEAX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerEAX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerEAX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerEAX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.AX => throw new NotImplementedException(),
+                Register.AH => throw new NotImplementedException(),
+                Register.AL => throw new NotImplementedException(),
+                Register.RBX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerRBX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerRBX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerRBX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerRBX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.EBX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerEBX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerEBX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerEBX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerEBX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.BX => throw new NotImplementedException(),
+                Register.BH => throw new NotImplementedException(),
+                Register.BL => throw new NotImplementedException(),
+                Register.RCX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerRCX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerRCX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerRCX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerRCX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.ECX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerECX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerECX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerECX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerECX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.CX => throw new NotImplementedException(),
+                Register.CH => throw new NotImplementedException(),
+                Register.CL => throw new NotImplementedException(),
+                Register.RDX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerRDX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerRDX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerRDX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerRDX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.EDX => bitWidth switch
+                {
+                    Runtime.BitWidth._8 => InstructionOperandType.PointerEDX8,
+                    Runtime.BitWidth._16 => InstructionOperandType.PointerEDX16,
+                    Runtime.BitWidth._32 => InstructionOperandType.PointerEDX32,
+                    Runtime.BitWidth._64 => InstructionOperandType.PointerEDX64,
+                    _ => throw new UnreachableException(),
+                },
+                Register.DX => throw new NotImplementedException(),
+                Register.DH => throw new NotImplementedException(),
+                Register.DL => throw new NotImplementedException(),
+                Register._8 => throw new UnreachableException(),
+                Register._4 => throw new UnreachableException(),
+                Register._2 => throw new UnreachableException(),
+                Register._H => throw new UnreachableException(),
+                Register._L => throw new UnreachableException(),
+                Register._A => throw new UnreachableException(),
+                Register._B => throw new UnreachableException(),
+                Register._C => throw new UnreachableException(),
+                Register._D => throw new UnreachableException(),
+                _ => throw new UnreachableException()
+            };
+        }
+        else
+        {
+            throw new InvalidOperationException();
+        }
+    }
 }

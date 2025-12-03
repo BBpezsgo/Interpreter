@@ -18,6 +18,14 @@ public enum BasicType : byte
     F32,
 }
 
+public static class BasicTypeExtensions
+{
+    public static bool IsSigned(this BasicType type) => type is BasicType.I8 or BasicType.I16 or BasicType.I32 or BasicType.I64;
+    public static bool IsUnsigned(this BasicType type) => type is BasicType.U8 or BasicType.U16 or BasicType.U32 or BasicType.U64;
+    public static bool IsFloat(this BasicType type) => type is BasicType.F32;
+    public static bool IsInteger(this BasicType type) => type is BasicType.U8 or BasicType.I8 or BasicType.U16 or BasicType.I16 or BasicType.U32 or BasicType.I32 or BasicType.U64 or BasicType.I64;
+}
+
 [DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class BuiltinType : GeneralType,
     IEquatable<BuiltinType>

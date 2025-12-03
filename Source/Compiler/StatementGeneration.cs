@@ -850,7 +850,7 @@ public partial class StatementCompiler
                 }
 
                 SetTypeType(newVariable.Type, type);
-                if (!Frames.Last.IsTemplate) newVariable.CompiledType = type;
+                if (!Frames.Last.IsTemplateInstance) newVariable.CompiledType = type;
             }
         }
 
@@ -926,7 +926,7 @@ public partial class StatementCompiler
         if (newVariable.Modifiers.Contains(ModifierKeywords.Temp))
         {
             CompileCleanup(type, newVariable.Location, out compiledCleanup);
-            if (!Frames.Last.IsTemplate) newVariable.CleanupReference = compiledCleanup;
+            if (!Frames.Last.IsTemplateInstance) newVariable.CleanupReference = compiledCleanup;
         }
 
         bool isGlobal = Frames.Last.IsTopLevel && Frames.Last.Scopes.Count <= 1;
@@ -1746,7 +1746,14 @@ public partial class StatementCompiler
                         case BinaryOperatorCallExpression.CompGEQ:
                         case BinaryOperatorCallExpression.CompEQ:
                         case BinaryOperatorCallExpression.CompNEQ:
-                            resultType = BooleanType;
+                            if (!GetUsedBy("boolean", out GeneralType? booleanType, out PossibleDiagnostic? internalTypeError))
+                            {
+                                resultType = BooleanType;
+                            }
+                            else
+                            {
+                                resultType = booleanType;
+                            }
                             break;
 
                         case BinaryOperatorCallExpression.LogicalOR:
@@ -2085,6 +2092,7 @@ public partial class StatementCompiler
         using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = Frames.Last.TypeArguments,
+            IsTemplateInstance = Frames.Last.IsTemplateInstance,
             IsTemplate = Frames.Last.IsTemplate,
             TypeParameters = Frames.Last.TypeParameters,
             CompiledParameters = compiledParameters.ToImmutable(),
@@ -2190,7 +2198,7 @@ public partial class StatementCompiler
                 }
                 closureSize += PointerSize;
                 if (!CompileAllocation(LiteralExpression.CreateAnonymous(closureSize, lambdaStatement.Position, lambdaStatement.File), out allocator)) return false;
-                if (!Frames.Last.IsTemplate) lambdaStatement.AllocatorReference = allocator is CompiledFunctionCall cfc ? cfc.Function : null;
+                if (!Frames.Last.IsTemplateInstance) lambdaStatement.AllocatorReference = allocator is CompiledFunctionCall cfc ? cfc.Function : null;
             }
 
             if (!frame.Value.CapturesGlobalVariables.HasValue) Frames.Last.CapturesGlobalVariables = null;
@@ -2321,7 +2329,7 @@ public partial class StatementCompiler
                     }
                 }
 
-                if (!GetLiteralType(literal.Type, out GeneralType? literalType))
+                if (!GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 { literalType = BuiltinType.I32; }
 
                 SetStatementType(literal, literalType);
@@ -2336,7 +2344,7 @@ public partial class StatementCompiler
             }
             case LiteralType.Float:
             {
-                if (!GetLiteralType(literal.Type, out GeneralType? literalType))
+                if (!GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 { literalType = BuiltinType.F32; }
 
                 SetStatementType(literal, literalType);
@@ -2434,9 +2442,12 @@ public partial class StatementCompiler
                     compiledStatement = null;
                     if (!CompileAllocation(LiteralExpression.CreateAnonymous((1 + literal.Value.Length) * type.GetSize(this), literal.Location.Position, literal.Location.File), out CompiledExpression? allocator)) return false;
 
-                    if (!GetLiteralType(literal.Type, out GeneralType? stringType))
+                    if (!GetLiteralType(literal.Type, out GeneralType? stringType, out PossibleDiagnostic? internalTypeError))
                     {
-                        stringType = new PointerType(new ArrayType(BuiltinType.Char, new CompiledConstantValue()
+                        if (!GetLiteralType(literal.Type, out GeneralType? charType, out PossibleDiagnostic? charInternalTypeError))
+                        { charType = BuiltinType.Char; }
+
+                        stringType = new PointerType(new ArrayType(charType, new CompiledConstantValue()
                         {
                             Value = literal.Value.Length + 1,
                             Location = literal.Location,
@@ -2570,7 +2581,7 @@ public partial class StatementCompiler
                     }
                 }
 
-                if (!GetLiteralType(literal.Type, out GeneralType? literalType))
+                if (!GetLiteralType(literal.Type, out GeneralType? literalType, out PossibleDiagnostic? internalTypeError))
                 { literalType = BuiltinType.Char; }
 
                 SetStatementType(literal, literalType);
@@ -4091,7 +4102,8 @@ public partial class StatementCompiler
         using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = typeArguments ?? ImmutableDictionary<string, GeneralType>.Empty,
-            IsTemplate = typeArguments is not null,
+            IsTemplateInstance = typeArguments is not null,
+            IsTemplate = function.IsTemplate,
             TypeParameters = function.Template?.Parameters ?? ImmutableArray<Token>.Empty,
             CompiledParameters = compiledParameters.ToImmutable(),
             InstructionLabels = localInstructionLabels.ToImmutable(),
@@ -4257,6 +4269,7 @@ public partial class StatementCompiler
         using (StackAuto<CompiledFrame> frame = Frames.PushAuto(new CompiledFrame()
         {
             TypeArguments = ImmutableDictionary<string, GeneralType>.Empty,
+            IsTemplateInstance = false,
             IsTemplate = false,
             TypeParameters = ImmutableArray<Token>.Empty,
             CompiledParameters = ImmutableArray<CompiledParameter>.Empty,

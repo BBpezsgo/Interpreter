@@ -90,26 +90,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         //    Diagnostics.Add(Diagnostic.Critical($"Variable \"{variableDeclaration.Identifier}\" already defined", variableDeclaration));
         //}
 
-        if (type is not null)
-        {
-
-        }
-        else
+        if (type is null)
         {
             type = variableDeclaration.Type;
-
-            if (type is ArrayType arrayType &&
-                variableDeclaration.InitialValue is CompiledList literalList &&
-                arrayType.Length is null)
-            {
-                arrayType = new ArrayType(arrayType.Of, new CompiledConstantValue()
-                {
-                    Value = literalList.Values.Length,
-                    Type = ArrayLengthType,
-                    Location = variableDeclaration.Location,
-                    SaveValue = true,
-                });
-            }
         }
 
         if (variableDeclaration.InitialValue != null)
@@ -2615,7 +2598,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         for (int i = 0; i < parameters.Length; i++)
         {
             CompiledArgument passed = parameters[i];
-            var defined = function.Parameters[i];
+            CompiledParameter defined = function.Parameters[i];
 
             GeneralType definedType = defined.Type;
             GeneralType passedType = passed.Type;
@@ -3309,7 +3292,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         for (int i = 1; i < function.Parameters.Length; i++)
         {
             CompiledArgument passed = parameters[i - 1];
-            var defined = function.Parameters[i];
+            CompiledParameter defined = function.Parameters[i];
 
             GeneralType definedType = defined.Type;
             GeneralType passedType = passed.Type;

@@ -60,4 +60,18 @@ public class GeneralFunctionDefinition : FunctionThingDefinition,
 
         return result.ToString();
     }
+
+    public override string ToReadable(IReadOnlyDictionary<string, GeneralType>? typeArguments = null)
+    {
+        StringBuilder result = new();
+        result.Append(Identifier.ToString());
+        result.Append('(');
+        for (int i = 0; i < Parameters.Count; i++)
+        {
+            if (i > 0) result.Append(", ");
+            result.Append(Parameters[i].Type.ToString(typeArguments));
+        }
+        result.Append(')');
+        return result.ToString();
+    }
 }

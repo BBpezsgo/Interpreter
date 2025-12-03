@@ -41,8 +41,9 @@ public class BytecodeEmitter
                 foreach (InstructionLabel label in Labels)
                 {
                     if (label.Index != i) continue;
-                    writer.WriteLine($"{label}:");
+                    writer.WriteLine($"     {label}:");
                 }
+                writer.Write($"{i,4}:");
                 writer.Write("  ");
                 writer.WriteLine(Code[i].ToString());
             }
@@ -90,6 +91,7 @@ public class BytecodeEmitter
                 writer.Write(new string(' ', indent + subindent));
                 writer.WriteLine($"{label}:");
             }
+            writer.Write($"{i,4}:");
             writer.Write(new string(' ', indent + subindent));
             writer.Write("  ");
             writer.WriteLine(Code[i].ToString());
@@ -173,7 +175,7 @@ public class BytecodeEmitter
             or Opcode.JumpIfNotEqual
             && prev0.Operand1.IsLabelAddress
             && prev0.Operand1.LabelValue.AdditionalLabelOffset == 0
-            && prev0.Operand1.LabelValue.IsAbsoluteLabelAddress == false
+            && !prev0.Operand1.LabelValue.IsAbsoluteLabelAddress
             && GetLabelIndex(prev0.Operand1.LabelValue.Label) == i + 1)
         {
             RemoveAt(i);
@@ -236,6 +238,28 @@ public class BytecodeEmitter
             return true;
         }
 
+        if (prev1.Opcode == Opcode.Move
+            && prev1.Operand1.Value.Type.IsRegisterPointer()
+            && prev1.Operand1.Value.Type.BitwidthOfPointer() == BitWidth._16
+            && prev1.Operand2.Value.Type.IsImmediate()
+
+            && prev0.Opcode == Opcode.Move
+            && prev0.Operand1.Value.Type.IsRegisterPointer()
+            && prev0.Operand1.Value.Type.BitwidthOfPointer() == BitWidth._16
+            && prev1.Operand2.Value.Type.IsImmediate()
+
+            && prev0.Operand1.Value.Type.RegisterOfPointer() == prev1.Operand1.Value.Type.RegisterOfPointer()
+            && prev0.Operand1.Value.Value - 2 == prev1.Operand1.Value.Value)
+        {
+            RemoveAt(i--);
+            Code[i] = new PreparationInstruction(
+                Opcode.Move,
+                new InstructionOperand(prev1.Operand1.Value.Value, prev1.Operand1.Value.Type.ChangeRegisterBitwidth(BitWidth._32)),
+                new InstructionOperand(prev1.Operand2.Value.Value | (prev0.Operand2.Value.Value << 16), InstructionOperandType.Immediate32)
+            );
+            return true;
+        }
+
         if (prev1.Opcode == Opcode.MathAdd
             && prev1.Operand2.Value.Type == InstructionOperandType.Immediate32
 
@@ -247,7 +271,7 @@ public class BytecodeEmitter
             Code[i] = new PreparationInstruction(
                 Opcode.MathAdd,
                 prev0.Operand1,
-                prev1.Operand2.Value.Value + prev0.Operand2.Value.Value
+                InstructionOperand.Immediate(prev1.Operand2.Value.Value + prev0.Operand2.Value.Value)
             );
             return true;
         }
@@ -263,7 +287,7 @@ public class BytecodeEmitter
             Code[i] = new PreparationInstruction(
                 Opcode.MathSub,
                 prev0.Operand1,
-                prev1.Operand2.Value.Value + prev0.Operand2.Value.Value
+                InstructionOperand.Immediate(prev1.Operand2.Value.Value + prev0.Operand2.Value.Value)
             );
             return true;
         }
@@ -281,7 +305,7 @@ public class BytecodeEmitter
             Code[i] = new PreparationInstruction(
                 v < 0 ? Opcode.MathSub : Opcode.MathAdd,
                 prev0.Operand1,
-                Math.Abs(v)
+                InstructionOperand.Immediate(Math.Abs(v))
             );
             return true;
         }
@@ -299,7 +323,7 @@ public class BytecodeEmitter
             Code[i] = new PreparationInstruction(
                 v < 0 ? Opcode.MathSub : Opcode.MathAdd,
                 prev0.Operand1,
-                Math.Abs(v)
+                InstructionOperand.Immediate(Math.Abs(v))
             );
             return true;
         }
@@ -373,7 +397,7 @@ public class BytecodeEmitter
 
             && prev0.Opcode == Opcode.MathAdd
             && prev0.Operand1 == Register.StackPointer
-            && prev0.Operand2 == 8)
+            && prev0.Operand2 == InstructionOperand.Immediate(8))
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -385,7 +409,7 @@ public class BytecodeEmitter
 
             && prev0.Opcode == Opcode.MathAdd
             && prev0.Operand1 == Register.StackPointer
-            && prev0.Operand2 == 4)
+            && prev0.Operand2 == InstructionOperand.Immediate(4))
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -397,7 +421,7 @@ public class BytecodeEmitter
 
             && prev0.Opcode == Opcode.MathAdd
             && prev0.Operand1 == Register.StackPointer
-            && prev0.Operand2 == 2)
+            && prev0.Operand2 == InstructionOperand.Immediate(2))
         {
             RemoveAt(i--);
             RemoveAt(i);
@@ -409,7 +433,7 @@ public class BytecodeEmitter
 
             && prev0.Opcode == Opcode.MathAdd
             && prev0.Operand1 == Register.StackPointer
-            && prev0.Operand2 == 1)
+            && prev0.Operand2 == InstructionOperand.Immediate(1))
         {
             RemoveAt(i--);
             RemoveAt(i);

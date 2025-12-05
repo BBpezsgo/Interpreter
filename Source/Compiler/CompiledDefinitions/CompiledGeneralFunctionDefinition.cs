@@ -5,7 +5,7 @@ namespace LanguageCore.Compiler;
 
 public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
     IDefinition<CompiledGeneralFunctionDefinition>,
-    IReferenceable<Statement?>,
+    IReferenceable<Expression?>,
     IHaveCompiledType,
     IInContext<CompiledStruct>,
     ITemplateable<CompiledGeneralFunctionDefinition>,
@@ -18,7 +18,7 @@ public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
     public GeneralType Type { get; }
     public new ImmutableArray<CompiledParameter> Parameters { get; }
     public new CompiledStruct Context { get; }
-    public List<Reference<Statement?>> References { get; }
+    public List<Reference<Expression?>> References { get; }
 
     public bool ReturnSomething => !Type.SameAs(BasicType.Void);
 
@@ -27,7 +27,7 @@ public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
         Type = type;
         Parameters = parameters;
         Context = context;
-        References = new List<Reference<Statement?>>();
+        References = new List<Reference<Expression?>>();
     }
 
     public CompiledGeneralFunctionDefinition(GeneralType type, ImmutableArray<CompiledParameter> parameters, CompiledGeneralFunctionDefinition other) : base(other)
@@ -35,7 +35,7 @@ public class CompiledGeneralFunctionDefinition : GeneralFunctionDefinition,
         Type = type;
         Parameters = parameters;
         Context = other.Context;
-        References = new List<Reference<Statement?>>(other.References);
+        References = new List<Reference<Expression?>>(other.References);
     }
 
     public bool DefinitionEquals(CompiledGeneralFunctionDefinition other)

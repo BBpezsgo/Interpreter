@@ -372,6 +372,8 @@ public sealed class Parser
             return false;
         }
 
+        keyword.AnalyzedType = TokenAnalyzedType.Keyword;
+
         if (!ExpectIdentifier(out Token? identifier))
         {
             diagnostic.Add(1, Diagnostic.Critical($"Expected identifier after keyword \"{keyword}\"", keyword.Position.After(), File));

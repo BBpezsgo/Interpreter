@@ -141,8 +141,8 @@ public partial class StatementCompiler
             else
             {
                 destructor = result.Function;
-                result.Function.References.Add(new Reference<Statement?>(null, location.File));
-                result.OriginalFunction.References.Add(new Reference<Statement?>(null, location.File));
+                result.Function.References.Add(new Reference<Expression?>(null, location.File));
+                result.OriginalFunction.References.Add(new Reference<Expression?>(null, location.File));
             }
         }
         else
@@ -157,8 +157,8 @@ public partial class StatementCompiler
             else
             {
                 destructor = result.Function;
-                result.Function.References.Add(new Reference<Statement?>(null, location.File));
-                result.OriginalFunction.References.Add(new Reference<Statement?>(null, location.File));
+                result.Function.References.Add(new Reference<Expression?>(null, location.File));
+                result.OriginalFunction.References.Add(new Reference<Expression?>(null, location.File));
             }
         }
 
@@ -1472,7 +1472,7 @@ public partial class StatementCompiler
             else if (argument is IdentifierExpression identifier)
             {
                 if (FindType(identifier.Identifier, identifier.File, out paramType, out PossibleDiagnostic? typeError))
-                { paramType = SetStatementType(identifier, paramType); }
+                { SetStatementType(identifier, paramType); }
                 else
                 {
                     Diagnostics.Add(typeError.ToError(identifier));
@@ -1640,22 +1640,6 @@ public partial class StatementCompiler
 
             if (!CompileFunctionCall(@operator, @operator.Arguments.ToImmutableArray(ArgumentExpression.Wrap), result, out compiledStatement)) return false;
 
-            if (Settings.Optimizations.HasFlag(OptimizationSettings.StatementEvaluating) &&
-                TryCompute(compiledStatement, out CompiledValue evaluated) &&
-                evaluated.TryCast(compiledStatement.Type, out evaluated))
-            {
-                compiledStatement = CompiledConstantValue.Create(evaluated, compiledStatement);
-                Diagnostics.Add(Diagnostic.OptimizationNotice($"Operator call evaluated with result \"{evaluated}\"", @operator));
-                SetPredictedValue(@operator, evaluated);
-                result.Function.References.Add(new Reference<Expression>(@operator, @operator.File, true));
-                result.OriginalFunction.References.Add(new Reference<Expression>(@operator, @operator.File, true));
-            }
-            else
-            {
-                result.Function.References.Add(new Reference<Expression>(@operator, @operator.File));
-                result.OriginalFunction.References.Add(new Reference<Expression>(@operator, @operator.File));
-            }
-
             return true;
         }
         else if (LanguageOperators.BinaryOperators.Contains(@operator.Operator.Content))
@@ -1778,7 +1762,7 @@ public partial class StatementCompiler
                             return false;
                     }
 
-                    resultType = SetStatementType(@operator, resultType);
+                    SetStatementType(@operator, resultType);
 
                     goto OK;
                 }
@@ -3678,7 +3662,7 @@ public partial class StatementCompiler
 
         if (_base.Type.Is(out ArrayType? arrayType))
         {
-            itemType = SetStatementType(target, arrayType.Of);
+            SetStatementType(target, itemType = arrayType.Of);
         }
         else if (_base.Type.Is(out PointerType? pointerType) &&
             pointerType.To.Is(out arrayType))
@@ -4352,7 +4336,6 @@ public partial class StatementCompiler
         function.Flags = default;
         AnalyseFunction(function.Body, ref function.Flags, stack);
     }
-
     void AnalyseFunction(IEnumerable<CompiledStatement> statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         foreach (CompiledStatement item in statement)
@@ -4360,7 +4343,6 @@ public partial class StatementCompiler
             AnalyseFunction(item, ref flags, stack);
         }
     }
-
     void AnalyseFunction(CompiledStatement statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         switch (statement)
@@ -4384,7 +4366,6 @@ public partial class StatementCompiler
             default: throw new UnreachableException(statement.GetType().Name);
         }
     }
-
     void AnalyseFunction(CompiledCleanup statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         if (statement.Deallocator is not null)
@@ -4407,7 +4388,6 @@ public partial class StatementCompiler
             }
         }
     }
-
     void AnalyseFunction(CompiledExpression statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         switch (statement)
@@ -4444,7 +4424,6 @@ public partial class StatementCompiler
             default: throw new UnreachableException();
         }
     }
-
     void AnalyseFunction(CompiledLambda statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         if (statement.Allocator is not null) AnalyseFunction(statement.Allocator, ref flags, stack);
@@ -4453,7 +4432,6 @@ public partial class StatementCompiler
         statement.Flags = _flags;
         flags |= _flags;
     }
-
     void AnalyseFunction(GeneralType statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         switch (statement)
@@ -4482,7 +4460,6 @@ public partial class StatementCompiler
                 throw new UnreachableException();
         }
     }
-
     void AnalyseFunction(CompiledBlock statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {
         AnalyseFunction(statement.Statements, ref flags, stack);

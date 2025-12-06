@@ -13,7 +13,7 @@ export inline void quicksort<T>(T[]* array, int length)
  */
 export void quicksort<T>(T[]* array, int left, int right)
 {
-    if (left >= 0 && right >= 0 && left < right)
+    if (left >= 0 && left < right)
     {
         int p = partition(array, left, right);
         quicksort(array, left, p);
@@ -63,5 +63,51 @@ export void insertsort<T>(T[]* values, int length)
         }
         values[j] = x;
         i = i + 1;
+    }
+}
+
+inline int iLeftChild(int i) { return 2 * i + 1; }
+
+export void heapsort<T>(T[]* values, int length)
+{
+    int start = length / 2;
+    int end = length;
+    while (end > 1)
+    {
+        if (start > 0) // (Heap construction)
+        {
+            start--;
+        }
+        else // Heap extraction
+        {
+            end--;
+            T t = values[end];
+            values[end] = values[0];
+            values[0] = t;
+        }
+   
+        // The following is siftDown(values, start, end)
+        int root = start;
+        while (iLeftChild(root) < end)
+        {
+            int child = iLeftChild(root);
+            // If there is a right child and that child is greater
+            if (child+1 < end && values[child] < values[child+1])
+            {
+                child++;
+            }
+
+            if (values[root] < values[child])
+            {
+                T t = values[root];
+                values[root] = values[child];
+                values[child] = t;
+                root = child; // repeat to continue sifting down the child now
+            }
+            else
+            {
+                break; // return to outer loop
+            }
+        }
     }
 }

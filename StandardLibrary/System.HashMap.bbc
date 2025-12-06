@@ -27,6 +27,19 @@ int hash(string v)
 
     return hash;
 #else
+#if BRAINFUCK
+    int hash = 181;
+    char c = v[0];
+
+    while (c)
+    {
+        hash = ((hash * 8) + hash) + c;
+        v = ((v as int) + sizeof(char)) as string;
+        c = v[0];
+    }
+
+    return hash;
+#else
     int hash = 181;
     char c = v[0];
 
@@ -38,6 +51,7 @@ int hash(string v)
     }
 
     return hash;
+#endif
 #endif
 }
 

@@ -63,7 +63,7 @@ bool join_free_blocks()
         bool blockUsed;
         get_header(headerPointer, &blockSize, &blockUsed);
 
-        if (headerPointer != 0 && blockUsed == false)
+        if (headerPointer != 0 && !blockUsed)
         {
             BlockHeader* prevOffset = (headerPointer - prevBlockSize - HeaderSize) as BlockHeader*;
 
@@ -71,7 +71,7 @@ bool join_free_blocks()
             bool prevBlockUsed;
             get_header(prevOffset, &_temp, &prevBlockUsed);
 
-            if (prevBlockUsed == false)
+            if (!prevBlockUsed)
             {
                 set_header_free(prevOffset, blockSize + prevBlockSize + HeaderSize);
                 *headerPointer = (BlockHeader)0;
@@ -106,32 +106,22 @@ export any* alloc(int sizeNeed)
         get_header(headerPointer, &blockSize, &blockUsed);
         any* dataPointer = (headerPointer + HeaderSize) as any*;
 
-        if (blockUsed == false)
+        if ((!blockUsed) && blockSize >= sizeNeed)
         {
-            if (blockSize == sizeNeed)
-            {
-                set_header_used(headerPointer, sizeNeed);
+            int _remainingSize = blockSize - sizeNeed - HeaderSize;
 
-                return dataPointer;
+            if (_remainingSize > 0)
+            {
+                set_header_free((dataPointer + sizeNeed) as BlockHeader*, _remainingSize);
+            }
+            else
+            {
+                sizeNeed = blockSize;
             }
 
-            if (blockSize > sizeNeed)
-            {
-                int _remainingSize = blockSize - sizeNeed - HeaderSize;
+            set_header_used(headerPointer, sizeNeed);
 
-                if (_remainingSize > 0)
-                {
-                    set_header_free((dataPointer + sizeNeed) as BlockHeader*, _remainingSize);
-                }
-                else
-                {
-                    sizeNeed = blockSize;
-                }
-
-                set_header_used(headerPointer, sizeNeed);
-
-                return dataPointer;
-            }
+            return dataPointer;
         }
 
         headerPointer += blockSize + HeaderSize;
@@ -216,7 +206,7 @@ export void free(any* pointer)
 
     get_header(headerPtr, &size, &allocated);
 
-    if (allocated == false)
+    if (!allocated)
     { return; }
 
     set_header_free(headerPtr, size);

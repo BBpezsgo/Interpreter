@@ -30,6 +30,11 @@ public class CommandLineOptions
         HelpText = "Writes the generated code to the specified file (this option only works for brainfuck)")]
     public string? Output { get; set; }
 
+    [Option("intermediate-output",
+        Required = false,
+        HelpText = "Writes the transformed source code to the specified file (for debug purposes only)")]
+    public string? IntermediateOutput { get; set; }
+
     [Option("throw-errors",
         Required = false,
         HelpText = "Crashes the program whenever an exception thrown. This useful for me when debugging the compiler.")]

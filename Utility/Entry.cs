@@ -124,6 +124,19 @@ public static class Entry
                 {
                     CompilerResult compiled = StatementCompiler.CompileFile(arguments.Source, compilerSettings, diagnostics);
                     generatedCode = CodeGeneratorForMain.Generate(compiled, mainGeneratorSettings, Output.Log, diagnostics);
+
+                    if (arguments.IntermediateOutput is not null)
+                    {
+                        using StreamWriter f = new(arguments.IntermediateOutput);
+                        f.WriteLine(compiled.Stringify());
+                        if (!generatedCode.ILGeneratorBuilders.IsDefault)
+                        {
+                            foreach (string builder in generatedCode.ILGeneratorBuilders)
+                            {
+                                f.WriteLine(builder);
+                            }
+                        }
+                    }
                     diagnostics.Print();
                     if (diagnostics.HasErrors) return 1;
                 }
@@ -335,16 +348,6 @@ public static class Entry
 
                 if (arguments.Debug)
                 {
-                    // if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    // { throw new PlatformNotSupportedException("Console rendering is only supported on Windows"); }
-
-                    // if (pauseBeforeRun)
-                    // {
-                    //     Console.WriteLine();
-                    //     Console.Write("Press any key to start executing");
-                    //     Console.ReadKey();
-                    // }
-
                     Console.ResetColor();
                     Console.Clear();
 
@@ -356,29 +359,26 @@ public static class Entry
                 }
                 else
                 {
-                    try
+                    if (Debugger.IsAttached)
                     {
                         interpreter.RunUntilCompletion();
                     }
-                    catch (UserException error)
+                    else
                     {
-                        Output.LogError($"UserException: {error.ToString(true)}");
-                        throw;
-                    }
-                    catch (RuntimeException error)
-                    {
-                        Output.LogError($"RuntimeException: {error}");
-                        throw;
-                    }
-                    catch (Exception error)
-                    {
-                        Output.LogError($"{error.GetType().Name}: {new RuntimeException(error.Message, error, interpreter.GetContext(), interpreter.DebugInformation)}");
-                        throw;
-                    }
-                    finally
-                    {
-                        Console.ResetColor();
-                        PrintStuff(interpreter);
+                        try
+                        {
+                            interpreter.RunUntilCompletion();
+                        }
+                        catch (RuntimeException error)
+                        {
+                            Output.LogError(error.ToString(true));
+                            return 1;
+                        }
+                        finally
+                        {
+                            Console.ResetColor();
+                            PrintStuff(interpreter);
+                        }
                     }
                 }
 

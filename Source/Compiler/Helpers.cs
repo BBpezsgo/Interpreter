@@ -1167,11 +1167,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 if (dstPointer.To.Is(out ArrayType? dstArray) &&
                     srcPointer.To.Is(out ArrayType? srcArray))
                 {
-                    if (dstArray.ComputedLength.HasValue &&
-                        srcArray.ComputedLength.HasValue &&
-                        dstArray.ComputedLength.Value != srcArray.ComputedLength.Value)
+                    if (dstArray.Length.HasValue &&
+                        srcArray.Length.HasValue &&
+                        dstArray.Length.Value != srcArray.Length.Value)
                     {
-                        error = new($"Can't cast an array pointer with length of {dstArray.ComputedLength.Value} to an array pointer with length of {srcArray.ComputedLength.Value}");
+                        error = new($"Can't cast an array pointer with length of {dstArray.Length.Value} to an array pointer with length of {srcArray.Length.Value}");
                         return false;
                     }
 
@@ -1210,13 +1210,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     return false;
                 }
 
-                if (!destArrayType.ComputedLength.HasValue)
+                if (!destArrayType.Length.HasValue)
                 {
                     error = new($"Can't cast literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (length of <runtime value>)");
                     return false;
                 }
 
-                if (literalValue.Length != destArrayType.ComputedLength.Value)
+                if (literalValue.Length != destArrayType.Length.Value)
                 {
                     error = new($"Can't cast literal value \"{literalValue}\" (length of {literalValue.Length}) to stack array \"{destination}\" (length of \"{destArrayType.Length?.ToString() ?? "null"}\")");
                     return false;
@@ -1231,13 +1231,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             {
                 if (arrayType.Length is not null)
                 {
-                    if (!arrayType.ComputedLength.HasValue)
+                    if (!arrayType.Length.HasValue)
                     {
                         error = new($"Can't cast literal value \"{literal.Value}\" (length of {literal.Value.Length}) to array \"{destination}\" (length of <runtime value>)");
                         return false;
                     }
 
-                    if (literal.Value.Length != arrayType.ComputedLength.Value)
+                    if (literal.Value.Length != arrayType.Length.Value)
                     {
                         error = new($"Can't cast literal value \"{literal.Value}\" (length of {literal.Value.Length}) to array \"{destination}\" (length of \"{arrayType.Length?.ToString() ?? "null"}\")");
                         return false;
@@ -1267,13 +1267,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             {
                 if (arrayType.Length is not null)
                 {
-                    if (!arrayType.ComputedLength.HasValue)
+                    if (!arrayType.Length.HasValue)
                     {
                         error = new($"Can't cast literal value \"{stringInstance.Value}\" (length of {stringInstance.Value.Length}) to array \"{destination}\" (length of <runtime value>)");
                         return false;
                     }
 
-                    if (stringInstance.Value.Length != arrayType.ComputedLength.Value)
+                    if (stringInstance.Value.Length != arrayType.Length.Value)
                     {
                         error = new($"Can't cast literal value \"{stringInstance.Value}\" (length of {stringInstance.Value.Length}) to array \"{destination}\" (length of \"{arrayType.Length?.ToString() ?? "null"}\")");
                         return false;
@@ -1295,13 +1295,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     return false;
                 }
 
-                if (!destArrayType.ComputedLength.HasValue)
+                if (!destArrayType.Length.HasValue)
                 {
                     error = new($"Can't cast literal value \"{stackStringInstance.Value}\" (length of {stackStringInstance.Value.Length}) to stack array \"{destination}\" (length of <runtime value>)");
                     return false;
                 }
 
-                if (stackStringInstance.Value.Length != destArrayType.ComputedLength.Value)
+                if (stackStringInstance.Value.Length != destArrayType.Length.Value)
                 {
                     error = new($"Can't cast literal value \"{stackStringInstance.Value}\" (length of {stackStringInstance.Value.Length}) to stack array \"{destination}\" (length of \"{destArrayType.Length?.ToString() ?? "null"}\")");
                     return false;
@@ -1324,12 +1324,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 }
                 if (!sourceFunctionType.HasClosure && targetFunctionType.HasClosure)
                 {
-                    if (!CompileAllocation(LiteralExpression.CreateAnonymous(PointerSize, value.Location.Position, value.Location.File), out CompiledExpression? allocator))
+                    if (!CompileAllocation(PointerSize, value.Location, out CompiledExpression? allocator))
                     {
                         return false;
                     }
                     assignedValue = new CompiledCast()
                     {
+                        TypeExpression = CompiledTypeExpression.CreateAnonymous(targetFunctionType, value.Location),
                         Type = targetFunctionType,
                         Value = value,
                         Allocator = allocator,
@@ -1494,6 +1495,80 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         ));
         return false;
     }
+    bool FindType(Token name, Uri relevantFile, [NotNullWhen(true)] out CompiledTypeExpression? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        if (TypeKeywords.BasicTypes.TryGetValue(name.Content, out BasicType builtinType))
+        {
+            result = new CompiledBuiltinTypeExpression(builtinType, new Location(name.Position, relevantFile));
+            error = null;
+            return true;
+        }
+
+        if (Frames.Last.TypeArguments.TryGetValue(name.Content, out GeneralType? typeArgument))
+        {
+            result = CompiledTypeExpression.CreateAnonymous(typeArgument, new Location(name.Position, relevantFile));
+            error = null;
+            return true;
+        }
+
+        {
+            int i = Frames.Last.TypeParameters.IndexOf(name.Content);
+            if (i != -1)
+            {
+                result = new CompiledGenericTypeExpression(Frames.Last.TypeParameters[i], relevantFile, new Location(name.Position, relevantFile));
+                error = null;
+                return true;
+            }
+        }
+
+        for (int i = 0; i < GenericParameters.Count; i++)
+        {
+            for (int j = 0; j < GenericParameters[i].Length; j++)
+            {
+                if (GenericParameters[i][j].Content == name.Content)
+                {
+                    GenericParameters[i][j].AnalyzedType = TokenAnalyzedType.TypeParameter;
+                    result = new CompiledGenericTypeExpression(GenericParameters[i][j], relevantFile, new Location(name.Position, relevantFile));
+                    error = null;
+                    return true;
+                }
+            }
+        }
+
+        if (GetAlias(name.Content, relevantFile, out CompiledAlias? alias, out PossibleDiagnostic? aliasError))
+        {
+            name.AnalyzedType = alias.Value.FinalValue switch
+            {
+                BuiltinType => TokenAnalyzedType.BuiltinType,
+                StructType => TokenAnalyzedType.Struct,
+                GenericType => TokenAnalyzedType.TypeParameter,
+                _ => TokenAnalyzedType.Type,
+            };
+            alias.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
+
+            // HERE
+            result = new CompiledAliasTypeExpression(CompiledTypeExpression.CreateAnonymous(alias.Value, ((AliasDefinition)alias).Value), alias, new Location(name.Position, relevantFile));
+            error = null;
+            return true;
+        }
+
+        if (GetStruct(name.Content, relevantFile, out CompiledStruct? @struct, out PossibleDiagnostic? structError))
+        {
+            name.AnalyzedType = TokenAnalyzedType.Struct;
+            @struct.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
+
+            result = new CompiledStructTypeExpression(@struct, relevantFile, new Location(name.Position, relevantFile));
+            error = null;
+            return true;
+        }
+
+        result = null;
+        error = new PossibleDiagnostic($"Can't find type `{name.Content}`", ImmutableArray.Create(
+            aliasError,
+            structError
+        ));
+        return false;
+    }
 
     bool GetLiteralType(LiteralType literal, [NotNullWhen(true)] out GeneralType? type, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
@@ -1555,7 +1630,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
         if (type is null)
         {
-            error = new PossibleDiagnostic($"No type definition found with attribute `{AttributeConstants.InternalType}`");
+            error = new PossibleDiagnostic($"No type definition found with attribute `{AttributeConstants.InternalType}`", false);
             return false;
         }
         else
@@ -1692,13 +1767,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             itemType = BuiltinType.Any;
         }
 
-        type = new ArrayType(itemType, new CompiledConstantValue()
-        {
-            Value = list.Values.Length,
-            Location = list.Location,
-            Type = ArrayLengthType,
-            SaveValue = true,
-        });
+        type = new ArrayType(itemType, list.Values.Length);
         return true;
     }
     bool FindStatementType(IndexCallExpression index, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
@@ -1780,8 +1849,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     leftBType.Type == BasicType.F32 ||
                     rightBType.Type == BasicType.F32;
 
-                BitWidth leftBitWidth = leftType.GetBitWidth(this, diagnostics, @operator.Left);
-                BitWidth rightBitWidth = rightType.GetBitWidth(this, diagnostics, @operator.Right);
+                if (!FindBitWidth(leftType, out BitWidth leftBitWidth, out PossibleDiagnostic? e1, this))
+                {
+                    diagnostics.Add(e1.ToError(@operator.Left));
+                    return false;
+                }
+
+                if (!FindBitWidth(rightType, out BitWidth rightBitWidth, out PossibleDiagnostic? d2, this))
+                {
+                    diagnostics.Add(d2.ToError(@operator.Left));
+                    return false;
+                }
+
                 BitWidth bitWidth = MaxBitWidth(leftBitWidth, rightBitWidth);
 
                 if (!leftBType.TryGetNumericType(out NumericType leftNType1) ||
@@ -1860,13 +1939,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             ok = false;
         }
 
-        if (!leftType.GetBitWidth(this, out BitWidth leftBitwidth, out PossibleDiagnostic? error))
+        if (!FindBitWidth(leftType, out BitWidth leftBitwidth, out PossibleDiagnostic? error, this))
         {
             diagnostics.Add(error.ToError(@operator.Left));
             ok = false;
         }
 
-        if (!rightType.GetBitWidth(this, out BitWidth rightBitwidth, out error))
+        if (!FindBitWidth(rightType, out BitWidth rightBitwidth, out error, this))
         {
             diagnostics.Add(error.ToError(@operator.Right));
             ok = false;
@@ -2061,13 +2140,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                     diagnostics.Add(Diagnostic.Warning($"No type defined for characters, using the default {charType}", literal).WithSuberrors(charInternalTypeError.ToError(literal)));
                 }
 
-                SetStatementType(literal, type = new PointerType(new ArrayType(charType, new CompiledConstantValue()
-                {
-                    Value = literal.Value.Length + 1,
-                    Location = literal.Location,
-                    Type = BuiltinType.I32,
-                    SaveValue = true
-                })));
+                SetStatementType(literal, type = new PointerType(new ArrayType(charType, literal.Value.Length + 1)));
                 diagnostics.Add(Diagnostic.Warning($"No type defined for string literals, using the default {type}", literal).WithSuberrors(internalTypeError.ToError(literal)));
                 return true;
             }
@@ -2178,7 +2251,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         if (GetFunction(identifier.Content, expectedType, out FunctionQueryResult<CompiledFunctionDefinition>? function, out PossibleDiagnostic? functionNotFoundError))
         {
             identifier.AnalyzedType = TokenAnalyzedType.FunctionName;
-            SetStatementType(identifier, type = new FunctionType(function.Function));
+            SetStatementType(identifier, type = new FunctionType(function.Function.Type, function.Function.Parameters.ToImmutableArray(v => v.Type), false));
             return true;
         }
 
@@ -2237,22 +2310,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool FindStatementType(NewInstanceExpression newInstance, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
-        if (!GeneralType.From(newInstance.Type, FindType, out type, out PossibleDiagnostic? typeError))
-        {
-            diagnostics.Add(typeError.ToError(newInstance.Type));
-            return false;
-        }
+        if (!CompileType(newInstance.Type, out type, diagnostics)) return false;
+
         SetTypeType(newInstance.Type, type);
         SetStatementType(newInstance, type);
         return true;
     }
     bool FindStatementType(ConstructorCallExpression constructorCall, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
-        if (!GeneralType.From(constructorCall.Type, FindType, out type, out PossibleDiagnostic? typeError))
-        {
-            diagnostics.Add(typeError.ToError(constructorCall.Type));
-            return false;
-        }
+        if (!CompileType(constructorCall.Type, out type, diagnostics)) return false;
+
         SetTypeType(constructorCall.Type, type);
         FindStatementTypes(constructorCall.Arguments, out ImmutableArray<GeneralType> parameters, diagnostics);
 
@@ -2308,22 +2375,16 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool FindStatementType(ReinterpretExpression @as, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
-        if (!GeneralType.From(@as.Type, FindType, out type, out PossibleDiagnostic? typeError))
-        {
-            diagnostics.Add(typeError.ToError(@as.Type));
-            return false;
-        }
+        if (!CompileType(@as.Type, out type, diagnostics)) return false;
+
         SetTypeType(@as.Type, type);
         SetStatementType(@as, type);
         return true;
     }
     bool FindStatementType(ManagedTypeCastExpression @as, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
-        if (!GeneralType.From(@as.Type, FindType, out type, out PossibleDiagnostic? typeError))
-        {
-            diagnostics.Add(typeError.ToError(@as.Type));
-            return false;
-        }
+        if (!CompileType(@as.Type, out type, diagnostics)) return false;
+
         SetTypeType(@as.Type, type);
         SetStatementType(@as, type);
         return true;
@@ -2431,9 +2492,66 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return true;
     }
 
+    static bool Inline(CompiledTypeExpression statement, InlineContext context, out CompiledTypeExpression inlined)
+    {
+        inlined = statement;
+
+        switch (statement)
+        {
+            case CompiledAliasTypeExpression v:
+                if (!Inline(v.Value, context, out CompiledTypeExpression? vInlined)) return false;
+                inlined = new CompiledAliasTypeExpression(vInlined, v.Definition, v.Location);
+                break;
+            case CompiledArrayTypeExpression v:
+                if (!Inline(v.Of, context, out CompiledTypeExpression? ofInlined)) return false;
+                if (!Inline(v.Length, context, out CompiledExpression? lengthInlined)) return false;
+                inlined = new CompiledArrayTypeExpression(ofInlined, lengthInlined, v.Location);
+                break;
+            case CompiledBuiltinTypeExpression v:
+                inlined = v;
+                break;
+            case CompiledFunctionTypeExpression v:
+                CompiledTypeExpression[] parameters = new CompiledTypeExpression[v.Parameters.Length];
+                if (!Inline(v.ReturnType, context, out CompiledTypeExpression? returnTypeInlined)) return false;
+                for (int i = 0; i < v.Parameters.Length; i++)
+                {
+                    if (!Inline(v.Parameters[i], context, out parameters[i])) return false;
+                }
+                inlined = new CompiledFunctionTypeExpression(returnTypeInlined, parameters.AsImmutableUnsafe(), v.HasClosure, v.Location);
+                break;
+            case CompiledGenericTypeExpression v:
+                inlined = v;
+                break;
+            case CompiledPointerTypeExpression v:
+                if (!Inline(v.To, context, out CompiledTypeExpression? toInlined)) return false;
+                inlined = new CompiledPointerTypeExpression(toInlined, v.Location);
+                break;
+            case CompiledStructTypeExpression v:
+                Dictionary<string, CompiledTypeExpression> typeArguments = new(v.TypeArguments.Count);
+                foreach (KeyValuePair<string, CompiledTypeExpression> i in v.TypeArguments)
+                {
+                    if (!Inline(i.Value, context, out CompiledTypeExpression? iInlined)) return false;
+                    typeArguments[i.Key] = iInlined;
+                }
+                inlined = new CompiledStructTypeExpression(v.Struct, v.File, typeArguments.ToImmutableDictionary(), v.Location);
+                break;
+            default: throw new UnreachableException();
+        }
+
+        if (inlined.Equals(statement)) inlined = statement;
+        return true;
+    }
     static bool Inline(CompiledSizeof statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
+        if (!Inline(statement.Of, context, out CompiledTypeExpression? inlinedOf)) return false;
+        inlined = new CompiledSizeof()
+        {
+            Of = inlinedOf,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+            Type = statement.Type,
+        };
         return true;
     }
     static bool Inline(CompiledBinaryOperatorCall statement, InlineContext context, out CompiledExpression inlined)
@@ -2594,6 +2712,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     static bool Inline(CompiledStackAllocation statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
+        if (!Inline(statement.TypeExpression, context, out CompiledTypeExpression? inlinedType)) return false;
+        inlined = new CompiledStackAllocation()
+        {
+            TypeExpression = inlinedType,
+            Type = statement.Type,
+            Location = statement.Location,
+            SaveValue = statement.SaveValue,
+        };
         return true;
     }
     static bool Inline(CompiledConstructorCall statement, InlineContext context, out CompiledExpression inlined)
@@ -2618,6 +2744,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         inlined = statement;
 
         if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
+        if (!Inline(statement.TypeExpression, context, out CompiledTypeExpression? inlinedType)) return false;
 
         inlined = new CompiledReinterpretation()
         {
@@ -2625,6 +2752,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             Location = statement.Location,
             SaveValue = statement.SaveValue,
             Type = statement.Type,
+            TypeExpression = inlinedType,
         };
         return true;
     }
@@ -2633,10 +2761,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         inlined = statement;
 
         if (!Inline(statement.Value, context, out CompiledExpression? inlinedValue)) return false;
+        if (!Inline(statement.TypeExpression, context, out CompiledTypeExpression? inlinedType)) return false;
 
         inlined = new CompiledReinterpretation()
         {
             Value = inlinedValue,
+            TypeExpression = inlinedType,
             Location = statement.Location,
             SaveValue = statement.SaveValue,
             Type = statement.Type,
@@ -2721,10 +2851,12 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         inlined = statement;
         if (!Inline(statement.InitialValue, context, out CompiledExpression? inlinedValue)) return false;
+        if (!Inline(statement.TypeExpression, context, out CompiledTypeExpression? inlinedType)) return false;
 
         CompiledVariableDefinition _inlined = new()
         {
             InitialValue = inlinedValue,
+            TypeExpression = inlinedType,
             Cleanup = statement.Cleanup,
             Identifier = statement.Identifier,
             IsGlobal = statement.IsGlobal,
@@ -3510,7 +3642,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool TryCompute(CompiledSizeof functionCall, EvaluationContext context, out CompiledValue value)
     {
-        if (!FindSize(functionCall.Of, out int size, out _))
+        if (!FindSize(functionCall.Of, out int size, out _, this))
         {
             value = CompiledValue.Null;
             return false;
@@ -3650,7 +3782,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledElementAccess v => TryCompute(v, context, out value),
             CompiledArgument v => TryCompute(v.Value, context, out value),
             CompiledFunctionReference v => TryCompute(v, context, out value),
-            CompiledLambda v => false, // TODO
+            CompiledLambda => false, // TODO
 
             CompiledString => false,
             CompiledStackString => false,
@@ -3984,30 +4116,46 @@ public partial class StatementCompiler : IRuntimeInfoProvider
 
     #region Find Size
 
-    static bool FindSize(GeneralType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
+    public static bool FindBitWidth(GeneralType type, out BitWidth size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
-        PointerType v => FindSize(v, out size, out error),
-        ArrayType v => FindSize(v, out size, out error),
-        FunctionType v => FindSize(v, out size, out error),
-        StructType v => FindSize(v, out size, out error),
-        GenericType v => FindSize(v, out size, out error),
-        BuiltinType v => FindSize(v, out size, out error),
-        AliasType v => FindSize(v, out size, out error),
+        size = default;
+        if (!FindSize(type, out int s, out error, runtime)) return false;
+        switch (s)
+        {
+            case 1: size = BitWidth._8; return true;
+            case 2: size = BitWidth._16; return true;
+            case 4: size = BitWidth._32; return true;
+            case 8: size = BitWidth._64; return true;
+            default:
+                error = new PossibleDiagnostic($"E");
+                return false;
+        }
+    }
+
+    public static bool FindSize(GeneralType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime) => type switch
+    {
+        PointerType v => FindSize(v, out size, out error, runtime),
+        ArrayType v => FindSize(v, out size, out error, runtime),
+        FunctionType v => FindSize(v, out size, out error, runtime),
+        StructType v => FindSize(v, out size, out error, runtime),
+        GenericType v => FindSize(v, out size, out error, runtime),
+        BuiltinType v => FindSize(v, out size, out error, runtime),
+        AliasType v => FindSize(v, out size, out error, runtime),
         _ => throw new NotImplementedException(),
     };
-    static bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
-        size = default;
-        error = new PossibleDiagnostic($"Pointer size is runtime dependent");
-        return false;
+        size = runtime.PointerSize;
+        error = null;
+        return true;
     }
-    static bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
-        size = default;
-        error = new PossibleDiagnostic($"Pointer size is runtime dependent");
-        return false;
+        size = runtime.PointerSize;
+        error = null;
+        return true;
     }
-    static bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
         size = default;
 
@@ -4017,19 +4165,13 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return false;
         }
 
-        if (!FindSize(type.Of, out int elementSize, out error)) return false;
+        if (!FindSize(type.Of, out int elementSize, out error, runtime)) return false;
 
-        if (type.Length is not CompiledConstantValue evaluatedStatement)
-        {
-            error = new PossibleDiagnostic($"Can't compute the array type's length");
-            return false;
-        }
-
-        size = elementSize * (int)evaluatedStatement.Value;
+        size = elementSize * type.Length.Value;
         error = null;
         return true;
     }
-    static bool FindSize(StructType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(StructType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
         size = 0;
 
@@ -4037,18 +4179,20 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         {
             GeneralType fieldType = type.ReplaceType(field.Type, out error);
             if (error is not null) return false;
-            if (!FindSize(fieldType, out int fieldSize, out error)) return false;
+            if (!FindSize(fieldType, out int fieldSize, out error, runtime)) return false;
             size += fieldSize;
         }
 
         error = null;
         return true;
     }
-    static bool FindSize(GenericType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(GenericType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
-        throw new InvalidOperationException($"Generic type doesn't have a size");
+        size = default;
+        error = new PossibleDiagnostic($"Generic type doesn't have a size");
+        return false;
     }
-    static bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
         size = default;
         error = default;
@@ -4068,9 +4212,98 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             default: throw new UnreachableException();
         }
     }
-    static bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    static bool FindSize(AliasType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
     {
-        return FindSize(type.Value, out size, out error);
+        return FindSize(type.Value, out size, out error, runtime);
+    }
+
+    public static bool FindSize(CompiledTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime) => type switch
+    {
+        CompiledPointerTypeExpression v => FindSize(v, out size, out error, runtime),
+        CompiledArrayTypeExpression v => FindSize(v, out size, out error, runtime),
+        CompiledFunctionTypeExpression v => FindSize(v, out size, out error, runtime),
+        CompiledStructTypeExpression v => FindSize(v, out size, out error, runtime),
+        CompiledGenericTypeExpression v => FindSize(v, out size, out error, runtime),
+        CompiledBuiltinTypeExpression v => FindSize(v, out size, out error, runtime),
+        CompiledAliasTypeExpression v => FindSize(v, out size, out error, runtime),
+        _ => throw new NotImplementedException(),
+    };
+    static bool FindSize(CompiledPointerTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        size = runtime.PointerSize;
+        error = null;
+        return true;
+    }
+    static bool FindSize(CompiledFunctionTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        size = runtime.PointerSize;
+        error = null;
+        return true;
+    }
+    static bool FindSize(CompiledArrayTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        size = default;
+
+        if (type.Length is null)
+        {
+            error = new PossibleDiagnostic($"Array type doesn't have a size", type);
+            return false;
+        }
+
+        if (!FindSize(type.Of, out int elementSize, out error, runtime)) return false;
+
+        if (type.Length is not CompiledConstantValue evaluatedStatement)
+        {
+            error = new PossibleDiagnostic($"Can't compute the array type's length", type.Length);
+            return false;
+        }
+
+        size = elementSize * (int)evaluatedStatement.Value;
+        error = null;
+        return true;
+    }
+    static bool FindSize(CompiledStructTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        size = 0;
+
+        foreach (CompiledField field in type.Struct.Fields)
+        {
+            if (!FindSize(field.Type, out int fieldSize, out error, runtime)) return false;
+            size += fieldSize;
+        }
+
+        error = null;
+        return true;
+    }
+    static bool FindSize(CompiledGenericTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        size = default;
+        error = new PossibleDiagnostic($"Generic type doesn't have a size", type);
+        return false;
+    }
+    static bool FindSize(CompiledBuiltinTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        size = default;
+        error = default;
+        switch (type.Type)
+        {
+            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\"", type); return false;
+            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\"", type); return false;
+            case BasicType.U8: size = 1; return true;
+            case BasicType.I8: size = 1; return true;
+            case BasicType.U16: size = 2; return true;
+            case BasicType.I16: size = 2; return true;
+            case BasicType.U32: size = 4; return true;
+            case BasicType.I32: size = 4; return true;
+            case BasicType.U64: size = 8; return true;
+            case BasicType.I64: size = 8; return true;
+            case BasicType.F32: size = 4; return true;
+            default: throw new UnreachableException();
+        }
+    }
+    static bool FindSize(CompiledAliasTypeExpression type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error, IRuntimeInfoProvider runtime)
+    {
+        return FindSize(type.Value, out size, out error, runtime);
     }
 
     #endregion
@@ -4093,14 +4326,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return res;
     }
 
-    StatementComplexity GetStatementComplexity(GeneralType statement) => statement.FinalValue switch
+    StatementComplexity GetStatementComplexity(CompiledTypeExpression statement) => statement.FinalValue switch
     {
-        ArrayType v => (v.Length is null || v.ComputedLength.HasValue) ? StatementComplexity.None : GetStatementComplexity(v.Length),
-        BuiltinType v => StatementComplexity.None,
-        FunctionType v => StatementComplexity.None,
-        GenericType v => StatementComplexity.Bruh,
-        PointerType v => StatementComplexity.None,
-        StructType v => StatementComplexity.None,
+        CompiledArrayTypeExpression v => (v.Length is null || v.ComputedLength.HasValue) ? StatementComplexity.None : GetStatementComplexity(v.Length),
+        CompiledBuiltinTypeExpression => StatementComplexity.None,
+        CompiledFunctionTypeExpression v => GetStatementComplexity(v.ReturnType) | v.Parameters.Select(GetStatementComplexity).Aggregate((a, b) => a | b),
+        CompiledGenericTypeExpression => StatementComplexity.Bruh,
+        CompiledPointerTypeExpression v => GetStatementComplexity(v.To),
+        CompiledStructTypeExpression v => v.TypeArguments.Values.Select(GetStatementComplexity).Aggregate((a, b) => a | b),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 
@@ -4145,6 +4378,14 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         }
     }
 
+    static IEnumerable<CompiledStatement> Visit(IEnumerable<CompiledTypeExpression> type)
+    {
+        foreach (CompiledTypeExpression v in type)
+        {
+            foreach (CompiledStatement v2 in Visit(v)) yield return v2;
+        }
+    }
+
     static IEnumerable<CompiledStatement> Visit(GeneralType? type)
     {
         switch (type)
@@ -4167,6 +4408,33 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 foreach (CompiledStatement v2 in Visit(v.TypeArguments.Values)) yield return v2;
                 break;
             case ArrayType v:
+                foreach (CompiledStatement v2 in Visit(v.Of)) yield return v2;
+                break;
+        }
+    }
+
+    static IEnumerable<CompiledStatement> Visit(CompiledTypeExpression? type)
+    {
+        switch (type)
+        {
+            case CompiledBuiltinTypeExpression:
+                break;
+            case CompiledAliasTypeExpression v:
+                foreach (CompiledStatement v2 in Visit(v.Value)) yield return v2;
+                break;
+            case CompiledPointerTypeExpression v:
+                foreach (CompiledStatement v2 in Visit(v.To)) yield return v2;
+                break;
+            case CompiledFunctionTypeExpression v:
+                foreach (CompiledStatement v2 in Visit(v.ReturnType)) yield return v2;
+                foreach (CompiledStatement v2 in Visit(v.Parameters)) yield return v2;
+                break;
+            case CompiledGenericTypeExpression:
+                break;
+            case CompiledStructTypeExpression v:
+                foreach (CompiledStatement v2 in Visit(v.TypeArguments.Values)) yield return v2;
+                break;
+            case CompiledArrayTypeExpression v:
                 foreach (CompiledStatement v2 in Visit(v.Of)) yield return v2;
                 foreach (CompiledStatement v2 in Visit(v.Length)) yield return v2;
                 break;
@@ -4423,5 +4691,145 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledStackString => ImmutableArray<CompiledStatement>.Empty,
             _ => throw new NotImplementedException(),
         };
+    }
+
+    bool CompileType(TypeInstance type, [NotNullWhen(true)] out GeneralType? result, DiagnosticsCollection diagnostics)
+    {
+        if (!CompileStatement(type, out CompiledTypeExpression? typeExpression, diagnostics))
+        {
+            result = null;
+            return false;
+        }
+
+        if (!CompileType(typeExpression, out result, out PossibleDiagnostic? typeError))
+        {
+            diagnostics.Add(typeError.ToError(type));
+            result = null;
+            return false;
+        }
+
+        return true;
+    }
+    public static bool CompileType(CompiledTypeExpression typeExpression, [NotNullWhen(true)] out GeneralType? type, [NotNullWhen(false)] out PossibleDiagnostic? error, bool ignoreValues = false)
+    {
+        type = null;
+        error = null;
+
+        switch (typeExpression)
+        {
+            case CompiledAliasTypeExpression v:
+            {
+                if (!CompileType(v.Value, out GeneralType? aliasValue, out error, ignoreValues)) return false;
+                type = new AliasType(aliasValue, v.Definition);
+                return true;
+            }
+            case CompiledArrayTypeExpression v:
+            {
+                if (!CompileType(v.Of, out GeneralType? ofType, out error, ignoreValues)) return false;
+                if (v.Length is not null)
+                {
+                    static bool IsValidArrayLength(CompiledExpression expression, out int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+                    {
+                        result = default;
+                        error = null;
+
+                        if (expression is not CompiledConstantValue constantLength)
+                        {
+                            error = new PossibleDiagnostic($"Array type's length must be constant", expression);
+                            return false;
+                        }
+                        if (constantLength.Value.Type == RuntimeType.F32)
+                        {
+                            error = new PossibleDiagnostic($"Array type's length cannot be a float", expression);
+                            return false;
+                        }
+                        if (constantLength.Value.Type == RuntimeType.Null)
+                        {
+                            error = new PossibleDiagnostic($"Array type's length cannot be null", expression);
+                            return false;
+                        }
+                        if (constantLength.Value > int.MaxValue)
+                        {
+                            error = new PossibleDiagnostic($"Array type's length cannot be more than {int.MaxValue}", expression);
+                            return false;
+                        }
+                        if (constantLength.Value < 1)
+                        {
+                            error = new PossibleDiagnostic($"Array type's length cannot be less than {1}", expression);
+                            return false;
+                        }
+                        if (constantLength.Value != (int)constantLength.Value)
+                        {
+                            error = new PossibleDiagnostic($"Invalid array length {constantLength.Value}", expression);
+                            return false;
+                        }
+
+                        result = (int)constantLength.Value;
+                        return true;
+                    }
+
+                    if (IsValidArrayLength(v.Length, out int length, out PossibleDiagnostic? lengthError))
+                    {
+                        type = new ArrayType(ofType, length);
+                    }
+                    else
+                    {
+                        if (ignoreValues)
+                        {
+                            type = new ArrayType(ofType, null);
+                        }
+                        else
+                        {
+                            error = lengthError;
+                            return false;
+                        }
+                    }
+                }
+                else
+                {
+                    type = new ArrayType(ofType, null);
+                }
+                return true;
+            }
+            case CompiledBuiltinTypeExpression v:
+            {
+                type = new BuiltinType(v.Type);
+                return true;
+            }
+            case CompiledFunctionTypeExpression v:
+            {
+                if (!CompileType(v.ReturnType, out GeneralType? returnType, out error, ignoreValues)) return false;
+                GeneralType[] parameters = new GeneralType[v.Parameters.Length];
+                for (int i = 0; i < v.Parameters.Length; i++)
+                {
+                    if (!CompileType(v.Parameters[i], out parameters[i]!, out error, ignoreValues)) return false;
+                }
+                type = new FunctionType(returnType, parameters.AsImmutableUnsafe(), v.HasClosure);
+                return true;
+            }
+            case CompiledGenericTypeExpression v:
+            {
+                type = new GenericType(v.Identifier, v.File);
+                return true;
+            }
+            case CompiledPointerTypeExpression v:
+            {
+                if (!CompileType(v.To, out GeneralType? toType, out error, ignoreValues)) return false;
+                type = new PointerType(toType);
+                return true;
+            }
+            case CompiledStructTypeExpression v:
+            {
+                Dictionary<string, GeneralType> typeArguments = new(v.TypeArguments.Count);
+                foreach (KeyValuePair<string, CompiledTypeExpression> item in v.TypeArguments)
+                {
+                    if (!CompileType(item.Value, out GeneralType? itemV, out error, ignoreValues)) return false;
+                    typeArguments.Add(item.Key, itemV);
+                }
+                type = new StructType(v.Struct, v.File, typeArguments.ToImmutableDictionary());
+                return true;
+            }
+            default: throw new UnreachableException();
+        }
     }
 }

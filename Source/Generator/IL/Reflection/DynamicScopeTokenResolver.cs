@@ -1,7 +1,3 @@
-#pragma warning disable CS8605 // Unboxing a possibly null value.
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -36,18 +32,12 @@ class DynamicScopeTokenResolver : ITokenResolver
         _genmethFi2 = _genMethodInfoType?.GetField("m_context", s_bfInternal);
 
         _genFieldInfoType = Type.GetType("System.Reflection.Emit.GenericFieldInfo", false);
-        if (_genFieldInfoType != null)
-        {
-            _genfieldFi1 = _genFieldInfoType.GetField("m_fieldHandle", s_bfInternal);
-            _genfieldFi2 = _genFieldInfoType.GetField("m_context", s_bfInternal);
-        }
-        else
-        {
-            _genfieldFi1 = _genfieldFi2 = null;
-        }
+        _genfieldFi1 = _genFieldInfoType?.GetField("m_fieldHandle", s_bfInternal);
+        _genfieldFi2 = _genFieldInfoType?.GetField("m_context", s_bfInternal);
     }
 
     readonly object? m_scope;
+
     public object? this[int token] => _indexer?.GetValue(m_scope, new object[] { token });
 
     public DynamicScopeTokenResolver(DynamicMethod dm)
@@ -55,53 +45,87 @@ class DynamicScopeTokenResolver : ITokenResolver
         m_scope = _scopeFi?.GetValue(dm.GetILGenerator());
     }
 
-    public string? AsString(int token) => this[token] as string;
+    public string? AsString(int token)
+    {
+        return this[token] as string;
+    }
 
     public FieldInfo AsField(int token)
     {
-        if (this[token] is RuntimeFieldHandle runtimeFieldHandle)
+        object? t = this[token];
+
+        if (t is RuntimeFieldHandle runtimeFieldHandle)
         { return FieldInfo.GetFieldFromHandle(runtimeFieldHandle); }
 
-        if (this[token].GetType() == _genFieldInfoType)
+        if (t is null)
         {
-            return FieldInfo.GetFieldFromHandle(
-                (RuntimeFieldHandle)_genfieldFi1.GetValue(this[token]),
-                (RuntimeTypeHandle)_genfieldFi2.GetValue(this[token])
-            );
+            Debug.Assert(false);
+            return null;
         }
 
-        Debug.Assert(false, $"Unexpected type: {this[token].GetType()}");
+        if (t.GetType().Equals(_genFieldInfoType))
+        {
+            if (_genfieldFi1?.GetValue(t) is not RuntimeFieldHandle v1 || _genfieldFi2?.GetValue(t) is not RuntimeTypeHandle v2)
+            {
+                Debug.Assert(false);
+                return null;
+            }
+
+            return FieldInfo.GetFieldFromHandle(v1, v2);
+        }
+
+        Debug.Assert(false, $"Unexpected type: {t.GetType()}");
         return null;
     }
 
-    public Type? AsType(int token) => Type.GetTypeFromHandle((RuntimeTypeHandle)this[token]);
+    public Type? AsType(int token)
+    {
+        if (this[token] is not RuntimeTypeHandle v)
+        {
+            Debug.Assert(false);
+            return null;
+        }
+
+        return Type.GetTypeFromHandle(v);
+    }
 
     public MethodBase? AsMethod(int token)
     {
-        if (this[token] is DynamicMethod dynamicMethod)
+        object? t = this[token];
+
+        if (t is null)
+        {
+            Debug.Assert(false);
+            return null;
+        }
+
+        if (t is DynamicMethod dynamicMethod)
         {
             return dynamicMethod;
         }
 
-        if (this[token] is RuntimeMethodHandle handle)
+        if (t is RuntimeMethodHandle handle)
         {
             return MethodBase.GetMethodFromHandle(handle);
         }
 
-        if (this[token].GetType() == _genMethodInfoType)
+        if (t.GetType() == _genMethodInfoType)
         {
-            return MethodBase.GetMethodFromHandle(
-               (RuntimeMethodHandle)_genmethFi1.GetValue(this[token]),
-               (RuntimeTypeHandle)_genmethFi2.GetValue(this[token])
-            );
+            if (_genmethFi1?.GetValue(t) is not RuntimeMethodHandle v1 || _genmethFi2?.GetValue(t) is not RuntimeTypeHandle v2)
+            {
+                Debug.Assert(false);
+                return null;
+            }
+
+            return MethodBase.GetMethodFromHandle(v1, v2);
         }
 
-        if (this[token].GetType() == _varArgMethodType)
+        if (t.GetType() == _varArgMethodType)
         {
-            return (MethodInfo)_varargFi1.GetValue(this[token]);
+            return (MethodInfo?)_varargFi1?.GetValue(t);
         }
 
-        Debug.Assert(false, $"Unexpected type: {this[token].GetType()}");
+        Debug.Assert(false, $"Unexpected type: {t.GetType()}");
         return null;
     }
 
@@ -115,5 +139,8 @@ class DynamicScopeTokenResolver : ITokenResolver
         return null;
     }
 
-    public byte[]? AsSignature(int token) => this[token] as byte[];
+    public byte[]? AsSignature(int token)
+    {
+        return this[token] as byte[];
+    }
 }

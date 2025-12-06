@@ -131,20 +131,6 @@ public partial class Tokenizer
                 break;
             }
 
-            // case "#elseif":
-            // {
-            //     if (PreprocessConditions.Count == 0)
-            //     { throw new TokenizerException($"Unexpected preprocessor tag \"{last.Identifier}\"", last.Identifier.Position, File); }
-            // 
-            //     if (last.Argument is null)
-            //     { throw new TokenizerException($"Argument expected after preprocessor tag \"{last.Identifier}\"", last.Identifier.Position.After(), File); }
-            // 
-            //     bool condition = PreprocessVariables.Contains(last.Argument.Content);
-            //     PreprocessConditions.Last = PreprocessConditions.Last ? !PreprocessConditions.Last : condition;
-            // 
-            //     break;
-            // }
-
             case "#else":
             {
                 if (finished)

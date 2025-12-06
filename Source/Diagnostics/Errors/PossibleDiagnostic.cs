@@ -26,31 +26,34 @@ public class PossibleDiagnostic
         ShouldBreak = shouldBreak;
     }
 
-    public PossibleDiagnostic(string message, ILocated location)
-        : this(message, location.Location.Position, location.Location.File, ImmutableArray<PossibleDiagnostic>.Empty)
+    public PossibleDiagnostic(string message, ILocated? location)
+        : this(message, location, ImmutableArray<PossibleDiagnostic>.Empty)
     { }
 
-    public PossibleDiagnostic(string message, ILocated location, params PossibleDiagnostic[] suberrors)
-        : this(message, location.Location.Position, location.Location.File, suberrors.ToImmutableArray())
+    public PossibleDiagnostic(string message, ILocated? location, params PossibleDiagnostic[] suberrors)
+        : this(message, location, suberrors.ToImmutableArray())
     { }
 
-    public PossibleDiagnostic(string message, ILocated location, ImmutableArray<PossibleDiagnostic> suberrors)
-        : this(message, location.Location.Position, location.Location.File, suberrors)
-    { }
-
-    PossibleDiagnostic(string message, Position position, Uri file, ImmutableArray<PossibleDiagnostic> suberrors)
+    public PossibleDiagnostic(string message, ILocated? location, ImmutableArray<PossibleDiagnostic> suberrors)
     {
         Message = message;
-        IsPopulated = true;
-        Position = position;
-        File = file;
         SubErrors = suberrors;
+        if (location is not null)
+        {
+            IsPopulated = true;
+            Position = location.Location.Position;
+            File = location.Location.File;
+        }
+        else
+        {
+            IsPopulated = false;
+        }
     }
 
     public void Throw()
     {
         if (IsPopulated)
-        { throw new LanguageException(Message, Position, File!); }
+        { throw new LanguageException(Message, Position, File); }
         else
         { throw new LanguageExceptionWithoutContext(Message); }
     }
@@ -63,22 +66,22 @@ public class PossibleDiagnostic
 
     public Diagnostic ToError(IPositioned position, Uri file, bool? shouldBreak = null) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Error, Message, Position, File!, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file, shouldBreak))) :
+        new(DiagnosticsLevel.Error, Message, Position, File, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file, shouldBreak))) :
         new(DiagnosticsLevel.Error, Message, position.Position, file, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(position, file, shouldBreak)));
 
     public Diagnostic ToWarning(IPositioned position, Uri file) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Warning, Message, Position, File!, false, SubErrors.ToImmutableArray(v => v.ToWarning(position, file))) :
+        new(DiagnosticsLevel.Warning, Message, Position, File, false, SubErrors.ToImmutableArray(v => v.ToWarning(position, file))) :
         new(DiagnosticsLevel.Warning, Message, position.Position, file, false, SubErrors.ToImmutableArray(v => v.ToWarning(position, file)));
 
     public Diagnostic ToError(ILocated location, bool? shouldBreak = null) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Error, Message, Position, File!, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location, shouldBreak))) :
+        new(DiagnosticsLevel.Error, Message, Position, File, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location, shouldBreak))) :
         new(DiagnosticsLevel.Error, Message, location.Location.Position, location.Location.File, shouldBreak ?? ShouldBreak, SubErrors.ToImmutableArray(v => v.ToError(location, shouldBreak)));
 
     public Diagnostic ToWarning(ILocated location) =>
         IsPopulated ?
-        new(DiagnosticsLevel.Warning, Message, Position, File!, false, SubErrors.ToImmutableArray(v => v.ToWarning(location))) :
+        new(DiagnosticsLevel.Warning, Message, Position, File, false, SubErrors.ToImmutableArray(v => v.ToWarning(location))) :
         new(DiagnosticsLevel.Warning, Message, location.Location.Position, location.Location.File, false, SubErrors.ToImmutableArray(v => v.ToWarning(location)));
 
     public override string ToString() => Message;

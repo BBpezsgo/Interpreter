@@ -2,7 +2,6 @@
 
 namespace LanguageCore.Brainfuck;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public readonly struct CompactCodeSegment
 {
     public OpCodesCompact OpCode { get; }
@@ -24,20 +23,6 @@ public readonly struct CompactCodeSegment
         OpCode = (OpCodesCompact)CompactCode.ToOpCode(opCode);
         Count = 1;
     }
-
-    string GetDebuggerDisplay() => $"{OpCode switch
-    {
-        OpCodesCompact.PointerRight => ">",
-        OpCodesCompact.PointerLeft => "<",
-        OpCodesCompact.Add => "+",
-        OpCodesCompact.Sub => "-",
-        OpCodesCompact.BranchStart => "[",
-        OpCodesCompact.BranchEnd => "]",
-        OpCodesCompact.Out => ".",
-        OpCodesCompact.In => ",",
-        OpCodesCompact.Break => "$",
-        _ => OpCode.ToString(),
-    }} x{Count}";
 
     public override string ToString()
     {
@@ -158,7 +143,7 @@ public static class CompactCode
     {
         OpCodes[] result = new OpCodes[c.Length];
         for (int i = 0; i < c.Length; i++)
-        { result[i] = CompactCode.ToOpCode(c[i]); }
+        { result[i] = ToOpCode(c[i]); }
         return result.AsImmutableUnsafe();
     }
 
@@ -166,7 +151,7 @@ public static class CompactCode
     {
         char[] result = new char[c.Length];
         for (int i = 0; i < c.Length; i++)
-        { result[i] = CompactCode.FromOpCode(c[i]); }
+        { result[i] = FromOpCode(c[i]); }
         return result.AsImmutableUnsafe();
     }
 

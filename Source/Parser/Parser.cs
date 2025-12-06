@@ -180,19 +180,6 @@ public sealed class Parser
         );
     }
 
-    Statement ParseStatementInternal()
-    {
-        if (ExpectStatementUnchecked(out Statement? statement))
-        {
-            Diagnostics.Throw();
-            return statement;
-        }
-        else if (CurrentToken is null)
-        { throw new SyntaxException($"Expected something but got nothing", PreviousToken?.Position.After() ?? Position.UnknownPosition, File); }
-        else
-        { throw new SyntaxException($"Expected something but not \"{CurrentToken}\"", CurrentToken, File); }
-    }
-
     #region Parse top level
 
     bool ExpectUsing([NotNullWhen(true)] out UsingDefinition? usingDefinition)
@@ -1543,7 +1530,7 @@ public sealed class Parser
             { throw new SyntaxException($"Expected condition after \"{keyword} (\"", bracketStart.Position.After(), File); }
 
             if (!ExpectOperator(")", out Token? bracketEnd))
-            { throw new SyntaxException($"Expected \")\" after \"{keyword}\" condition condition", condition.Position.After(), File); }
+            { throw new SyntaxException($"Expected \")\" after \"{keyword}\" condition", condition.Position.After(), File); }
 
             if (!ExpectStatement(out block))
             { throw new SyntaxException($"Expected a statement after \"{keyword}\" condition", bracketEnd.Position.After(), File); }

@@ -4,6 +4,7 @@ public class CompiledCast : CompiledExpression
 {
     public required CompiledExpression? Allocator { get; init; }
     public required CompiledExpression Value { get; init; }
+    public required CompiledTypeExpression TypeExpression { get; init; }
 
     public override string Stringify(int depth = 0) => $"({Type}){Value.Stringify(depth + 1)}";
 
@@ -16,5 +17,6 @@ public class CompiledCast : CompiledExpression
         Allocator = null,
         Location = value.Location,
         SaveValue = value.SaveValue,
+        TypeExpression = CompiledTypeExpression.CreateAnonymous(type, value.Location),
     };
 }

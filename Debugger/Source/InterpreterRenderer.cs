@@ -201,7 +201,7 @@ public class InterpreterRenderer
             case ArrayType v:
                 WriteType(ref t, v.Of);
                 t.Write('[');
-                if (v.ComputedLength.HasValue) t.Write(v.ComputedLength.Value.ToString());
+                if (v.Length.HasValue) t.Write(v.Length.Value.ToString());
                 t.Write(']');
                 break;
             case BuiltinType v:
@@ -792,10 +792,10 @@ public class InterpreterRenderer
                     int valueAddress = processor.Memory.AsSpan().Get<int>(pointerAddress);
                     if (valueAddress <= 0) continue;
 
-                    if (!pointerType.To.GetSize(new RuntimeInfoProvider()
+                    if (!StatementCompiler.FindSize(pointerType.To, out int valueSize, out _, new RuntimeInfoProvider()
                     {
                         PointerSize = CodeGeneratorForMain.DefaultCompilerSettings.PointerSize,
-                    }, out int valueSize, out _))
+                    }))
                     {
                         valueSize = 0;
                     }
@@ -906,10 +906,10 @@ public class InterpreterRenderer
                 int valueAddress = processor.Memory.AsSpan().Get<int>(pointerAddress);
                 if (valueAddress <= 0) continue;
 
-                if (!pointerType.To.GetSize(new RuntimeInfoProvider()
+                if (!StatementCompiler.FindSize(pointerType.To, out int valueSize, out _, new RuntimeInfoProvider()
                 {
                     PointerSize = CodeGeneratorForMain.DefaultCompilerSettings.PointerSize,
-                }, out int valueSize, out _))
+                }))
                 {
                     valueSize = 0;
                 }

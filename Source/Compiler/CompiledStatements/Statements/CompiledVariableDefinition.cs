@@ -2,6 +2,7 @@ namespace LanguageCore.Compiler;
 
 public class CompiledVariableDefinition : CompiledStatement
 {
+    public required CompiledTypeExpression TypeExpression { get; init; }
     public required GeneralType Type { get; init; }
     public required string Identifier { get; init; }
     public required CompiledExpression? InitialValue { get; init; }

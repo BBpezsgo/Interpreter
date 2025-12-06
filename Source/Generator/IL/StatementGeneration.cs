@@ -374,7 +374,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     {
         switch (statement.Operator)
         {
-            case "!":
+            case CompiledUnaryOperatorCall.LogicalNOT:
             {
                 Label labelFalse = il.DefineLabel();
                 Label labelEnd = il.DefineLabel();
@@ -1166,14 +1166,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     return;
                 }
 
-                if (!arrayType.Length.Type.SameAs(BuiltinType.I32))
-                {
-                    Diagnostics.Add(Diagnostic.Internal($"The array's length must be an i32 and not {arrayType.Length.Type}", statement));
-                    successful = false;
-                    return;
-                }
-
-                EmitStatement(arrayType.Length, il, ref successful);
+                EmitValue(arrayType.Length.Value, il);
                 il.Emit(OpCodes.Newarr, type);
                 EmitValue(0, il);
                 il.Emit(OpCodes.Ldelema, type);
@@ -1232,7 +1225,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     void EmitStatement(CompiledReinterpretation statement, ILProxy il, ref bool successful)
     {
-        if (statement.Type.Is(out PointerType? resultPointerType) &&
+        if (statement.TypeExpression.Is(out CompiledPointerTypeExpression? resultPointerType) &&
             statement.Value is CompiledFunctionCall allocatorCaller &&
             allocatorCaller.Function is CompiledFunctionDefinition allocatorCallee &&
             allocatorCallee.BuiltinFunctionName == "alloc" &&
@@ -1240,9 +1233,9 @@ public partial class CodeGeneratorForIL : CodeGenerator
         {
             if (allocatorCaller.Arguments[0].Value is CompiledSizeof sizeofArgument)
             {
-                if (sizeofArgument.Of.Is(out ArrayType? sizeofArrayType))
+                if (sizeofArgument.Of.Is(out CompiledArrayTypeExpression? sizeofArrayType))
                 {
-                    if (!resultPointerType.To.Is(out ArrayType? resultArrayType) ||
+                    if (!resultPointerType.To.Is(out CompiledArrayTypeExpression? resultArrayType) ||
                         !resultArrayType.Of.SameAs(sizeofArrayType.Of))
                     {
                         Diagnostics.Add(Diagnostic.Internal($"Invalid heap allocation types", sizeofArgument));
@@ -1255,7 +1248,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
                         Allocator = allocatorCallee,
                         Location = statement.Location,
                         SaveValue = statement.SaveValue,
-                        Type = resultPointerType,
+                        Type = statement.Type,
+                        TypeExpression = resultPointerType,
                     }, il, ref successful);
                 }
                 else
@@ -1272,7 +1266,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
                         Allocator = allocatorCallee,
                         Location = statement.Location,
                         SaveValue = statement.SaveValue,
-                        Type = resultPointerType,
+                        Type = statement.Type,
+                        TypeExpression = resultPointerType,
                     }, il, ref successful);
                 }
                 return;
@@ -1305,7 +1300,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
                     Allocator = allocatorCallee,
                     Location = statement.Location,
                     SaveValue = statement.SaveValue,
-                    Type = resultPointerType,
+                    Type = statement.Type,
+                    TypeExpression = resultPointerType,
                 }, il, ref successful);
                 return;
             }
@@ -1403,8 +1399,8 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         if (statement.Value.Type.Is(out BuiltinType? fromTypeB) &&
             statement.Type.Is(out BuiltinType? toTypeB) &&
-            fromTypeB.GetBitWidth(this, out BitWidth fromTypeBW, out _) &&
-            toTypeB.GetBitWidth(this, out BitWidth toTypeBW, out _) &&
+            FindBitWidth(fromTypeB, out BitWidth fromTypeBW, out _) &&
+            FindBitWidth(toTypeB, out BitWidth toTypeBW, out _) &&
             fromTypeBW == toTypeBW)
         {
             EmitStatement(statement.Value, il, ref successful);
@@ -1774,17 +1770,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
         successful = false;
         Diagnostics.Add(Diagnostic.Critical($"Arrays on stack aren't supported in MSIL", statement, false));
     }
-    void EmitStatement(CompiledCompilerVariableAccess statement, ILProxy il, ref bool successful)
-    {
-        if (statement.Identifier == "IL")
-        {
-            EmitValue(1, il);
-        }
-        else
-        {
-            EmitValue(0, il);
-        }
-    }
     void EmitStatement(CompiledLambda statement, ILProxy il, ref bool successful)
     {
         successful = false;
@@ -1830,7 +1815,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             case CompiledRegisterAccess v: EmitStatement(v, il, ref successful); break;
             case CompiledLabelReference v: EmitStatement(v, il, ref successful); break;
             case CompiledList v: EmitStatement(v, il, ref successful); break;
-            case CompiledCompilerVariableAccess v: EmitStatement(v, il, ref successful); break;
             case CompiledLambda v: EmitStatement(v, il, ref successful); break;
             default: throw new NotImplementedException(statement.GetType().Name);
         }
@@ -1978,7 +1962,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
     string GenerateTypeId_(GeneralType type) => type.FinalValue switch
     {
-        ArrayType v => $"{GenerateTypeId_(v.Of)}[{v.ComputedLength?.ToString() ?? ""}]",
+        ArrayType v => $"{GenerateTypeId_(v.Of)}[{v.Length?.ToString() ?? ""}]",
         BuiltinType v => v.Type.ToString(),
         FunctionType => $"fnc",
         PointerType => $"ptr",
@@ -2008,12 +1992,12 @@ public partial class CodeGeneratorForIL : CodeGenerator
 
         string id = GenerateTypeId(type);
 
-        if (!type.GetSize(this, out int size, out error))
+        if (!FindSize(type, out int size, out error))
         {
             return false;
         }
 
-        if (!type.GetFields(this, out ImmutableDictionary<CompiledField, int>? fields, out error))
+        if (!GetFieldOffsets(type, out ImmutableDictionary<CompiledField, int>? fields, out error))
         {
             return false;
         }
@@ -2075,14 +2059,14 @@ public partial class CodeGeneratorForIL : CodeGenerator
     }
     bool ToType(ArrayType type, [NotNullWhen(true)] out Type? result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        if (type.Length is not CompiledConstantValue _length)
+        if (!type.Length.HasValue)
         {
             error = new PossibleDiagnostic($"The array's length must be a constant", false);
             result = null;
             return false;
         }
 
-        if (_length.Value.Type == RuntimeType.F32 || _length.Value <= 0)
+        if (type.Length.Value <= 0)
         {
             error = new PossibleDiagnostic($"Invalid array length");
             result = null;
@@ -2101,7 +2085,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
             return false;
         }
 
-        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1, elementSize * (int)_length.Value);
+        TypeBuilder builder = Module.DefineType(id, TypeAttributes.Public | TypeAttributes.SequentialLayout | TypeAttributes.AnsiClass | TypeAttributes.Sealed | TypeAttributes.BeforeFieldInit, typeof(ValueType), PackingSize.Size1, elementSize * type.Length.Value);
 
         ConstructorBuilder constructor = builder.DefineConstructor(
             MethodAttributes.Public |

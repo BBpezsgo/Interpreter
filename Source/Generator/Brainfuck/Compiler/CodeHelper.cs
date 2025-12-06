@@ -41,15 +41,14 @@ public readonly struct AutoCodeBlock : IDisposable
     }
 }
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class CodeHelper : IDuplicatable<CodeHelper>
 {
     const int HalfByte = byte.MaxValue / 2;
     const int InitialSize = 1024;
     const int IndentationSize = 2;
 
-    public int Pointer => _pointer;
-    public int BranchDepth => _branchDepth;
+    public int Pointer { get; private set; }
+    public int BranchDepth { get; private set; }
     public int Length => _code.Length;
 
     public bool AddComments { get; set; }
@@ -57,15 +56,13 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     StringBuilder _code;
     int _indent;
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int _pointer;
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] int _branchDepth;
 
     public CodeHelper()
     {
         _code = new StringBuilder(InitialSize);
         _indent = 0;
-        _pointer = 0;
-        _branchDepth = 0;
+        Pointer = 0;
+        BranchDepth = 0;
 
         AddComments = false;
         AddSmallComments = false;
@@ -229,7 +226,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </code>
     /// </para>
     /// </summary>
-    public void SetPointer(int address) => MovePointer(address - _pointer);
+    public void SetPointer(int address) => MovePointer(address - Pointer);
 
     public void MovePointer(int offset)
     {
@@ -238,7 +235,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
             for (int i = 0; i < (-offset); i++)
             {
                 Append('<');
-                _pointer--;
+                Pointer--;
             }
             return;
         }
@@ -247,7 +244,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
             for (int i = 0; i < offset; i++)
             {
                 Append('>');
-                _pointer++;
+                Pointer++;
             }
             return;
         }
@@ -506,7 +503,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     public void JumpStart()
     {
         Append('[');
-        _branchDepth++;
+        BranchDepth++;
     }
 
     /// <summary>
@@ -515,7 +512,7 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     public void JumpEnd()
     {
         Append(']');
-        _branchDepth--;
+        BranchDepth--;
     }
 
     /// <summary>
@@ -523,8 +520,8 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </summary>
     public void JumpStart(int conditionAddress)
     {
-        this.SetPointer(conditionAddress);
-        this.JumpStart();
+        SetPointer(conditionAddress);
+        JumpStart();
     }
 
     /// <summary>
@@ -532,9 +529,9 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </summary>
     public void JumpEnd(int conditionAddress, bool clearCondition = false)
     {
-        this.SetPointer(conditionAddress);
-        if (clearCondition) this.ClearCurrent();
-        this.JumpEnd();
+        SetPointer(conditionAddress);
+        if (clearCondition) ClearCurrent();
+        JumpEnd();
     }
 
     public static CodeHelper operator +(CodeHelper a, string b)
@@ -602,11 +599,8 @@ public class CodeHelper : IDuplicatable<CodeHelper>
     /// </summary>
     public void FixPointer(int pointer)
     {
-        this._pointer = pointer;
+        Pointer = pointer;
     }
-
-    string GetDebuggerDisplay()
-        => $"{{{nameof(CodeHelper)}}}";
 
     /// <summary>
     /// <b>POINTER MISMATCH</b>
@@ -796,10 +790,10 @@ public class CodeHelper : IDuplicatable<CodeHelper>
 
     public CodeHelper Duplicate() => new()
     {
-        _branchDepth = BranchDepth,
+        BranchDepth = BranchDepth,
         _code = new StringBuilder(_code.ToString()),
         _indent = _indent,
-        _pointer = _pointer,
+        Pointer = Pointer,
         AddComments = AddComments,
         AddSmallComments = AddSmallComments,
     };

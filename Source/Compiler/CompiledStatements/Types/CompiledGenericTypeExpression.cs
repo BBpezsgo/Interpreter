@@ -3,8 +3,8 @@ using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
-public class GenericType : GeneralType,
-    IEquatable<GenericType>,
+public class CompiledGenericTypeExpression : CompiledTypeExpression,
+    IEquatable<CompiledGenericTypeExpression>,
     IReferenceableTo<Token>
 {
     public string Identifier { get; }
@@ -17,23 +17,25 @@ public class GenericType : GeneralType,
         set => throw new InvalidOperationException();
     }
 
-    public GenericType(string identifier, Uri originalFile)
+    [SetsRequiredMembers]
+    public CompiledGenericTypeExpression(string identifier, Uri originalFile, Location location) : base(location)
     {
         Identifier = identifier;
         Definition = null;
         File = originalFile;
     }
 
-    public GenericType(Token definition, Uri originalFile)
+    [SetsRequiredMembers]
+    public CompiledGenericTypeExpression(Token definition, Uri originalFile, Location location) : base(location)
     {
         Identifier = definition.Content;
         Definition = definition;
         File = originalFile;
     }
 
-    public override bool Equals(object? other) => Equals(other as GenericType);
-    public override bool Equals(GeneralType? other) => Equals(other as GenericType);
-    public bool Equals(GenericType? other)
+    public override bool Equals(object? other) => Equals(other as CompiledGenericTypeExpression);
+    public override bool Equals(CompiledTypeExpression? other) => Equals(other as CompiledGenericTypeExpression);
+    public bool Equals(CompiledGenericTypeExpression? other)
     {
         if (other is null) return false;
         if (!Identifier.Equals(other.Identifier)) return false;
@@ -53,4 +55,14 @@ public class GenericType : GeneralType,
     }
     public override int GetHashCode() => HashCode.Combine(Identifier);
     public override string ToString() => Identifier;
+    public override string Stringify(int depth = 0) => Identifier;
+
+    public static CompiledGenericTypeExpression CreateAnonymous(GenericType type, ILocated location)
+    {
+        return new(
+            type.Identifier,
+            type.File,
+            location.Location
+        );
+    }
 }

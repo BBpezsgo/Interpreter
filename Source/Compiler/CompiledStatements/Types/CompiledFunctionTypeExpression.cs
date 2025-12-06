@@ -2,25 +2,26 @@
 
 namespace LanguageCore.Compiler;
 
-public class FunctionType : GeneralType,
-    IEquatable<FunctionType>
+public class CompiledFunctionTypeExpression : CompiledTypeExpression,
+    IEquatable<CompiledFunctionTypeExpression>
 {
-    public GeneralType ReturnType { get; }
-    public ImmutableArray<GeneralType> Parameters { get; }
+    public CompiledTypeExpression ReturnType { get; }
+    public ImmutableArray<CompiledTypeExpression> Parameters { get; }
     public bool HasClosure { get; }
 
     public bool ReturnSomething => !ReturnType.SameAs(BasicType.Void);
 
-    public FunctionType(GeneralType returnType, ImmutableArray<GeneralType> parameters, bool hasClosure)
+    [SetsRequiredMembers]
+    public CompiledFunctionTypeExpression(CompiledTypeExpression returnType, ImmutableArray<CompiledTypeExpression> parameters, bool hasClosure, Location location) : base(location)
     {
         ReturnType = returnType;
         Parameters = parameters;
         HasClosure = hasClosure;
     }
 
-    public override bool Equals(object? other) => Equals(other as FunctionType);
-    public override bool Equals(GeneralType? other) => Equals(other as FunctionType);
-    public bool Equals(FunctionType? other)
+    public override bool Equals(object? other) => Equals(other as CompiledFunctionTypeExpression);
+    public override bool Equals(CompiledTypeExpression? other) => Equals(other as CompiledFunctionTypeExpression);
+    public bool Equals(CompiledFunctionTypeExpression? other)
     {
         if (other is null) return false;
         if (!other.ReturnType.Equals(ReturnType)) return false;
@@ -53,5 +54,30 @@ public class FunctionType : GeneralType,
         result.Append(')');
 
         return result.ToString();
+    }
+    public override string Stringify(int depth = 0)
+    {
+        StringBuilder result = new();
+        if (HasClosure) result.Append('@');
+        result.Append(ReturnType.Stringify(depth));
+        result.Append('(');
+        for (int i = 0; i < Parameters.Length; i++)
+        {
+            if (i > 0) result.Append(", ");
+            result.Append(Parameters[i].Stringify(depth));
+        }
+        result.Append(')');
+
+        return result.ToString();
+    }
+
+    public static CompiledFunctionTypeExpression CreateAnonymous(FunctionType type, ILocated location)
+    {
+        return new(
+            CreateAnonymous(type.ReturnType, location),
+            type.Parameters.ToImmutableArray(v => CreateAnonymous(v, location)),
+            type.HasClosure,
+            location.Location
+        );
     }
 }

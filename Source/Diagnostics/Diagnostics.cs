@@ -14,9 +14,41 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
 {
     readonly List<Diagnostic> _diagnostics;
     readonly List<DiagnosticWithoutContext> _diagnosticsWithoutContext;
+    readonly Stack<Override> _overrides;
 
     public IReadOnlyCollection<Diagnostic> Diagnostics => _diagnostics;
     public IReadOnlyCollection<DiagnosticWithoutContext> DiagnosticsWithoutContext => _diagnosticsWithoutContext;
+
+    public readonly struct Override : IDisposable
+    {
+        public DiagnosticsCollection Collection { get; }
+        public DiagnosticsCollection Base { get; }
+
+        public Override(DiagnosticsCollection @base, DiagnosticsCollection? collection)
+        {
+            Collection = collection ?? new();
+            Base = @base;
+        }
+
+        public void Apply()
+        {
+            Base.AddRange(Collection);
+            Collection.Clear();
+        }
+
+        public void Dispose()
+        {
+            Override r = Base._overrides.Pop();
+            if (r.Collection != Collection) throw new UnreachableException();
+        }
+    }
+
+    public Override MakeOverride(DiagnosticsCollection? diagnostics = null)
+    {
+        Override r = new(this, diagnostics);
+        _overrides.Push(r);
+        return r;
+    }
 
     public bool HasErrors =>
         _diagnostics.Any(v => v.Level == DiagnosticsLevel.Error) ||
@@ -30,12 +62,14 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
     {
         _diagnostics = new();
         _diagnosticsWithoutContext = new();
+        _overrides = new();
     }
 
     public DiagnosticsCollection(DiagnosticsCollection other)
     {
         _diagnostics = new(other._diagnostics);
         _diagnosticsWithoutContext = new(other._diagnosticsWithoutContext);
+        _overrides = new();
     }
 
     public void Throw()

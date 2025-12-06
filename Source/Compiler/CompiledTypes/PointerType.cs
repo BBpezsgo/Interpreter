@@ -1,9 +1,7 @@
-﻿using LanguageCore.Runtime;
-using LanguageCore.Parser;
+﻿using LanguageCore.Parser;
 
 namespace LanguageCore.Compiler;
 
-[DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class PointerType : GeneralType,
     IEquatable<PointerType>
 {
@@ -14,20 +12,6 @@ public class PointerType : GeneralType,
     public PointerType(GeneralType to)
     {
         To = to;
-    }
-
-    public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = runtime.PointerSize;
-        error = default;
-        return true;
-    }
-
-    public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        bitWidth = (BitWidth)runtime.PointerSize;
-        error = default;
-        return true;
     }
 
     public override bool Equals(object? other) => Equals(other as PointerType);

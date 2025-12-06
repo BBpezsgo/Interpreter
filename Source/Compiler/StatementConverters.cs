@@ -95,6 +95,7 @@ public static class StatementConverters
     public static CompiledVariableDefinition ToVariable(this ParameterDefinition parameterDefinition, GeneralType type, CompiledArgument? initialValue = null)
         => new()
         {
+            TypeExpression = CompiledTypeExpression.CreateAnonymous(type, parameterDefinition.Type.Location),
             Identifier = parameterDefinition.Identifier.Content,
             Type = type,
             Cleanup = new CompiledCleanup()

@@ -23,7 +23,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         ),
     };
 
-    public override int PointerSize => 8;
+    public override int PointerSize => nint.Size;
     public override BuiltinType BooleanType => BuiltinType.U8;
     public override BuiltinType SizeofStatementType => BuiltinType.I32;
     public override BuiltinType ArrayLengthType => BuiltinType.I32;
@@ -44,13 +44,6 @@ public partial class CodeGeneratorForIL : CodeGenerator
             {
                 Name = "BBLangGeneratedAssembly",
             }, AssemblyBuilderAccess.RunAndCollect);
-
-            // Type daType = typeof(DebuggableAttribute);
-            // ConstructorInfo daCtor = daType.GetConstructor(new Type[] { typeof(DebuggableAttribute.DebuggingModes) })!;
-            // CustomAttributeBuilder daBuilder = new(daCtor, new object[] {
-            //     DebuggableAttribute.DebuggingModes.DisableOptimizations |
-            //     DebuggableAttribute.DebuggingModes.Default });
-            // assemBuilder.SetCustomAttribute(daBuilder);
 
             Module = assemBuilder.DefineDynamicModule("BBLangGeneratedModule");
         }

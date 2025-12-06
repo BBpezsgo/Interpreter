@@ -171,7 +171,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         InstructionLabel returnLabel = Code.DefineLabel();
         Push(returnLabel.Absolute());
 
-        //PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, address));
+        //PushFrom(AbsoluteGlobalAddress, FindSize(AbsGlobalAddressType, address));
         Push(Register.BasePointer);
 
         GenerateCodeForStatement(address);
@@ -186,7 +186,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             }
         }
 
-        using (RegisterUsage.Auto reg = Registers.GetFree(addressType.GetBitWidth(this, Diagnostics, address)))
+        using (RegisterUsage.Auto reg = Registers.GetFree(FindBitWidth(addressType, address)))
         {
             PopTo(reg.Register);
             InstructionLabel offsetLabel = Code.DefineLabel();
@@ -206,7 +206,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (captureGlobalVariables)
         {
-            PushFrom(AbsoluteGlobalAddress, AbsGlobalAddressType.GetSize(this, Diagnostics, callerLocation));
+            PushFrom(AbsoluteGlobalAddress, PointerSize);
         }
         Push(Register.BasePointer);
 
@@ -222,7 +222,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         PopTo(Register.BasePointer);
         if (HasCapturedGlobalVariables)
         {
-            Pop(AbsGlobalAddressType.GetSize(this, Diagnostics, location)); // Pop AbsoluteGlobalOffset
+            Pop(PointerSize); // Pop AbsoluteGlobalOffset
         }
         Code.Emit(Opcode.Return);
         ScopeSizes.LastRef -= PointerSize;
@@ -267,7 +267,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         return new AddressOffset(new AddressPointer(GetParameterAddress(0)), offset);
                     }
                 }
-                offset += (capturedLocal.Variable?.Type ?? capturedLocal.Parameter?.Type)!.GetSize(this);
+                offset += FindSize((capturedLocal.Variable?.Type ?? capturedLocal.Parameter?.Type)!, ((ILocated?)capturedLocal.Variable ?? (ILocated?)capturedLocal.Parameter)!);
             }
         }
 
@@ -280,8 +280,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         );
     }
 
-    [SuppressMessage("Style", "IDE0060:Remove unused parameter")]
-    public AddressOffset GetReturnValueAddress(GeneralType returnType)
+    public AddressOffset GetReturnValueAddress()
     {
         return new(
             Register.BasePointer,
@@ -309,7 +308,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         return new AddressOffset(new AddressPointer(GetParameterAddress(0)), _offset + offset);
                     }
                 }
-                _offset += (capturedLocal.Variable?.Type ?? capturedLocal.Parameter?.Type)!.GetSize(this);
+                _offset += FindSize((capturedLocal.Variable?.Type ?? capturedLocal.Parameter?.Type)!, ((ILocated?)capturedLocal.Variable ?? (ILocated?)capturedLocal.Parameter)!);
             }
         }
 
@@ -324,7 +323,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             if (i <= beforeThis) continue;
             CompiledParameter parameter = CompiledParameters[i];
-            sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this, Diagnostics, parameter);
+            sum += parameter.IsRef ? PointerSize : FindSize(parameter.Type, parameter);
         }
 
         return sum;
@@ -811,7 +810,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     bool GetAddress(CompiledElementAccess indexCall, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        error = default;
         address = default;
 
         GeneralType prevType = indexCall.Base.Type;
@@ -838,11 +836,14 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        int elementSize = array.Of.GetSize(this, Diagnostics, indexCall);
+        if (!FindSize(array.Of, out int elementSize, out error))
+        {
+            return false;
+        }
 
         if (indexCall.Index is CompiledConstantValue evaluatedStatement)
         {
-            int offset = (int)evaluatedStatement.Value * array.Of.GetSize(this, Diagnostics, indexCall);
+            int offset = (int)evaluatedStatement.Value * elementSize;
             address = new AddressOffset(baseAddress, offset);
             return true;
         }
@@ -881,7 +882,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return false;
         }
 
-        if (!@struct.GetField(value.Field.Identifier.Content, this, out _, out int fieldOffset, out error))
+        if (!GetFieldOffset(@struct, value.Field.Identifier.Content, out _, out int fieldOffset, out error))
         {
             return false;
         }
@@ -953,7 +954,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GlobalVariablesSize);
 
     public int SavedBasePointerOffset => 0 * ProcessorState.StackDirection;
-    public int AbsoluteGlobalOffset => ExitCodeType.GetSize(this) * -ProcessorState.StackDirection;
+    public int AbsoluteGlobalOffset => FindSize(ExitCodeType) * -ProcessorState.StackDirection;
     public int SavedCodePointerOffset => ((HasCapturedGlobalVariables ? AbsGlobalAddressSize : 0) + CodePointerSize) * -ProcessorState.StackDirection;
 
     public const int InvalidFunctionAddress = int.MinValue;
@@ -966,7 +967,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
             foreach (CompiledParameter parameter in CompiledParameters)
             {
-                sum += parameter.IsRef ? PointerSize : parameter.Type.GetSize(this, Diagnostics, parameter);
+                sum += parameter.IsRef ? PointerSize : FindSize(parameter.Type, parameter);
             }
 
             return sum;

@@ -43,17 +43,15 @@ public partial class StatementCompiler
         {
             FieldDefinition field = @struct.Fields[i];
 
-            if (!GeneralType.From(field.Type, FindType, out GeneralType? fieldType, out PossibleDiagnostic? error))
-            {
-                Diagnostics.Add(error.ToError(field.Type));
-                continue;
-            }
+            if (!CompileType(field.Type, out GeneralType? fieldType, Diagnostics)) continue;
             SetTypeType(field.Type, fieldType);
             compiledFields.Add(new CompiledField(fieldType, null! /* CompiledStruct constructor will set this */, field));
         }
 
         if (@struct.Template is not null)
         { GenericParameters.Pop(); }
+
+        if (compiledFields.Count != compiledFields.Capacity) return;
 
         @struct.SetFields(compiledFields.MoveToImmutable());
     }
@@ -252,8 +250,29 @@ public partial class StatementCompiler
 
     public static void CheckExternalFunctionDeclaration(IRuntimeInfoProvider runtime, FunctionThingDefinition definition, IExternalFunction externalFunction, GeneralType returnType, IReadOnlyList<GeneralType> parameterTypes, DiagnosticsCollection diagnostics)
     {
-        int passedParametersSize = parameterTypes.Sum(v => v.SameAs(BasicType.Void) ? 0 : v.GetSize(runtime));
-        int passedReturnType = returnType.SameAs(BasicType.Void) ? 0 : returnType.GetSize(runtime);
+        int passedParametersSize = 0;
+        int passedReturnType;
+
+        if (returnType.SameAs(BasicType.Void))
+        {
+            passedReturnType = 0;
+        }
+        else if (!FindSize(returnType, out passedReturnType, out PossibleDiagnostic? sizeError, runtime))
+        {
+            diagnostics.Add(sizeError.ToError(definition));
+            return;
+        }
+
+        foreach (GeneralType parameter in parameterTypes)
+        {
+            if (!FindSize(parameter, out int parameterSize, out PossibleDiagnostic? sizeError, runtime))
+            {
+                diagnostics.Add(sizeError.ToError(definition));
+                return;
+            }
+            passedParametersSize += parameterSize;
+        }
+
         if (externalFunction.ParametersSize != passedParametersSize)
         {
             diagnostics?.Add(Diagnostic.Critical($"Wrong size of parameters defined ({passedParametersSize}) for external function \"{externalFunction.ToReadable()}\" {definition.ToReadable()}", definition.Identifier, definition.File));
@@ -278,21 +297,13 @@ public partial class StatementCompiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        if (!GeneralType.From(function.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
-        {
-            Diagnostics.Add(typeError.ToError(function.Type));
-            return false;
-        }
+        if (!CompileType(function.Type, out GeneralType? type, Diagnostics)) return false;
         SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out typeError))
-            {
-                Diagnostics.Add(typeError.ToError(item.Type));
-                return false;
-            }
+            if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
             SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
@@ -353,21 +364,13 @@ public partial class StatementCompiler
     {
         result = null;
 
-        if (!GeneralType.From(function.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
-        {
-            Diagnostics.Add(typeError.ToError(function.Type));
-            return false;
-        }
+        if (!CompileType(function.Type, out GeneralType? type, Diagnostics)) return false;
         SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out typeError))
-            {
-                Diagnostics.Add(typeError.ToError(item.Type));
-                return false;
-            }
+            if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
             SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
@@ -391,11 +394,7 @@ public partial class StatementCompiler
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out PossibleDiagnostic? typeError))
-            {
-                Diagnostics.Add(typeError.ToError(item.Type));
-                return false;
-            }
+            if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
             SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
@@ -423,21 +422,13 @@ public partial class StatementCompiler
             { typeParameter.AnalyzedType = TokenAnalyzedType.TypeParameter; }
         }
 
-        if (!GeneralType.From(function.Type, FindType, out GeneralType? type, out PossibleDiagnostic? typeError))
-        {
-            Diagnostics.Add(typeError.ToError(function.Type));
-            return false;
-        }
+        if (!CompileType(function.Type, out GeneralType? type, Diagnostics)) return false;
         SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
-            if (!GeneralType.From(item.Type, FindType, out GeneralType? parameterType, out typeError))
-            {
-                Diagnostics.Add(typeError.ToError(item.Type));
-                return false;
-            }
+            if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
             SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
@@ -796,11 +787,7 @@ public partial class StatementCompiler
                 continue;
             }
 
-            if (!GeneralType.From(aliasDefinition.Value, FindType, out GeneralType? aliasType, out PossibleDiagnostic? typeError))
-            {
-                Diagnostics.Add(typeError.ToError(aliasDefinition.Value));
-                continue;
-            }
+            if (!CompileType(aliasDefinition.Value, out GeneralType? aliasType, Diagnostics)) continue;
             SetTypeType(aliasDefinition.Value, aliasType);
 
             CompiledAlias alias = new(

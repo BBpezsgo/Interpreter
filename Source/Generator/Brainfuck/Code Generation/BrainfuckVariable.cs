@@ -2,7 +2,6 @@
 
 namespace LanguageCore.Brainfuck.Generator;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class BrainfuckVariable :
     IIdentifiable<string>,
     IHaveCompiledType,
@@ -42,7 +41,4 @@ public class BrainfuckVariable :
         Size = size;
         Declaration = declaration.Declaration;
     }
-
-    [ExcludeFromCodeCoverage]
-    string GetDebuggerDisplay() => $"{Type} {Identifier} ({Size} bytes at {Address})";
 }

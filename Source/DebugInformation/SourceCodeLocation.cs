@@ -1,7 +1,6 @@
 namespace LanguageCore.Runtime;
 
 [ExcludeFromCodeCoverage]
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct SourceCodeLocation
 {
     public MutableRange<int> Instructions;
@@ -12,5 +11,4 @@ public struct SourceCodeLocation
         Instructions.End > instruction;
 
     public override readonly string ToString() => $"({Instructions} -> {Location.Position.ToStringRange()})";
-    readonly string GetDebuggerDisplay() => ToString();
 }

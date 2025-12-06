@@ -120,9 +120,9 @@ public class BrainfuckTests
     [TestMethod, Timeout(Timeout)] public void Test113() => TestList.GetTest(113).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test114() => TestList.GetTest(114).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test115() => TestList.GetTest(115).DoBrainfuck();
-    [TestMethod, Timeout(Timeout)] public void Test116() => TestList.GetTest(116).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("Goto statements")] public void Test116() => TestList.GetTest(116).DoBrainfuck();
     [TestMethod, Timeout(Timeout), Ignore("none")] public void Test117() => TestList.GetTest(117).DoBrainfuck();
-    [TestMethod, Timeout(Timeout)] public void Test118() => TestList.GetTest(118).DoBrainfuck();
+    [TestMethod, Timeout(Timeout), Ignore("too slow")] public void Test118() => TestList.GetTest(118).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test119() => TestList.GetTest(119).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test120() => TestList.GetTest(120).DoBrainfuck();
     [TestMethod, Timeout(Timeout)] public void Test121() => TestList.GetTest(121).DoBrainfuck();

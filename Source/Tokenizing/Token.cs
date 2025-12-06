@@ -1,6 +1,5 @@
 ﻿namespace LanguageCore.Tokenizing;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public class Token :
     IPositioned,
     IEquatable<Token>,
@@ -80,13 +79,6 @@ public class Token :
 
     public Token Duplicate() => new(TokenType, Content, IsAnonymous, Position)
     { AnalyzedType = AnalyzedType };
-
-    string GetDebuggerDisplay() => TokenType switch
-    {
-        TokenType.LiteralString => $"\"{Content.Escape()}\"",
-        TokenType.LiteralCharacter => $"\'{Content.Escape()}\'",
-        _ => Content.Escape(),
-    };
 
     public (Token?, Token?) Slice(int at)
     {

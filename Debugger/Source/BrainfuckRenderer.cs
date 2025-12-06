@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
-using LanguageCore.BBLang.Generator;
 using LanguageCore.Brainfuck;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
@@ -107,7 +106,7 @@ public class BrainfuckRenderer
             case ArrayType v:
                 WriteType(ref t, v.Of);
                 t.Write('[');
-                if (v.ComputedLength.HasValue) t.Write(v.ComputedLength.Value.ToString());
+                if (v.Length.HasValue) t.Write(v.Length.Value.ToString());
                 t.Write(']');
                 break;
             case BuiltinType v:

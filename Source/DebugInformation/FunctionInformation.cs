@@ -3,7 +3,6 @@ using LanguageCore.Compiler;
 namespace LanguageCore.Runtime;
 
 [ExcludeFromCodeCoverage]
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct FunctionInformation
 {
     public bool IsValid;
@@ -29,18 +28,6 @@ public struct FunctionInformation
         result.Append(ReadableIdentifier);
 
         result.Append(LanguageException.Format(ReadableIdentifier, SourcePosition, File));
-
-        return result.ToString();
-    }
-
-    readonly string GetDebuggerDisplay()
-    {
-        if (!IsValid) return "<unknown>";
-        StringBuilder result = new();
-
-        result.Append(Instructions.ToString());
-
-        result.Append(ReadableIdentifier);
 
         return result.ToString();
     }

@@ -1,9 +1,7 @@
-﻿using LanguageCore.Runtime;
-using LanguageCore.Parser;
+﻿using LanguageCore.Parser;
 
 namespace LanguageCore.Compiler;
 
-[DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public abstract class GeneralType :
     IEquatable<GeneralType>,
     IEquatable<TypeInstance>,
@@ -11,205 +9,6 @@ public abstract class GeneralType :
     IEquatable<RuntimeType>
 {
     public virtual GeneralType FinalValue => this;
-
-    public int GetSize(IRuntimeInfoProvider runtime)
-    {
-        if (!GetSize(runtime, out int size, out PossibleDiagnostic? error))
-        { error.Throw(); }
-        return size;
-    }
-
-    public BitWidth GetBitWidth(IRuntimeInfoProvider runtime)
-    {
-        if (!GetBitWidth(runtime, out BitWidth bitWidth, out PossibleDiagnostic? error))
-        { error.Throw(); }
-        return bitWidth;
-    }
-
-    public int GetSize(IRuntimeInfoProvider runtime, DiagnosticsCollection diagnostics, ILocated location)
-    {
-        if (!GetSize(runtime, out int size, out PossibleDiagnostic? error))
-        { diagnostics?.Add(error.ToError(location)); }
-        return size;
-    }
-
-    public BitWidth GetBitWidth(IRuntimeInfoProvider runtime, DiagnosticsCollection diagnostics, ILocated location)
-    {
-        if (!GetBitWidth(runtime, out BitWidth bitWidth, out PossibleDiagnostic? error))
-        { diagnostics?.Add(error.ToError(location)); }
-        return bitWidth;
-    }
-
-    public abstract bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error);
-    public abstract bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error);
-
-    public static bool From(
-        TypeInstance type,
-        FindType typeFinder,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null) => type switch
-        {
-            TypeInstanceSimple simpleType => From(simpleType, typeFinder, out result, out error, constComputer),
-            TypeInstanceFunction functionType => From(functionType, typeFinder, out result, out error, constComputer),
-            TypeInstanceStackArray stackArrayType => From(stackArrayType, typeFinder, out result, out error, constComputer),
-            TypeInstancePointer pointerType => From(pointerType, typeFinder, out result, out error, constComputer),
-            _ => throw new UnreachableException(),
-        };
-
-    public static bool From(
-        TypeInstanceStackArray type,
-        FindType typeFinder,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null)
-    {
-        result = null;
-        error = null;
-        CompiledValue? stackArraySize = default;
-
-        if (type.StackArraySize is not null)
-        {
-            if (constComputer is not null)
-            {
-                if (constComputer.Invoke(type.StackArraySize, out CompiledValue _stackArraySize))
-                { stackArraySize = _stackArraySize; }
-            }
-            else
-            {
-                if (StatementCompiler.TryComputeSimple(type.StackArraySize, out CompiledValue _stackArraySize))
-                { stackArraySize = _stackArraySize; }
-            }
-
-            if (!From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
-
-            result = new ArrayType(of, stackArraySize.HasValue ? new CompiledConstantValue()
-            {
-                Value = stackArraySize.Value,
-                Location = type.StackArraySize.Location,
-                SaveValue = true,
-                Type = BuiltinType.I32,
-            } : null);
-            //type.SetAnalyzedType(result);
-            return true;
-        }
-        else
-        {
-            if (!From(type.StackArrayOf, typeFinder, out GeneralType? of, out error, constComputer)) return false;
-            result = new ArrayType(of, null);
-            //type.SetAnalyzedType(result);
-            return true;
-        }
-    }
-
-    public static bool From(
-        TypeInstanceFunction type,
-        FindType typeFinder,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null)
-    {
-        result = null;
-
-        if (!From(type.FunctionReturnType, typeFinder, out GeneralType? returnType, out error, constComputer)) return false;
-        if (!FromArray(type.FunctionParameterTypes, typeFinder, out ImmutableArray<GeneralType> parameters, out error, constComputer)) return false;
-
-        result = new FunctionType(returnType, parameters, type.ClosureModifier is not null);
-        //type.SetAnalyzedType(result);
-        return true;
-    }
-
-    public static bool From(
-        TypeInstancePointer type,
-        FindType typeFinder,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null)
-    {
-        result = null;
-
-        if (!From(type.To, typeFinder, out GeneralType? to, out error, constComputer)) return false;
-
-        result = new PointerType(to);
-        //type.SetAnalyzedType(result);
-
-        return true;
-    }
-
-    public static bool From(
-        TypeInstanceSimple type,
-        FindType typeFinder,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null)
-    {
-        //result = null;
-        error = null;
-
-        if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
-        {
-            result = new BuiltinType(builtinType);
-            //type.SetAnalyzedType(result);
-            return true;
-        }
-
-        if (!typeFinder.Invoke(type.Identifier, type.File, out result, out error))
-        {
-            return false;
-        }
-
-        if (result.Is(out StructType? resultStructType) &&
-            resultStructType.Struct.Template is not null)
-        {
-            if (type.TypeArguments.HasValue)
-            {
-                if (!FromArray(type.TypeArguments.Value, typeFinder, out ImmutableArray<GeneralType> typeParameters, out error, constComputer)) return false;
-                result = new StructType(resultStructType.Struct, type.File, typeParameters);
-            }
-            else
-            {
-                result = new StructType(resultStructType.Struct, type.File);
-            }
-        }
-        else
-        {
-            if (type.TypeArguments.HasValue)
-            {
-                error = new($"Asd", type);
-                return false;
-            }
-        }
-
-        //type.SetAnalyzedType(result);
-        return true;
-    }
-
-    public static ImmutableArray<GeneralType> FromArray<T>(ImmutableArray<T> types) where T : IHaveCompiledType
-    {
-        ImmutableArray<GeneralType>.Builder result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
-        foreach (IHaveCompiledType item in types) result.Add(item.Type);
-        return result.MoveToImmutable();
-    }
-
-    public static bool FromArray(
-        ImmutableArray<TypeInstance> types,
-        FindType typeFinder,
-        [NotNullWhen(true)] out ImmutableArray<GeneralType> result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error,
-        ComputeValue? constComputer = null)
-    {
-        result = default;
-        error = null;
-
-        ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
-        foreach (TypeInstance item in types)
-        {
-            if (!From(item, typeFinder, out GeneralType? _item, out error, constComputer)) return false;
-            _result.Add(_item);
-        }
-        result = _result.MoveToImmutable();
-        return true;
-    }
 
     [Obsolete]
     public static bool operator ==(GeneralType? a, GeneralType? b)
@@ -295,10 +94,10 @@ public abstract class GeneralType :
         {
             if (definedPointerType.To is ArrayType definedArrayType && passedPointerType.To is ArrayType passedArrayType)
             {
-                if (definedArrayType.ComputedLength.HasValue)
+                if (definedArrayType.Length.HasValue)
                 {
-                    if (!passedArrayType.ComputedLength.HasValue) return false;
-                    if (definedArrayType.ComputedLength.Value != passedArrayType.ComputedLength.Value) return false;
+                    if (!passedArrayType.Length.HasValue) return false;
+                    if (definedArrayType.Length.Value != passedArrayType.Length.Value) return false;
                 }
 
                 return TryGetTypeParameters(definedArrayType.Of, passedArrayType.Of, typeParameters);

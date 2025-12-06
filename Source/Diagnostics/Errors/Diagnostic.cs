@@ -12,20 +12,18 @@ public class Diagnostic :
     public Position Position { get; }
     public Uri? File { get; }
     public ImmutableArray<Diagnostic> SubErrors { get; }
+    bool IsDebugged;
 
-#if DEBUG
-    bool _isDebugged;
-#endif
-
-    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool _break, ImmutableArray<Diagnostic> suberrors)
+    public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool @break, ImmutableArray<Diagnostic> suberrors)
     {
         Level = level;
         Message = message;
         Position = position;
         File = file;
         SubErrors = suberrors;
+        IsDebugged = false;
 
-        if (_break)
+        if (@break)
         { Break(); }
     }
 
@@ -55,6 +53,8 @@ public class Diagnostic :
     [DoesNotReturn]
     public void Throw() => throw ToException();
 
+    #region Internal
+
     public static Diagnostic Internal(string message, IPositioned? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, ImmutableArray<Diagnostic>.Empty);
 
@@ -64,6 +64,9 @@ public class Diagnostic :
     public static Diagnostic Internal(string message, ILocated location, bool @break = true)
         => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region Critical
 
     public static Diagnostic Critical(string message, IPositioned? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, ImmutableArray<Diagnostic>.Empty);
@@ -74,6 +77,9 @@ public class Diagnostic :
     public static Diagnostic Critical(string message, ILocated location, bool @break = true)
         => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region Error
 
     public static Diagnostic Error(string message, IPositioned? position, Uri? file, bool @break = true)
         => new(DiagnosticsLevel.Error, message, position?.Position ?? Position.UnknownPosition, file, @break, ImmutableArray<Diagnostic>.Empty);
@@ -84,6 +90,9 @@ public class Diagnostic :
     public static Diagnostic Error(string message, ILocated location, bool @break = true)
         => new(DiagnosticsLevel.Error, message, location.Location.Position, location.Location.File, @break, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region Warning
 
     public static Diagnostic Warning(string message, IPositioned? position, Uri? file)
         => new(DiagnosticsLevel.Warning, message, position?.Position ?? Position.UnknownPosition, file, false, ImmutableArray<Diagnostic>.Empty);
@@ -94,6 +103,9 @@ public class Diagnostic :
     public static Diagnostic Warning(string message, ILocated location)
         => new(DiagnosticsLevel.Warning, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region Information
 
     public static Diagnostic Information(string message, IPositioned? position, Uri? file)
         => new(DiagnosticsLevel.Information, message, position?.Position ?? Position.UnknownPosition, file, false, ImmutableArray<Diagnostic>.Empty);
@@ -104,6 +116,9 @@ public class Diagnostic :
     public static Diagnostic Information(string message, ILocated location)
         => new(DiagnosticsLevel.Information, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region Hint
 
     public static Diagnostic Hint(string message, IPositioned? position, Uri? file)
         => new(DiagnosticsLevel.Hint, message, position?.Position ?? Position.UnknownPosition, file, false, ImmutableArray<Diagnostic>.Empty);
@@ -114,21 +129,30 @@ public class Diagnostic :
     public static Diagnostic Hint(string message, ILocated location)
         => new(DiagnosticsLevel.Hint, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region OptimizationNotice
 
     public static Diagnostic OptimizationNotice(string message, ILocated location)
         => new(DiagnosticsLevel.OptimizationNotice, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
+
+    #region FailedOptimization
 
     public static Diagnostic FailedOptimization(string message, ILocated location)
         => new(DiagnosticsLevel.FailedOptimization, message, location.Location.Position, location.Location.File, false, ImmutableArray<Diagnostic>.Empty);
 
+    #endregion
 
     public Diagnostic Break()
     {
-#if DEBUG && !UNITY
-        if (!_isDebugged)
+#if TESTING
+        Throw();
+#elif DEBUG && !UNITY
+        if (!IsDebugged)
         { Debugger.Break(); }
-        _isDebugged = true;
+        IsDebugged = true;
 #endif
         return this;
     }

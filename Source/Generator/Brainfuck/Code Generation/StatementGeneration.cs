@@ -14,34 +14,21 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateDestructor(CompiledExpression value, CompiledCleanup cleanup)
     {
-        GeneralType deallocateableType = value.Type;
-
-        if (!deallocateableType.Is(out PointerType? deallocateablePointerType))
+        if (cleanup.Destructor is not null)
         {
-            Diagnostics.Add(Diagnostic.Warning($"The \"{StatementKeywords.Delete}\" keyword-function is only working on pointers so I skip this", value));
-            return;
+            GenerateCodeForFunction(cleanup.Destructor, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
+
+            if (cleanup.Destructor.ReturnSomething)
+            { Stack.Pop(); }
         }
 
-        if (cleanup.Destructor is null)
+        if (StatementCompiler.AllowDeallocate(cleanup.TrashType))
         {
-            if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
-
-            if (!deallocateablePointerType.To.Is<BuiltinType>())
+            if (cleanup.Deallocator is not null)
             {
-                Diagnostics.Add(Diagnostic.Warning(
-                    $"Destructor for type \"{deallocateablePointerType}\" not found",
-                    value));
+                GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
             }
-
-            return;
         }
-
-        GenerateCodeForFunction(cleanup.Destructor, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
-
-        if (cleanup.Destructor.ReturnSomething)
-        { Stack.Pop(); }
-
-        if (cleanup.Deallocator is not null) GenerateCodeForFunction(cleanup.Deallocator, ImmutableArray.Create(CompiledArgument.Wrap(value)), null, value);
     }
 
     void GenerateDestructor(BrainfuckVariable variable)
@@ -99,7 +86,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             GeneralType initialValueType = variableDeclaration.InitialValue.Type;
 
-            if (initialValueType.GetSize(this, Diagnostics, variableDeclaration.InitialValue) != type.GetSize(this, Diagnostics, variableDeclaration))
+            if (FindSize(initialValueType, variableDeclaration.InitialValue) != FindSize(type, variableDeclaration))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Variable initial value type (\"{initialValueType}\") and variable type (\"{type}\") mismatch", variableDeclaration.InitialValue));
                 return default;
@@ -112,14 +99,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     if (arrayType.Length is not null)
                     {
-                        if (!arrayType.ComputedLength.HasValue)
+                        if (!arrayType.Length.HasValue)
                         {
                             Diagnostics.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length <runtime value>", literal));
                             return default;
                         }
-                        if (literal.Value.Length != arrayType.ComputedLength.Value)
+                        if (literal.Value.Length != arrayType.Length.Value)
                         {
-                            Diagnostics.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.ComputedLength.Value}", literal));
+                            Diagnostics.Add(Diagnostic.Critical($"Literal length {literal.Value.Length} must be equal to the stack array length {arrayType.Length.Value}", literal));
                             return default;
                         }
                     }
@@ -151,13 +138,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 }
                 else
                 {
-                    if (!arrayType.ComputedLength.HasValue)
+                    if (!arrayType.Length.HasValue)
                     {
                         Diagnostics.Add(Diagnostic.Critical($"This aint supported", variableDeclaration));
                         return default;
                     }
 
-                    int arraySize = arrayType.ComputedLength.Value;
+                    int arraySize = arrayType.Length.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -182,20 +169,20 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 if (!StatementCompiler.CanCastImplicitly(pointerType.To, shadowingVariable.Type, null, out PossibleDiagnostic? castError))
                 { Diagnostics.Add(castError.ToError(variableDeclaration.InitialValue)); }
 
-                variables.Push(new BrainfuckVariable(shadowingVariable.Address, true, false, null, type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration)
+                variables.Push(new BrainfuckVariable(shadowingVariable.Address, true, false, null, FindSize(type, variableDeclaration), variableDeclaration)
                 {
                     IsInitialized = true
                 });
                 return 0;
             }
 
-            int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration);
-            variables.Push(new BrainfuckVariable(address, false, true, variableDeclaration.Cleanup, type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration));
+            int address = Stack.PushVirtual(FindSize(type, variableDeclaration), variableDeclaration);
+            variables.Push(new BrainfuckVariable(address, false, true, variableDeclaration.Cleanup, FindSize(type, variableDeclaration), variableDeclaration));
             debugInfo?.Add(new()
             {
                 Identifier = variableDeclaration.Identifier,
                 Address = address,
-                Size = type.GetSize(this, Diagnostics, variableDeclaration),
+                Size = FindSize(type, variableDeclaration),
                 Kind = Runtime.StackElementKind.Variable,
                 Type = variableDeclaration.Type,
             });
@@ -205,13 +192,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             if (type.Is(out ArrayType? arrayType))
             {
-                if (!arrayType.ComputedLength.HasValue)
+                if (!arrayType.Length.HasValue)
                 {
                     Diagnostics.Add(Diagnostic.Critical($"This aint supported", variableDeclaration));
                     return default;
                 }
 
-                int arraySize = arrayType.ComputedLength.Value;
+                int arraySize = arrayType.Length.Value;
 
                 int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -228,13 +215,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return 1;
             }
 
-            int address = Stack.PushVirtual(type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration);
-            variables.Push(new BrainfuckVariable(address, false, true, variableDeclaration.Cleanup, type.GetSize(this, Diagnostics, variableDeclaration), variableDeclaration));
+            int address = Stack.PushVirtual(FindSize(type, variableDeclaration), variableDeclaration);
+            variables.Push(new BrainfuckVariable(address, false, true, variableDeclaration.Cleanup, FindSize(type, variableDeclaration), variableDeclaration));
             debugInfo?.Add(new()
             {
                 Identifier = variableDeclaration.Identifier,
                 Address = address,
-                Size = type.GetSize(this, Diagnostics, variableDeclaration),
+                Size = FindSize(type, variableDeclaration),
                 Kind = Runtime.StackElementKind.Variable,
                 Type = variableDeclaration.Type,
             });
@@ -245,20 +232,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     #region Find Size
 
-    protected override bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = 1;
-        error = null;
-        return true;
-    }
-
-    protected override bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = 1;
-        error = null;
-        return true;
-    }
-
     protected override bool FindSize(ArrayType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         size = default;
@@ -268,36 +241,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return false;
         }
 
-        if (type.Length is not CompiledConstantValue evaluatedStatement)
-        {
-            error = new PossibleDiagnostic($"Can't compute the array type's length");
-            return false;
-        }
-
         error = null;
-        size = Snippets.ARRAY_SIZE((int)evaluatedStatement.Value);
+        size = Snippets.ARRAY_SIZE(type.Length.Value);
         return true;
-    }
-
-    protected override bool FindSize(BuiltinType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = default;
-        error = default;
-        switch (type.Type)
-        {
-            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
-            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{type}\""); return false;
-            case BasicType.U8: size = 1; return true;
-            case BasicType.I8: size = 1; return true;
-            case BasicType.U16: size = 1; return true;
-            case BasicType.I16: size = 1; return true;
-            case BasicType.U32: size = 1; return true;
-            case BasicType.I32: size = 1; return true;
-            case BasicType.U64: size = 1; return true;
-            case BasicType.I64: size = 1; return true;
-            case BasicType.F32: size = 1; return true;
-            default: throw new UnreachableException();
-        }
     }
 
     #endregion
@@ -315,7 +261,6 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         AliasType v => GenerateSize(v, result, out error),
         _ => throw new NotImplementedException(),
     };
-
     bool GenerateSize(PointerType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
@@ -336,7 +281,76 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return false;
         }
 
-        if (type.Length.Type.GetSize(this, Diagnostics, type.Length) != 1)
+        if (!FindSize(type.Of, out int elementSize, out error))
+        {
+            return false;
+        }
+
+        if (elementSize != 1)
+        {
+            error = new PossibleDiagnostic($"Array element size must be 1 byte");
+            return false;
+        }
+
+        Code.AddValue(result, (2 * type.Length.Value) + 3);
+
+        return true;
+    }
+    bool GenerateSize(FunctionType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = null;
+        Code.AddValue(result, 1);
+        return true;
+    }
+    bool GenerateSize(StructType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        if (!FindSize(type, out int size, out error))
+        { return false; }
+        Code.AddValue(result, size);
+        return true;
+    }
+    bool GenerateSize(GenericType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
+    bool GenerateSize(BuiltinType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        if (!FindSize(type, out int size, out error))
+        { return false; }
+        Code.AddValue(result, size);
+        return true;
+    }
+    bool GenerateSize(AliasType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GenerateSize(type.Value, result, out error);
+
+    bool GenerateSize(CompiledTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
+    {
+        CompiledPointerTypeExpression v => GenerateSize(v, result, out error),
+        CompiledArrayTypeExpression v => GenerateSize(v, result, out error),
+        CompiledFunctionTypeExpression v => GenerateSize(v, result, out error),
+        CompiledStructTypeExpression v => GenerateSize(v, result, out error),
+        CompiledGenericTypeExpression v => GenerateSize(v, result, out error),
+        CompiledBuiltinTypeExpression v => GenerateSize(v, result, out error),
+        CompiledAliasTypeExpression v => GenerateSize(v, result, out error),
+        _ => throw new NotImplementedException(),
+    };
+    bool GenerateSize(CompiledPointerTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        error = null;
+        Code.AddValue(result, 1);
+        return true;
+    }
+    bool GenerateSize(CompiledArrayTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        if (FindSize(type, out int size, out error))
+        {
+            Code.AddValue(result, size);
+            return true;
+        }
+
+        if (type.Length is null)
+        {
+            error = new PossibleDiagnostic($"Array type doesn't have a size");
+            return false;
+        }
+
+        if (FindSize(type.Length.Type, type.Length) != 1)
         {
             error = new PossibleDiagnostic($"Array length must be 1 byte");
             return false;
@@ -365,28 +379,28 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         return true;
     }
-    bool GenerateSize(FunctionType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GenerateSize(CompiledFunctionTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         error = null;
         Code.AddValue(result, 1);
         return true;
     }
-    bool GenerateSize(StructType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GenerateSize(CompiledStructTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
         if (!FindSize(type, out int size, out error))
         { return false; }
         Code.AddValue(result, size);
         return true;
     }
-    bool GenerateSize(GenericType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
-    bool GenerateSize(BuiltinType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    bool GenerateSize(CompiledGenericTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => throw new InvalidOperationException($"Generic type doesn't have a size");
+    bool GenerateSize(CompiledBuiltinTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error)
     {
-        if (!FindSize(type, out int size, out error))
+        if (!FindSize(new BuiltinType(type.Type), out int size, out error))
         { return false; }
         Code.AddValue(result, size);
         return true;
     }
-    bool GenerateSize(AliasType type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GenerateSize(type.Value, result, out error);
+    bool GenerateSize(CompiledAliasTypeExpression type, int result, [NotNullWhen(false)] out PossibleDiagnostic? error) => GenerateSize(type.Value, result, out error);
 
     #endregion
 
@@ -453,7 +467,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            if (size != value.Type.GetSize(this, Diagnostics, value))
+            if (size != FindSize(value.Type, value))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
                 return;
@@ -471,13 +485,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            if (!structPointerType.GetField(field.Field.Identifier.Content, this, out _, out int fieldOffset, out PossibleDiagnostic? error))
+            if (!GetFieldOffset(structPointerType, field.Field.Identifier.Content, out _, out int fieldOffset, out PossibleDiagnostic? error))
             {
                 Diagnostics.Add(error.ToError(field));
                 return;
             }
 
-            if (field.Type.GetSize(this, Diagnostics, field) != value.Type.GetSize(this, Diagnostics, value))
+            if (FindSize(field.Type, field) != FindSize(value.Type, value))
             {
                 Diagnostics.Add(Diagnostic.Critical($"Field and value size mismatch", value));
                 return;
@@ -631,7 +645,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
         using (Code.Block(this, $"Set variable \"{variable.Identifier}\" (at {variable.Address}) to \"{value}\""))
         {
-            int valueSize = value.Type.GetSize(this, Diagnostics, value);
+            int valueSize = FindSize(value.Type, value);
 
             if (variable.Type.Is(out ArrayType? arrayType))
             {
@@ -697,11 +711,11 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     }
                 }
                 else if (value is CompiledList literalList &&
-                         arrayType.ComputedLength.HasValue &&
-                         arrayType.ComputedLength.Value == literalList.Values.Length &&
-                         arrayType.Of.GetSize(this, Diagnostics, value) == 1)
+                         arrayType.Length.HasValue &&
+                         arrayType.Length.Value == literalList.Values.Length &&
+                         FindSize(arrayType.Of, value) == 1)
                 {
-                    int arraySize = arrayType.ComputedLength.Value;
+                    int arraySize = arrayType.Length.Value;
 
                     int size = Snippets.ARRAY_SIZE(arraySize);
 
@@ -886,14 +900,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             int valueAddress = Stack.NextAddress;
             GenerateCodeForStatement(value);
 
-            if (valueType.GetSize(this, Diagnostics, value) == 1 && AllowOtherOptimizations)
+            if (FindSize(valueType, value) == 1 && AllowOtherOptimizations)
             {
                 Heap.Set(pointerAddress, valueAddress);
             }
             else
             {
                 using StackAddress tempPointerAddress = Stack.PushVirtual(1, value);
-                for (int i = 0; i < valueType.GetSize(this, Diagnostics, value); i++)
+                for (int i = 0; i < FindSize(valueType, value); i++)
                 {
                     Code.CopyValue(pointerAddress, tempPointerAddress);
                     Heap.Set(tempPointerAddress, valueAddress + i);
@@ -943,7 +957,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         int valueAddress = Stack.NextAddress;
         GenerateCodeForStatement(value);
 
-        int size = value.Type.GetSize(this, Diagnostics, value);
+        int size = FindSize(value.Type, value);
 
         if (size == 1 && AllowOtherOptimizations)
         {
@@ -999,7 +1013,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                     return;
                 }
 
-                int elementSize = elementType.GetSize(this, Diagnostics, elementAccess.Base);
+                int elementSize = FindSize(elementType, elementAccess.Base);
 
                 if (elementSize != 1)
                 { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", elementAccess); }
@@ -1048,9 +1062,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             int indexAddress = Stack.NextAddress;
             GenerateCodeForStatement(elementAccess.Index);
 
-            if (arrayType.Of.GetSize(this, Diagnostics, elementAccess.Base) != 1)
+            if (FindSize(arrayType.Of, elementAccess.Base) != 1)
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this, Diagnostics, elementAccess.Base));
+                using StackAddress multiplierAddress = Stack.Push(FindSize(arrayType.Of, elementAccess.Base));
                 Code.MULTIPLY(indexAddress, multiplierAddress, v => Stack.GetTemporaryAddress(v, value));
             }
 
@@ -1141,7 +1155,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
             GeneralType elementType = arrayType.Of;
 
-            int elementSize = elementType.GetSize(this, Diagnostics, indexCall.Base);
+            int elementSize = FindSize(elementType, indexCall.Base);
 
             if (elementSize != 1)
             {
@@ -1183,7 +1197,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GenerateCodeForStatement(indexCall.Index);
 
             {
-                using StackAddress multiplierAddress = Stack.Push(arrayType.Of.GetSize(this, Diagnostics, indexCall.Base));
+                using StackAddress multiplierAddress = Stack.Push(FindSize(arrayType.Of, indexCall.Base));
                 Code.MULTIPLY(indexAddress, multiplierAddress, v => Stack.GetTemporaryAddress(v, indexCall.Index));
             }
 
@@ -1615,7 +1629,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (functionCall.Declaration.Type.GetSize(this, Diagnostics, functionCall) != 1)
+                if (FindSize(functionCall.Declaration.Type, functionCall) != 1)
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)functionCall.Declaration).Type, functionCall.Declaration.File));
                     return;
@@ -2240,8 +2254,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     {
         using DebugInfoBlock debugBlock = DebugBlock(newInstance);
 
-        int address = Stack.PushVirtual(newInstance.Type.GetSize(this, Diagnostics, newInstance), newInstance);
-        int size = newInstance.Type.GetSize(this);
+        int address = Stack.PushVirtual(FindSize(newInstance.Type, newInstance), newInstance);
+        int size = FindSize(newInstance.Type, newInstance.TypeExpression);
 
         for (int offset = 0; offset < size; offset++)
         {
@@ -2293,20 +2307,25 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 return;
             }
 
-            if (!structPointerType.GetField(field.Field.Identifier.Content, this, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error))
+            if (!GetFieldOffset(structPointerType, field.Field.Identifier.Content, out CompiledField? fieldDefinition, out int fieldOffset, out PossibleDiagnostic? error))
             {
                 Diagnostics.Add(error.ToError(field));
                 return;
             }
+            GeneralType fieldType = structPointerType.ReplaceType(fieldDefinition.Type, out PossibleDiagnostic? replaceError);
+            if (replaceError is not null)
+            {
+                Diagnostics.Add(replaceError.ToError(field));
+            }
 
-            int resultAddress = Stack.Push(fieldDefinition.Type.GetSize(this, Diagnostics, fieldDefinition));
+            int resultAddress = Stack.Push(FindSize(fieldType, fieldDefinition));
 
             int pointerAddress = Stack.NextAddress;
             GenerateCodeForStatement(field.Object);
 
             Code.AddValue(pointerAddress, fieldOffset);
 
-            Heap.Get(pointerAddress, resultAddress, fieldDefinition.Type.GetSize(this, Diagnostics, fieldDefinition));
+            Heap.Get(pointerAddress, resultAddress, FindSize(fieldType, fieldDefinition));
 
             Stack.Pop();
 
@@ -2334,7 +2353,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (typeCast.Value.Type.GetSize(this, Diagnostics, typeCast.Value) != typeCast.Type.GetSize(this, Diagnostics, typeCast))
+        if (FindSize(typeCast.Value.Type, typeCast.Value) != FindSize(typeCast.Type, typeCast))
         {
             Diagnostics.Add(Diagnostic.Critical($"Type-cast is not supported at the moment", typeCast));
             return;
@@ -2462,8 +2481,8 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             return;
         }
 
-        if (valueType.GetSize(this, Diagnostics, value) != 1)
-        { throw new NotSupportedException($"Only value of size 1 (not {valueType.GetSize(this, Diagnostics, value)}) supported by the output printer in brainfuck", value); }
+        if (FindSize(valueType, value) != 1)
+        { throw new NotSupportedException($"Only value of size 1 (not {FindSize(valueType, value)}) supported by the output printer in brainfuck", value); }
 
         if (!valueType.Is<BuiltinType>())
         { throw new NotSupportedException($"Only built-in types or string literals (not \"{valueType}\") supported by the output printer in brainfuck", value); }
@@ -2498,8 +2517,9 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         return CanGenerateCodeForValuePrinter(value.Type);
     }
     bool CanGenerateCodeForValuePrinter(GeneralType valueType) =>
-        valueType.GetSize(this) == 1 &&
-        valueType.Is<BuiltinType>();
+        FindSize(valueType, out int size, out _)
+        && size == 1
+        && valueType.Is<BuiltinType>();
 
     #endregion
 
@@ -2603,7 +2623,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             GeneralType definedType = defined.Type;
             GeneralType passedType = passed.Type;
 
-            if (passedType.GetSize(this, Diagnostics, passed) != definedType.GetSize(this, Diagnostics, defined))
+            if (FindSize(passedType, passed) != FindSize(definedType, defined))
             { Diagnostics.Add(Diagnostic.Critical($"Wrong type of argument passed to function \"{function.ToReadable()}\" at index {i}: Expected \"{definedType}\", passed \"{passedType}\"", passed)); }
 
             foreach (BrainfuckVariable compiledParameter in compiledParameters)
@@ -2644,7 +2664,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
                 CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                 PointerType parameterType = new(v.Type);
-                compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
+                compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, FindSize(parameterType, passed), variableDeclaration)
                 {
                     IsInitialized = true,
                 });
@@ -2663,7 +2683,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                     PointerType parameterType = new(v.Type);
-                    compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
+                    compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, FindSize(parameterType, passed), variableDeclaration)
                     {
                         IsInitialized = true,
                     });
@@ -2683,7 +2703,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 {
                     CompiledVariableDefinition variableDeclaration = defined.ToVariable(definedType, passed);
                     PointerType parameterType = new(v.Type);
-                    compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, parameterType.GetSize(this, Diagnostics, passed), variableDeclaration)
+                    compiledParameters.Push(new BrainfuckVariable(v.Address, true, false, null, FindSize(parameterType, passed), variableDeclaration)
                     {
                         IsInitialized = true,
                     });
@@ -2703,7 +2723,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             //     }
             // 
             //     var variableDeclaration = defined.ToVariable2(passed);
-            //     compiledParameters.Push(new BrainfuckVariable(variable.Address, true, false, null, variable.Type, variable.Type.GetSize(this, Diagnostics, passed), variableDeclaration.Variable)
+            //     compiledParameters.Push(new BrainfuckVariable(variable.Address, true, false, null, variable.Type, FindSize(variable.Type, passed), variableDeclaration.Variable)
             //     {
             //         IsInitialized = variable.IsInitialized,
             //     });
@@ -2795,7 +2815,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (function.Type.GetSize(this, Diagnostics, function) != 1)
+                if (FindSize(function.Type, function) != 1)
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Function with attribute \"[{AttributeConstants.ExternalIdentifier}(\"{ExternalFunctionNames.StdIn}\")]\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File));
                     return;
@@ -2833,13 +2853,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 IsGlobal = false,
                 Location = function.Location,
                 Type = function.Type,
+                TypeExpression = CompiledTypeExpression.CreateAnonymous(function.Type, function),
                 Cleanup = new CompiledCleanup()
                 {
                     TrashType = function.Type,
                     Location = function.Location,
                 },
             };
-            returnVariable = new BrainfuckVariable(Stack.PushVirtual(function.Type.GetSize(this, Diagnostics, function), callerPosition), false, false, null, function.Type.GetSize(this, Diagnostics, function), variableDeclaration);
+            returnVariable = new BrainfuckVariable(Stack.PushVirtual(FindSize(function.Type, function), callerPosition), false, false, null, FindSize(function.Type, function), variableDeclaration);
         }
 
         if (!IxMaxResursiveDepthReached(function, callerPosition))
@@ -2975,7 +2996,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
             else
             {
-                if (function.Type.GetSize(this, Diagnostics, function) != 1)
+                if (FindSize(function.Type, function) != 1)
                 {
                     Diagnostics.Add(Diagnostic.Critical($"Function with attribute \"StandardInput\" must have a return type with size of 1", ((FunctionDefinition)function).Type, function.File));
                     return;
@@ -3013,13 +3034,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 IsGlobal = false,
                 Location = function.Location,
                 Type = function.Type,
+                TypeExpression = CompiledTypeExpression.CreateAnonymous(function.Type, function.Location),
                 Cleanup = new CompiledCleanup()
                 {
                     TrashType = function.Type,
                     Location = function.Location,
                 },
             };
-            returnVariable = new BrainfuckVariable(Stack.PushVirtual(function.Type.GetSize(this, Diagnostics, function), callerPosition), false, false, null, function.Type.GetSize(this, Diagnostics, function), variableDeclaration);
+            returnVariable = new BrainfuckVariable(Stack.PushVirtual(FindSize(function.Type, function), callerPosition), false, false, null, FindSize(function.Type, function), variableDeclaration);
         }
 
         if (!IxMaxResursiveDepthReached(function, callerPosition))
@@ -3140,6 +3162,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 IsGlobal = false,
                 Location = function.Location,
                 Type = function.Type,
+                TypeExpression = CompiledTypeExpression.CreateAnonymous(function.Type, function),
                 Cleanup = new CompiledCleanup()
                 {
                     TrashType = function.Type,
@@ -3147,7 +3170,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 },
             };
             GeneralType returnType = GeneralType.InsertTypeParameters(function.Type, typeArguments) ?? function.Type;
-            returnVariable = new BrainfuckVariable(Stack.PushVirtual(returnType.GetSize(this, Diagnostics, function), callerPosition), false, false, null, returnType.GetSize(this, Diagnostics, function), variableDeclaration);
+            returnVariable = new BrainfuckVariable(Stack.PushVirtual(FindSize(returnType, function), callerPosition), false, false, null, FindSize(returnType, function), variableDeclaration);
         }
 
         if (!IxMaxResursiveDepthReached(function, callerPosition))
@@ -3260,6 +3283,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 IsGlobal = false,
                 Location = function.Location,
                 Type = newInstanceType,
+                TypeExpression = CompiledTypeExpression.CreateAnonymous(newInstanceType, function.Location),
                 Cleanup = new CompiledCleanup()
                 {
                     TrashType = newInstanceType,
@@ -3276,6 +3300,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
                 IsGlobal = false,
                 Location = function.Location,
                 Type = new PointerType(newInstanceType),
+                TypeExpression = CompiledTypeExpression.CreateAnonymous(new PointerType(newInstanceType), function),
                 Cleanup = new CompiledCleanup()
                 {
                     TrashType = new PointerType(newInstanceType),
@@ -3423,7 +3448,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         int depth = 0;
         for (int i = 0; i < CurrentMacro.Count; i++)
         {
-            if (!object.ReferenceEquals(CurrentMacro[i], function))
+            if (!ReferenceEquals(CurrentMacro[i], function))
             { continue; }
             depth++;
 

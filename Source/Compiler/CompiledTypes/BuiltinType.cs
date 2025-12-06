@@ -26,7 +26,6 @@ public static class BasicTypeExtensions
     public static bool IsInteger(this BasicType type) => type is BasicType.U8 or BasicType.I8 or BasicType.U16 or BasicType.I16 or BasicType.U32 or BasicType.I32 or BasicType.U64 or BasicType.I64;
 }
 
-[DebuggerDisplay($"{{{nameof(ToString)}(),nq}}")]
 public class BuiltinType : GeneralType,
     IEquatable<BuiltinType>
 {
@@ -60,39 +59,6 @@ public class BuiltinType : GeneralType,
     public BuiltinType(BasicType type)
     {
         Type = type;
-    }
-
-    public override bool GetSize(IRuntimeInfoProvider runtime, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = default;
-        error = default;
-
-        switch (Type)
-        {
-            case BasicType.Void: error = new PossibleDiagnostic($"Can't get the size of type \"{this}\""); return false;
-            case BasicType.Any: error = new PossibleDiagnostic($"Can't get the size of type \"{this}\""); return false;
-            case BasicType.U8: size = 1; return true;
-            case BasicType.I8: size = 1; return true;
-            case BasicType.U16: size = 2; return true;
-            case BasicType.I16: size = 2; return true;
-            case BasicType.U32: size = 4; return true;
-            case BasicType.I32: size = 4; return true;
-            case BasicType.U64: size = 8; return true;
-            case BasicType.I64: size = 8; return true;
-            case BasicType.F32: size = 4; return true;
-            default: throw new UnreachableException();
-        }
-    }
-
-    public override bool GetBitWidth(IRuntimeInfoProvider runtime, out BitWidth bitWidth, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        bitWidth = default;
-        if (!GetSize(runtime, out int size, out error))
-        {
-            return false;
-        }
-        bitWidth = (BitWidth)size;
-        return true;
     }
 
     public static BuiltinType CreateNumeric(NumericType type, BitWidth size) => type switch

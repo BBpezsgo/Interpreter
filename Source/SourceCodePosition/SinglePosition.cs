@@ -1,6 +1,5 @@
 ﻿namespace LanguageCore;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public struct SinglePosition :
     IEquatable<SinglePosition>,
     IComparable<SinglePosition>,
@@ -67,14 +66,6 @@ public struct SinglePosition :
 
     public override readonly string ToString() => $"({Line + 1}:{Character})";
     public readonly string ToStringMin() => $"{Line + 1}:{Character}";
-    readonly string GetDebuggerDisplay()
-    {
-        if (this == SinglePosition.Undefined)
-        { return "?"; }
-        if (this == SinglePosition.Zero)
-        { return "0"; }
-        return ToString();
-    }
 
     public override readonly bool Equals(object? obj) => obj is SinglePosition position && Equals(position);
     public readonly bool Equals(SinglePosition other) => Line == other.Line && Character == other.Character;

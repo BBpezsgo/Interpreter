@@ -75,10 +75,10 @@ public class RuntimeException : LanguageExceptionWithoutContext
                     if (colored) result.SetGraphics(Ansi.BrightForegroundBlack);
                     result.Append('[');
 
-                    if (v.ComputedLength.HasValue)
+                    if (v.Length.HasValue)
                     {
                         if (colored) result.SetGraphics(Ansi.ForegroundWhite);
-                        result.Append(v.ComputedLength.Value.ToString());
+                        result.Append(v.Length.Value.ToString());
                     }
                     else if (v.Length is not null)
                     {
@@ -214,17 +214,21 @@ public class RuntimeException : LanguageExceptionWithoutContext
                         }
                         result.Append('"');
                     }
-                    else if (!toArrayType.ComputedLength.HasValue)
+                    else if (!toArrayType.Length.HasValue)
                     {
                         result.Append('*');
                         result.Append(value.To<int>());
                         result.Append(" -> ");
                         result.Append("[ ? ]");
                     }
+                    else if (StatementCompiler.FindSize(pointerType.To, out int _s, out _, runtimeInfoProvider))
+                    {
+                        Range<int> pointerTo = new(value.To<int>(), value.To<int>() + _s);
+                        AppendValue(pointerTo, pointerType.To, depth + 1);
+                    }
                     else
                     {
-                        Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
-                        AppendValue(pointerTo, pointerType.To, depth + 1);
+                        result.Append('?');
                     }
                 }
                 else if (pointerType.To is BuiltinType toBuiltinType &&
@@ -235,42 +239,50 @@ public class RuntimeException : LanguageExceptionWithoutContext
                     result.Append(" -> ");
                     result.Append('?');
                 }
+                else if (StatementCompiler.FindSize(pointerType.To, out int _s, out _, runtimeInfoProvider))
+                {
+                    Range<int> pointerTo = new(value.To<int>(), value.To<int>() + _s);
+                    AppendValue(pointerTo, pointerType.To, depth + 1);
+                }
                 else
                 {
-                    Range<int> pointerTo = new(value.To<int>(), value.To<int>() + pointerType.To.GetSize(runtimeInfoProvider));
-                    AppendValue(pointerTo, pointerType.To, depth + 1);
+                    result.Append('?');
                 }
             }
             else if (type.Is(out StructType? structType))
             {
                 result.Append("{ ");
-                if (!structType.GetFields(runtimeInfoProvider, out ImmutableDictionary<CompiledField, int>? _fields, out _))
+                int offset = 0;
+                bool comma = true;
+                foreach (CompiledField field in structType.Struct.Fields)
                 {
-                    result.Append("<invalid type> ");
-                }
-                else
-                {
-                    bool comma = true;
-                    foreach ((CompiledField field, int offset) in _fields)
+                    if (comma) comma = false;
+                    else result.Append(", ");
+                    result.Append(field.Identifier.Content);
+                    result.Append(": ");
+                    GeneralType fieldType = structType.ReplaceType(field.Type, out _);
+
+                    if (StatementCompiler.FindSize(fieldType, out int _s, out _, runtimeInfoProvider))
                     {
-                        if (comma) comma = false;
-                        else result.Append(", ");
-                        result.Append(field.Identifier.Content);
-                        result.Append(": ");
-                        Range<int> fieldRange = new(range.Start + offset, range.Start + offset + field.Type.GetSize(runtimeInfoProvider));
-                        AppendValue(fieldRange, field.Type, depth + 1);
+                        Range<int> fieldRange = new(range.Start + offset, range.Start + offset + _s);
+                        AppendValue(fieldRange, fieldType, depth + 1);
+                        offset += _s;
                     }
-                    if (_fields.Count > 0) result.Append(' ');
+                    else
+                    {
+                        result.Append('?');
+                        break;
+                    }
                 }
+                if (structType.Struct.Fields.Length > 0) result.Append(' ');
                 result.Append('}');
             }
             else if (type.Is(out ArrayType? arrayType))
             {
                 result.Append('[');
-                if (arrayType.ComputedLength.HasValue)
+                if (arrayType.Length.HasValue && StatementCompiler.FindSize(arrayType.Of, out int elementSize, out _, runtimeInfoProvider))
                 {
-                    int elementSize = arrayType.Of.GetSize(runtimeInfoProvider);
-                    for (int i = 0; i < arrayType.ComputedLength.Value; i++)
+                    for (int i = 0; i < arrayType.Length.Value; i++)
                     {
                         if (i > 0) result.Append(',');
                         result.Append(' ');
@@ -294,10 +306,14 @@ public class RuntimeException : LanguageExceptionWithoutContext
                     {
                         result.Append("NULL");
                     }
+                    else if (StatementCompiler.FindSize(PointerType.Any, out int _s, out _, runtimeInfoProvider))
+                    {
+                        Range<int> pointerTo = new(value.To<int>(), value.To<int>() + _s);
+                        AppendValue(pointerTo, new FunctionType(functionType.ReturnType, functionType.Parameters, false), depth);
+                    }
                     else
                     {
-                        Range<int> pointerTo = new(value.To<int>(), value.To<int>() + PointerType.Any.GetSize(runtimeInfoProvider));
-                        AppendValue(pointerTo, new FunctionType(functionType.ReturnType, functionType.Parameters, false), depth);
+                        result.Append('?');
                     }
                 }
                 else

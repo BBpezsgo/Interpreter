@@ -403,19 +403,24 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             prevVariable.IsReference
         ) && prevPointerType.To.Is(out ArrayType? arrayType))
         {
-            size = arrayType.Of.GetSize(this, Diagnostics, index.Base);
+            if (!FindSize(arrayType.Of, out size, out PossibleDiagnostic? sizeError))
+            {
+                Diagnostics.Add(sizeError.ToError(index.Base));
+                address = null;
+                return false;
+            }
 
             if (size != 1)
             { throw new NotSupportedException($"I'm not smart enough to handle arrays with element sizes other than one (at least in brainfuck)", index); }
 
-            if (index.Index is CompiledConstantValue indexValue)
+            if (index.Index is not CompiledConstantValue indexValue)
             {
-                address = new AddressRuntimePointer(index.Base) + ((int)indexValue.Value * arrayType.Of.GetSize(this, Diagnostics, index.Base));
-                return true;
+                address = null;
+                return false;
             }
 
-            address = null;
-            return false;
+            address = new AddressRuntimePointer(index.Base) + ((int)indexValue.Value * size);
+            return true;
         }
 
         if (!GetVariable(index.Base, out BrainfuckVariable? variable, out PossibleDiagnostic? notFoundError))
@@ -428,7 +433,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
         if (variable.Type.Is(out arrayType))
         {
-            size = arrayType.Of.GetSize(this, Diagnostics, index.Base);
+            size = FindSize(arrayType.Of, index.Base);
             address = new AddressAbsolute(variable.Address);
 
             if (size != 1)
@@ -436,7 +441,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
 
             if (index.Index is CompiledConstantValue indexValue)
             {
-                address += (int)indexValue.Value * 2 * arrayType.Of.GetSize(this, Diagnostics, index.Base);
+                address += (int)indexValue.Value * 2 * size;
                 return true;
             }
 
@@ -467,7 +472,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
                 return false;
             }
 
-            if (!structType.GetField(field.Field.Identifier.Content, this, out _, out int fieldOffset, out PossibleDiagnostic? error))
+            if (!GetFieldOffset(structType, field.Field.Identifier.Content, out _, out int fieldOffset, out PossibleDiagnostic? error))
             {
                 Diagnostics.Add(error.ToError(field));
                 address = default;
@@ -478,14 +483,14 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             GeneralType fieldType = field.Type;
 
             address = prevAddress + fieldOffset;
-            size = fieldType.GetSize(this, Diagnostics, field);
+            size = FindSize(fieldType, field);
             return true;
         }
 
         if (field.Object.Type.Is(out PointerType? prevPointerType) &&
             prevPointerType.To.Is(out structType))
         {
-            if (!structType.GetField(field.Field.Identifier.Content, this, out _, out int fieldOffset, out PossibleDiagnostic? error))
+            if (!GetFieldOffset(structType, field.Field.Identifier.Content, out _, out int fieldOffset, out PossibleDiagnostic? error))
             {
                 Diagnostics.Add(error.ToError(field));
                 address = default;
@@ -496,7 +501,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             GeneralType fieldType = field.Type;
 
             address = new AddressRuntimePointer(field.Object) + fieldOffset;
-            size = fieldType.GetSize(this, Diagnostics, field);
+            size = FindSize(fieldType, field);
             return true;
         }
 
@@ -749,12 +754,13 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             compilerResult.File
         );
 
-        CompiledVariables.Add(new BrainfuckVariable(Stack.PushVirtual(1), false, false, null, ExitCodeType.GetSize(this), new CompiledVariableDefinition()
+        CompiledVariables.Add(new BrainfuckVariable(Stack.PushVirtual(1), false, false, null, FindSize(ExitCodeType, implicitReturnValueVariable), new CompiledVariableDefinition()
         {
             Identifier = implicitReturnValueVariable.Identifier.Content,
             InitialValue = null,
             IsGlobal = true,
             Location = implicitReturnValueVariable.Location,
+            TypeExpression = CompiledTypeExpression.CreateAnonymous(ExitCodeType, implicitReturnValueVariable.Location),
             Type = ExitCodeType,
             Cleanup = new CompiledCleanup()
             {

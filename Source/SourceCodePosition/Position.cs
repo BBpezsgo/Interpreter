@@ -1,6 +1,5 @@
 ﻿namespace LanguageCore;
 
-[DebuggerDisplay($"{{{nameof(GetDebuggerDisplay)}(),nq}}")]
 public readonly struct Position :
     IEquatable<Position>
 {
@@ -63,16 +62,9 @@ public readonly struct Position :
         return $"{Range.Start.ToStringMin()}-{Range.End.ToStringMin()}";
     }
 
-    string GetDebuggerDisplay()
-    {
-        if (this == Position.UnknownPosition)
-        { return "?"; }
-        return this.ToStringRange();
-    }
+    public Position Before() => new(new Range<SinglePosition>(new SinglePosition(Range.Start.Line, Range.Start.Character - 1), new SinglePosition(Range.Start.Line, Range.Start.Character)), new Range<int>(AbsoluteRange.Start - 1, AbsoluteRange.Start));
 
-    public Position Before() => new(new Range<SinglePosition>(new SinglePosition(this.Range.Start.Line, this.Range.Start.Character - 1), new SinglePosition(this.Range.Start.Line, this.Range.Start.Character)), new Range<int>(this.AbsoluteRange.Start - 1, this.AbsoluteRange.Start));
-
-    public Position After() => new(new Range<SinglePosition>(new SinglePosition(this.Range.End.Line, this.Range.End.Character), new SinglePosition(this.Range.End.Line, this.Range.End.Character + 1)), new Range<int>(this.AbsoluteRange.End, this.AbsoluteRange.End + 1));
+    public Position After() => new(new Range<SinglePosition>(new SinglePosition(Range.End.Line, Range.End.Character), new SinglePosition(Range.End.Line, Range.End.Character + 1)), new Range<int>(AbsoluteRange.End, AbsoluteRange.End + 1));
 
     public Position NextLine() => new(new Range<SinglePosition>(new SinglePosition(Range.End.Line + 1, 0), new SinglePosition(Range.End.Line + 1, 1)), new Range<int>(AbsoluteRange.End, AbsoluteRange.End + 1));
 

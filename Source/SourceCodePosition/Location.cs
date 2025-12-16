@@ -10,6 +10,7 @@ public readonly struct Location :
     public Uri File { get; }
 
     Location ILocated.Location => this;
+    public bool IsDefault => File is null && Position == default;
 
     public Location(Position position, Uri file)
     {

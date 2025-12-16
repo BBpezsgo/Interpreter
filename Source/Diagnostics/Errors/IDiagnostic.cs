@@ -15,4 +15,5 @@ public interface IDiagnostic
 {
     DiagnosticsLevel Level { get; }
     string Message { get; }
+    IEnumerable<IDiagnostic> SubErrors { get; }
 }

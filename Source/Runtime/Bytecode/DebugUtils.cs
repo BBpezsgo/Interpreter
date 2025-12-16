@@ -9,7 +9,7 @@ public record struct CallTraceItem(int BasePointer, int InstructionPointer);
 [ExcludeFromCodeCoverage]
 public static class DebugUtils
 {
-    static void TraceStack(ReadOnlySpan<byte> stack, int basePointer, StackOffsets stackOffsets, List<CallTraceItem> callTrace)
+    public static void TraceStack(ReadOnlySpan<byte> stack, int basePointer, StackOffsets stackOffsets, List<CallTraceItem> callTrace)
     {
         int savedCodePointerAddress = basePointer + stackOffsets.SavedCodePointer;
         int savedBasePointerAddress = basePointer + stackOffsets.SavedBasePointer;

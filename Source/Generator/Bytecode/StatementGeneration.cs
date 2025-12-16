@@ -376,10 +376,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CompiledExpression throwValue = keywordCall.Value;
         GeneralType throwType = throwValue.Type;
 
-        if (throwValue is CompiledString literalThrowValue)
+        if (throwValue is CompiledString literalThrowValue && Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.CrashStringOnStack))
         {
             _statistics.Optimizations++;
             Diagnostics.Add(Diagnostic.OptimizationNotice("String allocated on stack", throwValue));
+            Push(new InstructionOperand('\0', InstructionOperandType.Immediate16));
             for (int i = literalThrowValue.Value.Length - 1; i >= 0; i--)
             {
                 Push(new InstructionOperand(

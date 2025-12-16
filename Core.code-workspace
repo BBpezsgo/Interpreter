@@ -17,6 +17,9 @@
 		},
 		{
 			"path": "../SpeedTests"
+		},
+		{
+			"path": "../DebugServer"
 		}
 	],
 	"settings": {

@@ -678,6 +678,9 @@ public static class Entry
             }
             case "assembly-old":
             {
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                { throw new PlatformNotSupportedException($"This is only supported on Linux"); }
+
                 List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(VoidIO.Instance);
 
                 CompilerSettings compilerSettings = new(CodeGeneratorForMain.DefaultCompilerSettings)

@@ -12,6 +12,7 @@ public enum GeneratorOptimizationSettings : uint
     BinaryOperatorFetchSkip = 2,
     IndexerFetchSkip = 4,
     TrimReturnBreak = 8,
+    CrashStringOnStack = 16,
 }
 
 [ExcludeFromCodeCoverage]

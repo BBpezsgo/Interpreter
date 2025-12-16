@@ -4330,10 +4330,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         CompiledArrayTypeExpression v => (v.Length is null || v.ComputedLength.HasValue) ? StatementComplexity.None : GetStatementComplexity(v.Length),
         CompiledBuiltinTypeExpression => StatementComplexity.None,
-        CompiledFunctionTypeExpression v => GetStatementComplexity(v.ReturnType) | v.Parameters.Select(GetStatementComplexity).Aggregate((a, b) => a | b),
+        CompiledFunctionTypeExpression v => GetStatementComplexity(v.ReturnType) | v.Parameters.Select(GetStatementComplexity).Aggregate(StatementComplexity.None, (a, b) => a | b),
         CompiledGenericTypeExpression => StatementComplexity.Bruh,
         CompiledPointerTypeExpression v => GetStatementComplexity(v.To),
-        CompiledStructTypeExpression v => v.TypeArguments.Values.Select(GetStatementComplexity).Aggregate((a, b) => a | b),
+        CompiledStructTypeExpression v => v.TypeArguments.Values.Select(GetStatementComplexity).Aggregate(StatementComplexity.None, (a, b) => a | b),
         _ => throw new NotImplementedException(statement.GetType().ToString()),
     };
 

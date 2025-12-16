@@ -8,6 +8,8 @@ public class DiagnosticWithoutContext :
     public DiagnosticsLevel Level { get; }
     public string Message { get; }
 
+    public IEnumerable<IDiagnostic> SubErrors => Enumerable.Empty<IDiagnostic>();
+
 #if DEBUG
     bool _isDebugged;
 #endif

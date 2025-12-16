@@ -61,10 +61,10 @@ public class InterpreterRenderer
 
         ImmutableArray<(int, int)>.Builder codeCommentOffsets = ImmutableArray.CreateBuilder<(int, int)>(processor.DebugInformation.CodeComments.Count);
         int offset = 0;
-        foreach (var item in processor.DebugInformation.CodeComments.OrderBy(v => v.Key))
+        foreach ((int i, ImmutableArray<string> comments) in processor.DebugInformation.CodeComments.OrderBy(v => v.Key))
         {
-            offset += item.Value.Length;
-            codeCommentOffsets.Add((item.Key, offset));
+            offset += comments.Length;
+            codeCommentOffsets.Add((i, offset));
         }
         CodeCommentOffsets = codeCommentOffsets.MoveToImmutable();
         CodeCommentOffsets2 = CodeCommentOffsets.ToDictionary().ToImmutableDictionary();

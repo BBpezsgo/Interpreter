@@ -12,9 +12,15 @@
     <PackageId>BBLang</PackageId>
     <Authors>BB</Authors>
     <InvariantGlobalization>true</InvariantGlobalization>
-    <BaseOutputPath>..\bin</BaseOutputPath>
-    <BaseIntermediateOutputPath>..\obj</BaseIntermediateOutputPath>
-    <IntermediateOutputPath Condition=" '$(PlatformName)' == 'AnyCPU' ">$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
-    <IntermediateOutputPath Condition=" '$(PlatformName)' != 'AnyCPU' ">$(BaseIntermediateOutputPath)$(PlatformName)\$(Configuration)\</IntermediateOutputPath>
+    <BaseOutputPath>../bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>../obj/</BaseIntermediateOutputPath>
+    <IntermediateOutputPath Condition=" '$(PlatformName)' == 'AnyCPU' ">$(BaseIntermediateOutputPath)$(Configuration)/</IntermediateOutputPath>
+    <IntermediateOutputPath Condition=" '$(PlatformName)' != 'AnyCPU' ">$(BaseIntermediateOutputPath)$(PlatformName)/$(Configuration)/</IntermediateOutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ForLanguageServer)' == 'true'">
+    <DefineConstants>$(DefineConstants);LANGUAGE_SERVER</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(ForTesting)' == 'true'">
+    <DefineConstants>$(DefineConstants);TESTING</DefineConstants>
   </PropertyGroup>
 </Project>

@@ -23,7 +23,7 @@ public partial class CodeGeneratorForIL : CodeGenerator
         ),
     };
 
-    public override int PointerSize => nint.Size;
+    public override unsafe int PointerSize => sizeof(nint);
     public override BuiltinType BooleanType => BuiltinType.U8;
     public override BuiltinType SizeofStatementType => BuiltinType.I32;
     public override BuiltinType ArrayLengthType => BuiltinType.I32;

@@ -1,9 +1,9 @@
 <Project>
   <PropertyGroup>
     <ArtifactsPath>..</ArtifactsPath>
-    <BaseOutputPath>..\bin</BaseOutputPath>
-    <BaseIntermediateOutputPath>..\obj</BaseIntermediateOutputPath>
-    <IntermediateOutputPath Condition=" '$(PlatformName)' == 'AnyCPU' ">$(BaseIntermediateOutputPath)$(Configuration)\</IntermediateOutputPath>
-    <IntermediateOutputPath Condition=" '$(PlatformName)' != 'AnyCPU' ">$(BaseIntermediateOutputPath)$(PlatformName)\$(Configuration)\</IntermediateOutputPath>
+    <BaseOutputPath>../bin/</BaseOutputPath>
+    <BaseIntermediateOutputPath>../obj/</BaseIntermediateOutputPath>
+    <IntermediateOutputPath Condition=" '$(PlatformName)' == 'AnyCPU' ">$(BaseIntermediateOutputPath)$(Configuration)/</IntermediateOutputPath>
+    <IntermediateOutputPath Condition=" '$(PlatformName)' != 'AnyCPU' ">$(BaseIntermediateOutputPath)$(PlatformName)/$(Configuration)/</IntermediateOutputPath>
   </PropertyGroup>
 </Project>

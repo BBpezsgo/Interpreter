@@ -108,6 +108,22 @@ public class DiagnosticsCollection : IReadOnlyDiagnosticsCollection
         _diagnostics.Add(diagnostic);
     }
 
+    public bool Update(Diagnostic old, Diagnostic diagnostic)
+    {
+        if (diagnostic is null) return false;
+
+        for (int i = 0; i < _diagnostics.Count; i++)
+        {
+            if (_diagnostics[i] == old)
+            {
+                _diagnostics[i] = diagnostic;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void AddRange(IEnumerable<Diagnostic> diagnostic)
     { foreach (Diagnostic item in diagnostic) Add(item); }
 
@@ -147,5 +163,24 @@ public static class DiagnosticsCollectionExtensions
 
         foreach (Diagnostic diagnostic in diagnosticsCollection.Diagnostics)
         { Output.LogDiagnostic(diagnostic, sourceProviders); }
+    }
+
+    public static void WriteErrorsTo(this IReadOnlyDiagnosticsCollection diagnosticsCollection, StringBuilder writer)
+    {
+        foreach (DiagnosticWithoutContext diagnostic in diagnosticsCollection.DiagnosticsWithoutContext)
+        {
+            if (diagnostic.Level == DiagnosticsLevel.Error)
+            {
+                writer.AppendLine(diagnostic.Message);
+            }
+        }
+
+        foreach (Diagnostic diagnostic in diagnosticsCollection.Diagnostics)
+        {
+            if (diagnostic.Level == DiagnosticsLevel.Error)
+            {
+                writer.AppendLine(diagnostic.ToString());
+            }
+        }
     }
 }

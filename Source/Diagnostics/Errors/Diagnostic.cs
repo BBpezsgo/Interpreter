@@ -14,6 +14,8 @@ public class Diagnostic :
     public ImmutableArray<Diagnostic> SubErrors { get; }
     bool IsDebugged;
 
+    IEnumerable<IDiagnostic> IDiagnostic.SubErrors => SubErrors;
+
     public Diagnostic(DiagnosticsLevel level, string message, Position position, Uri? file, bool @break, ImmutableArray<Diagnostic> suberrors)
     {
         Level = level;

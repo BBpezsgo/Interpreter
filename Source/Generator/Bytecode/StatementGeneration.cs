@@ -344,7 +344,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             if (InFunction)
             {
                 AddComment(" Set return value:");
-                PopTo(GetReturnValueAddress(), FindSize(keywordCall.Value.Type, keywordCall.Value));
+                PopTo(ReturnValueAddress, FindSize(keywordCall.Value.Type, keywordCall.Value));
             }
             else
             {
@@ -1170,6 +1170,10 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         PushFrom(GetVariableAddress(variable.Variable), FindSize(variable.Type, variable));
     }
+    void GenerateCodeForStatement(CompiledExpressionVariableAccess variable, GeneralType? expectedType = null, bool resolveReference = true)
+    {
+        PushFrom(new AddressAbsolute(variable.Variable.Address), FindSize(variable.Type, variable));
+    }
     void GenerateCodeForStatement(CompiledFunctionReference variable, GeneralType? expectedType = null, bool resolveReference = true)
     {
         IHaveInstructionOffset compiledFunction = variable.Function;
@@ -1490,29 +1494,37 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (prevType.Is(out ArrayType? arrayType))
         {
-            using (RegisterUsage.Auto regPtr = Registers.GetFree(PointerBitWidth))
+            if (!GetAddress(index.Base, out Address? address, out PossibleDiagnostic? error))
             {
-                if (!GetAddress(index.Base, out Address? address, out PossibleDiagnostic? error))
+                Diagnostics.Add(error.ToError(index.Base));
+                return;
+            }
+
+            if (!indexType.Is<BuiltinType>())
+            {
+                Diagnostics.Add(Diagnostic.Critical($"Index must be a builtin type (i.e. int) and not \"{indexType}\"", index.Index));
+                return;
+            }
+
+            if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
+                && index.Index is CompiledConstantValue evaluatedIndex)
+            {
+                if (arrayType.Length.HasValue && (evaluatedIndex.Value < 0 || evaluatedIndex.Value >= arrayType.Length.Value))
                 {
-                    Diagnostics.Add(error.ToError(index.Base));
-                    return;
+                    Diagnostics.Add(Diagnostic.Warning($"Index out of range", index.Index));
                 }
+                address = new AddressOffset(address, (int)evaluatedIndex.Value * FindSize(arrayType.Of, index.Base));
+
+                PushFrom(address, FindSize(arrayType.Of, index.Base));
+            }
+            else
+            {
                 GenerateAddressResolver(address);
-                PopTo(regPtr.Register);
 
-                if (!indexType.Is<BuiltinType>())
+                using (RegisterUsage.Auto regPtr = Registers.GetFree(PointerBitWidth))
                 {
-                    Diagnostics.Add(Diagnostic.Critical($"Index must be a builtin type (i.e. int) and not \"{indexType}\"", index.Index));
-                    return;
-                }
+                    PopTo(regPtr.Register);
 
-                if (Settings.Optimizations.HasFlag(GeneratorOptimizationSettings.IndexerFetchSkip)
-                    && index.Index is CompiledConstantValue evaluatedIndex)
-                {
-                    Code.Emit(Opcode.MathAdd, regPtr.Register, InstructionOperand.Immediate((int)evaluatedIndex.Value * FindSize(arrayType.Of, index.Base), regPtr.Register.BitWidth()));
-                }
-                else
-                {
                     GenerateCodeForStatement(index.Index);
                     using (RegisterUsage.Auto regIndex = Registers.GetFree(FindBitWidth(indexType, index.Index)))
                     {
@@ -1520,9 +1532,9 @@ public partial class CodeGeneratorForMain : CodeGenerator
                         Code.Emit(Opcode.MathMultU, regIndex.Register, InstructionOperand.Immediate(FindSize(arrayType.Of, index.Base), regIndex.Register.BitWidth()));
                         Code.Emit(Opcode.MathAdd, regPtr.Register, regIndex.Register);
                     }
-                }
 
-                PushFrom(new AddressRegisterPointer(regPtr.Register), FindSize(arrayType.Of, index.Base));
+                    PushFrom(new AddressRegisterPointer(regPtr.Register), FindSize(arrayType.Of, index.Base));
+                }
             }
             return;
         }
@@ -1543,7 +1555,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateAddressResolver(Address address)
     {
-        switch (address)
+        switch (address.Simplify())
         {
             case AddressPointer runtimePointer:
             {
@@ -1612,6 +1624,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
                     }
                 }
 
+                break;
+            }
+            case AddressAbsolute absolute:
+            {
+                Push(absolute.Value);
                 break;
             }
             default: throw new NotImplementedException();
@@ -1816,6 +1833,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             case CompiledConstantValue v: GenerateCodeForStatement(v, expectedType); break;
             case CompiledRegisterAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case CompiledVariableAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
+            case CompiledExpressionVariableAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case CompiledParameterAccess v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case CompiledFunctionReference v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
             case CompiledLabelReference v: GenerateCodeForStatement(v, expectedType, resolveReference); break;
@@ -2137,6 +2155,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             case CompiledRegisterAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
             case CompiledVariableAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
+            case CompiledExpressionVariableAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
             case CompiledParameterAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
             case CompiledFieldAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
             case CompiledElementAccess v: GenerateCodeForValueSetter(v, setter.Value); break;
@@ -2154,6 +2173,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
         GenerateCodeForStatement(value, localVariableSetter.Variable.Type);
         PopTo(GetVariableAddress(localVariableSetter.Variable), FindSize(localVariableSetter.Variable.Type, localVariableSetter.Variable));
         // localVariableSetter.Variable.Variable.IsInitialized = true;
+    }
+    void GenerateCodeForValueSetter(CompiledExpressionVariableAccess localVariableSetter, CompiledExpression value)
+    {
+        GenerateCodeForStatement(value, localVariableSetter.Variable.Type);
+        PopTo(new AddressAbsolute(localVariableSetter.Variable.Address), FindSize(localVariableSetter.Variable.Type, value));
     }
     void GenerateCodeForValueSetter(CompiledParameterAccess parameterSetter, CompiledExpression value)
     {
@@ -2457,7 +2481,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
             {
-                Address = GetReturnValueAddress().Offset,
+                Address = ReturnValueAddress.Offset,
                 BasePointerRelative = true,
                 Kind = StackElementKind.Internal,
                 Size = FindSize(returnType.Type, (ILocated)function),
@@ -2605,8 +2629,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = null;
 
-        AddComment("Pop stack frame");
-        PopTo(Register.BasePointer);
+        if (!Settings.IsExpression)
+        {
+            AddComment("Pop stack frame");
+            PopTo(Register.BasePointer);
+        }
+
         if (ScopeSizes.Pop() != 0) { }
 
         AddComment("}");
@@ -2621,7 +2649,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
     BBLangGeneratorResult GenerateCode(CompilerResult compilerResult, MainGeneratorSettings settings)
     {
         ScopeSizes.Push(0);
-        HasCapturedGlobalVariables = true;
 
         CurrentScopeDebug.Push(new ScopeInformation()
         {
@@ -2633,6 +2660,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Stack = new List<StackElementInformation>(),
         });
 
+        if (!Settings.IsExpression)
         {
             // Exit code
 
@@ -2680,10 +2708,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             AddComment("Allocate global variables {");
             StackAlloc(GlobalVariablesSize, false);
             AddComment("}");
-        }
 
-        {
-            // Absolute global offset
+            HasCapturedGlobalVariables = true;
 
             AddComment("Abs global address");
 
@@ -2707,11 +2733,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         GenerateCodeForTopLevelStatements(compilerResult.Statements);
 
-        AddComment("Pop abs global address");
-        Pop(FindSize(AbsGlobalAddressType)); // Pop abs global offset
+        if (HasCapturedGlobalVariables)
+        {
+            AddComment("Pop abs global address");
+            Pop(FindSize(AbsGlobalAddressType)); // Pop abs global offset
+        }
 
         if (Settings.CleanupGlobalVaraibles && globalVariablesCleanup.Count > 0)
         {
+            if (!HasCapturedGlobalVariables) throw new UnreachableException();
             AddComment("Cleanup global variables {");
             CleanupVariables(globalVariablesCleanup.ToImmutableArray(), default, true);
             AddComment("}");
@@ -2775,22 +2805,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
         // }
 
         Dictionary<string, ExposedFunction> exposedFunctions = new();
-        foreach (CompiledFunctionDefinition f in compilerResult.FunctionDefinitions)
+        if (!compilerResult.IsExpression)
         {
-            if (f.ExposedFunctionName is null) continue;
-            if (f.InstructionOffset == InvalidFunctionAddress)
+            foreach (CompiledFunctionDefinition f in compilerResult.FunctionDefinitions)
             {
-                Diagnostics.Add(Diagnostic.Internal($"Exposed function \"{f.ToReadable()}\" was not compiled", f.Identifier, f.File));
-                continue;
+                if (f.ExposedFunctionName is null) continue;
+                if (f.InstructionOffset == InvalidFunctionAddress)
+                {
+                    Diagnostics.Add(Diagnostic.Internal($"Exposed function \"{f.ToReadable()}\" was not compiled", f.Identifier, f.File));
+                    continue;
+                }
+                CompiledFunction e = Functions.First(v => v.Function == f);
+
+                int returnValueSize = f.ReturnSomething ? FindSize(f.Type, f.TypeToken) : 0;
+                int argumentsSize = 0;
+                foreach (CompiledParameter p in f.Parameters)
+                { argumentsSize += FindSize(p.Type, ((FunctionDefinition)f).Type); }
+
+                exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize, e.Flags);
             }
-            CompiledFunction e = Functions.First(v => v.Function == f);
-
-            int returnValueSize = f.ReturnSomething ? FindSize(f.Type, f.TypeToken) : 0;
-            int argumentsSize = 0;
-            foreach (CompiledParameter p in f.Parameters)
-            { argumentsSize += FindSize(p.Type, ((FunctionDefinition)f).Type); }
-
-            exposedFunctions[f.ExposedFunctionName] = new(f.ExposedFunctionName, returnValueSize, f.InstructionOffset, argumentsSize, e.Flags);
         }
 
         return new BBLangGeneratorResult()

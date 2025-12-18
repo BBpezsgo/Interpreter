@@ -1108,29 +1108,59 @@ public partial class StatementCompiler
         return CompileInternal(res.ResolvedEntry, res.ParsedFiles);
     }
 
-    CompilerResult CompileInteractiveInternal(Statement statement, Uri file)
+    CompilerResult CompileExpressionInternal(string expression, CompilerResult previous)
     {
-        SourceCodeManagerResult res = SourceCodeManager.Collect(
-            null,
+        Uri entryFile = new("void:///");
+        TokenizerResult expressionTokens = Tokenizer.Tokenize(
+            expression,
             Diagnostics,
             PreprocessorVariables,
-            ImmutableArray.Create("Primitives", "System"),
-            Settings.SourceProviders,
+            null,
             Settings.TokenizerSettings
         );
 
-        foreach (ParsedFile parsedFile in res.ParsedFiles)
-        { AddAST(parsedFile); }
+        ParserResult expressionAst = Parser.Parser.ParseExpression(expressionTokens.Tokens, entryFile, Diagnostics);
 
-        TopLevelStatements.Add((ImmutableArray.Create(statement), file));
+        ParsedFile parsedExpression = new(entryFile, null, expressionTokens, expressionAst, new ImportIndex());
 
-        return CompileInternal(file, res.ParsedFiles);
+        if (expressionAst.Usings.Any())
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Cannot import files from an interactive expression", expressionAst.Usings.First()));
+            return CompilerResult.MakeEmpty(entryFile);
+        }
+
+        CompiledStructs.Set(previous.Structs);
+        CompiledAliases.Set(previous.Aliases);
+        CompiledOperators.Set(previous.OperatorDefinitions);
+        CompiledFunctions.Set(previous.FunctionDefinitions);
+        CompiledGeneralFunctions.Set(previous.GeneralFunctionDefinitions);
+        CompiledConstructors.Set(previous.ConstructorDefinitions);
+
+        if (parsedExpression.AST.TopLevelStatements.Length > 1)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Expression should consists of one value only", parsedExpression.AST.TopLevelStatements[1]));
+            return CompilerResult.MakeEmpty(entryFile);
+        }
+        else if (parsedExpression.AST.TopLevelStatements.Length == 0)
+        {
+            Diagnostics.Add(Diagnostic.Critical($"Expression doesn't have any values", new Location(Position.Zero, entryFile)));
+            return CompilerResult.MakeEmpty(entryFile);
+        }
+
+        if (parsedExpression.AST.Functions.Length > 0) { Diagnostics.Add(Diagnostic.Error($"No function definitions allowed", parsedExpression.AST.Functions[0])); }
+        if (parsedExpression.AST.Operators.Length > 0) { Diagnostics.Add(Diagnostic.Error($"No operator definitions allowed", parsedExpression.AST.Operators[0])); }
+        if (parsedExpression.AST.AliasDefinitions.Length > 0) { Diagnostics.Add(Diagnostic.Error($"No alias definitions allowed", new Location(parsedExpression.AST.AliasDefinitions[0].Position, parsedExpression.AST.AliasDefinitions[0].File))); }
+        if (parsedExpression.AST.Structs.Length > 0) { Diagnostics.Add(Diagnostic.Error($"No struct definitions allowed", new Location(parsedExpression.AST.Structs[0].Position, parsedExpression.AST.Structs[0].File))); }
+
+        TopLevelStatements.Add((parsedExpression.AST.TopLevelStatements, parsedExpression.File));
+
+        return CompileInternal(entryFile, ImmutableArray.Create(parsedExpression), false);
     }
 
 #if UNITY
     static readonly Unity.Profiling.ProfilerMarker _m3 = new("LanguageCore.Compiler");
 #endif
-    CompilerResult CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles)
+    CompilerResult CompileInternal(Uri file, ImmutableArray<ParsedFile> parsedFiles, bool compileDefinitions = true)
     {
 #if UNITY
         using var _1 = _m3.Auto();
@@ -1138,7 +1168,7 @@ public partial class StatementCompiler
 
         using (Frames.PushAuto(CompiledFrame.Empty))
         {
-            CompileDefinitions(file, parsedFiles);
+            if (compileDefinitions) CompileDefinitions(file, parsedFiles);
 
             GenerateCode(
                 parsedFiles,
@@ -1157,7 +1187,7 @@ public partial class StatementCompiler
             CompiledStructs.ToImmutableArray(),
             TopLevelStatements.ToImmutableArray(),
             file,
-            false,
+            Settings.IsExpression,
             CompiledTopLevelStatements.ToImmutable(),
             GeneratedFunctions.ToImmutableArray()
         );
@@ -1181,13 +1211,13 @@ public partial class StatementCompiler
         return compiler.CompileMainFile(file);
     }
 
-    public static CompilerResult CompileInteractive(
-        Statement statement,
+    public static CompilerResult CompileExpression(
+        string expression,
         CompilerSettings settings,
         DiagnosticsCollection diagnostics,
-        Uri file)
+        CompilerResult previous)
     {
         StatementCompiler compiler = new(settings, diagnostics, null);
-        return compiler.CompileInteractiveInternal(statement, file);
+        return compiler.CompileExpressionInternal(expression, previous);
     }
 }

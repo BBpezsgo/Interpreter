@@ -703,10 +703,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 Diagnostics.Add(Diagnostic.Critical($"External constant \"{variableDeclaration.ExternalConstantName}\" not found", variableDeclaration));
                 constantValue = default;
             }
-            else
-            {
-                Diagnostics.Add(Diagnostic.Warning($"External constant \"{variableDeclaration.ExternalConstantName}\" not found", variableDeclaration));
-            }
         }
 
         if (variableDeclaration.InitialValue is null)
@@ -2209,6 +2205,18 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             return true;
         }
 
+        if (!Settings.ExpressionVariables.IsDefault)
+        {
+            foreach (ExpressionVariable item in Settings.ExpressionVariables)
+            {
+                if (item.Name != identifier.Content) continue;
+                identifier.AnalyzedType = TokenAnalyzedType.VariableName;
+                SetStatementReference(identifier, item);
+                SetStatementType(identifier, type = item.Type);
+                return true;
+            }
+        }
+
         if (GetConstant(identifier.Content, identifier.File, out CompiledVariableConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
             SetStatementReference(identifier, constant);
@@ -2592,6 +2600,11 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         return true;
     }
     static bool Inline(CompiledRegisterAccess statement, InlineContext context, out CompiledExpression inlined)
+    {
+        inlined = statement;
+        return true;
+    }
+    static bool Inline(CompiledExpressionVariableAccess statement, InlineContext context, out CompiledExpression inlined)
     {
         inlined = statement;
         return true;
@@ -3095,6 +3108,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledConstantValue v => Inline(v, context, out inlined),
             CompiledRegisterAccess v => Inline(v, context, out inlined),
             CompiledVariableAccess v => Inline(v, context, out inlined),
+            CompiledExpressionVariableAccess v => Inline(v, context, out inlined),
             CompiledParameterAccess v => Inline(v, context, out inlined),
             CompiledFunctionReference v => Inline(v, context, out inlined),
             CompiledLabelReference v => Inline(v, context, out inlined),
@@ -3796,6 +3810,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledDummyExpression => false,
             CompiledRegisterAccess => false,
             CompiledLabelReference => false,
+            CompiledExpressionVariableAccess => false,
             null => false,
 
             _ => throw new NotImplementedException(statement.GetType().ToString()),
@@ -4346,6 +4361,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         CompiledConstantValue => StatementComplexity.None,
         CompiledRegisterAccess => StatementComplexity.None,
         CompiledVariableAccess => StatementComplexity.None,
+        CompiledExpressionVariableAccess => StatementComplexity.None,
         CompiledParameterAccess => StatementComplexity.None,
         CompiledFunctionReference => StatementComplexity.None,
         CompiledLabelReference => StatementComplexity.None,
@@ -4505,6 +4521,9 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 yield return v;
                 break;
             case CompiledVariableAccess v:
+                yield return v;
+                break;
+            case CompiledExpressionVariableAccess v:
                 yield return v;
                 break;
             case CompiledParameterAccess v:
@@ -4682,6 +4701,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             CompiledConstantValue or
             CompiledRegisterAccess or
             CompiledVariableAccess or
+            CompiledExpressionVariableAccess or
             CompiledParameterAccess or
             CompiledFunctionReference or
             CompiledLabelReference or

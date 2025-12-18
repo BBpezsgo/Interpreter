@@ -19,4 +19,15 @@ public abstract class Address
             return new AddressOffset(a, b);
         }
     }
+
+    public Address Simplify() => this switch
+    {
+        AddressOffset v => v.Base.Simplify() switch
+        {
+            AddressOffset w => new AddressOffset(w.Base, v.Offset + w.Offset),
+            AddressAbsolute w => new AddressAbsolute(v.Offset + w.Value),
+            _ => this,
+        },
+        _ => this,
+    };
 }

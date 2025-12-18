@@ -112,6 +112,21 @@ public readonly struct CompiledDebugInformation
         return default;
     }
 
+    public bool TryGetFunctionInformation(int codePointer, out FunctionInformation function) => TryGetFunctionInformation(FunctionInformation.AsSpan(), codePointer, out function);
+    public static bool TryGetFunctionInformation(ReadOnlySpan<FunctionInformation> functionInformation, int codePointer, out FunctionInformation function)
+    {
+        for (int i = 0; i < functionInformation.Length; i++)
+        {
+            function = functionInformation[i];
+
+            if (function.Contains(codePointer))
+            { return true; }
+        }
+
+        function = default;
+        return false;
+    }
+
     public ImmutableArray<FunctionInformation> GetFunctionInformationNested(int codePointer)
         => GetFunctionInformationNested(FunctionInformation.AsSpan(), codePointer);
     public static ImmutableArray<FunctionInformation> GetFunctionInformationNested(ReadOnlySpan<FunctionInformation> functionInformation, int codePointer)

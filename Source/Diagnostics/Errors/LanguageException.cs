@@ -49,6 +49,8 @@ public class LanguageException : Exception
             result.Append(message);
         }
 
+        if (file?.Scheme == "void") file = null;
+
         if (file is not null)
         {
             if (result.Length > 0) result.Append(' ');

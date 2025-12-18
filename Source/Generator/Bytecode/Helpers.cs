@@ -280,20 +280,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         );
     }
 
-    public AddressOffset GetReturnValueAddress()
-    {
-        return new(
-            Register.BasePointer,
-            0 // We start at the saved base pointer
-            - ((
-                ParametersSize // Offset by the parameters
-                + StackFrameTags // Offset by the stack frame stuff
-            ) * ProcessorState.StackDirection)
-        //  - returnType.SizeBytes // We at the end of the return value, but we want to be at the start
-        //  + 1 // Stack pointer offset (???)
-        );
-    }
-
     public AddressOffset GetParameterAddress(CompiledParameter parameter, int offset = 0)
     {
         if (CurrentContext is CompiledLambda compiledLambda)
@@ -379,7 +365,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void PopTo(Address address, int size)
     {
-        switch (address)
+        switch (address.Simplify())
         {
             case AddressOffset v: PopTo(v, size); break;
             case AddressPointer v: PopTo(v, size); break;
@@ -567,14 +553,43 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
     void PushFrom(Address address, int size)
     {
-        switch (address)
+        switch (address.Simplify())
         {
             case AddressOffset v: PushFrom(v, size); break;
+            case AddressAbsolute v: PushFrom(v, size); break;
             case AddressPointer v: PushFrom(v, size); break;
             case AddressRegisterPointer v: PushFrom(v, size); break;
             case AddressRuntimePointer v: PushFrom(v, size); break;
             case AddressRuntimeIndex v: PushFrom(v, size); break;
             default: throw new NotImplementedException();
+        }
+    }
+
+    void PushFrom(AddressAbsolute address, int size)
+    {
+        int currentOffset = size;
+
+        while (currentOffset > 0)
+        {
+            if (currentOffset >= 4)
+            {
+                Push(new InstructionOperand(address.Value, InstructionOperandType.Pointer32));
+                currentOffset -= 4;
+            }
+            else if (currentOffset >= 2)
+            {
+                Push(new InstructionOperand(address.Value, InstructionOperandType.Pointer16));
+                currentOffset -= 2;
+            }
+            else if (currentOffset >= 1)
+            {
+                Push(new InstructionOperand(address.Value, InstructionOperandType.Pointer8));
+                currentOffset -= 1;
+            }
+            else
+            {
+                throw new UnreachableException();
+            }
         }
     }
 
@@ -784,6 +799,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         switch (value)
         {
             case CompiledVariableAccess v: return GetAddress(v, out address, out error);
+            case CompiledExpressionVariableAccess v: return GetAddress(v, out address, out error);
             case CompiledParameterAccess v: return GetAddress(v, out address, out error);
             case CompiledElementAccess v: return GetAddress(v, out address, out error);
             case CompiledFieldAccess v: return GetAddress(v, out address, out error);
@@ -792,6 +808,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 error = new PossibleDiagnostic($"Can't get the address of {value.GetType().Name}", value);
                 return false;
         }
+    }
+
+    bool GetAddress(CompiledExpressionVariableAccess value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
+    {
+        address = new AddressAbsolute(value.Variable.Address);
+        error = null;
+        return true;
     }
 
     bool GetAddress(CompiledVariableAccess value, [NotNullWhen(true)] out Address? address, [NotNullWhen(false)] out PossibleDiagnostic? error)
@@ -895,6 +918,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         CompiledVariableAccess => null,
         CompiledParameterAccess => null,
+        CompiledExpressionVariableAccess => null,
         CompiledElementAccess v => NeedDerefernce(v),
         CompiledFieldAccess v => NeedDerefernce(v),
         CompiledFunctionCall v => NeedDerefernce(v),
@@ -938,20 +962,25 @@ public partial class CodeGeneratorForMain : CodeGenerator
     int CodePointerSize => PointerSize;
     int BasePointerSize => PointerSize;
 
-    /// <summary>
-    /// <c>Saved BP</c> + <c>Abs global address</c> + <c>Saved CP</c>
-    /// </summary>
     int StackFrameTags => BasePointerSize + (HasCapturedGlobalVariables ? AbsGlobalAddressSize : 0) + CodePointerSize;
+    int TopLevelStackFrameTags => BasePointerSize + (HasCapturedGlobalVariables ? AbsGlobalAddressSize : 0);
 
-    public Address AbsoluteGlobalAddress => new AddressOffset(
+    public AddressOffset AbsoluteGlobalAddress => new(
         new AddressRegisterPointer(Register.BasePointer),
-        AbsoluteGlobalOffset);
-    public Address StackTop => new AddressOffset(
+        AbsoluteGlobalOffset
+    );
+    public AddressOffset StackTop => new(
         new AddressRegisterPointer(Register.StackPointer),
-        0);
-    public Address ExitCodeAddress => new AddressOffset(
-        new AddressPointer(AbsoluteGlobalAddress),
-        GlobalVariablesSize);
+        0
+    );
+    public AddressOffset ExitCodeAddress => new(
+        new AddressRegisterPointer(Register.BasePointer),
+        TopLevelStackFrameTags + GlobalVariablesSize
+    );
+    public AddressOffset ReturnValueAddress => new(
+        new AddressRegisterPointer(Register.BasePointer),
+        StackFrameTags + ParametersSize
+    );
 
     public int SavedBasePointerOffset => 0 * ProcessorState.StackDirection;
     public int AbsoluteGlobalOffset => FindSize(ExitCodeType) * -ProcessorState.StackDirection;

@@ -116,7 +116,7 @@ public sealed class Parser
     static readonly ImmutableArray<string> UnaryPostfixOperators = ImmutableArray<string>.Empty;
 #pragma warning restore RCS1213, IDE0052, CA1823
 
-    // === Result ===
+    readonly bool IsExpression;
     readonly DiagnosticsCollection Diagnostics;
     readonly List<FunctionDefinition> Functions = new();
     readonly List<FunctionDefinition> Operators = new();
@@ -124,9 +124,8 @@ public sealed class Parser
     readonly List<UsingDefinition> Usings = new();
     readonly List<AliasDefinition> AliasDefinitions = new();
     readonly List<Statement> TopLevelStatements = new();
-    // === ===
 
-    Parser(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
+    Parser(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics, bool isExpression)
     {
         OriginalTokens = tokens;
         Tokens = tokens
@@ -140,11 +139,15 @@ public sealed class Parser
                 and not TokenType.PreprocessSkipped)
             .ToArray();
         File = file;
+        IsExpression = isExpression;
         Diagnostics = diagnostics;
     }
 
     public static ParserResult Parse(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
-        => new Parser(tokens, file, diagnostics).ParseInternal();
+        => new Parser(tokens, file, diagnostics, false).ParseInternal();
+
+    public static ParserResult ParseExpression(ImmutableArray<Token> tokens, Uri file, DiagnosticsCollection diagnostics)
+        => new Parser(tokens, file, diagnostics, true).ParseInternal();
 
 #if UNITY
     static readonly Unity.Profiling.ProfilerMarker _marker = new("LanguageCore.Parser");
@@ -1558,12 +1561,12 @@ public sealed class Parser
             return false;
         }
 
-        SetStatementThings(statement);
+        if (!IsExpression) SetStatementThings(statement);
 
         Token? semicolon;
         if (NeedSemicolon(statement))
         {
-            if (!ExpectOperator(";", out semicolon))
+            if (!ExpectOperator(";", out semicolon) && !IsExpression)
             { Diagnostics.Add(Diagnostic.Error($"Please put a \";\" here (after \"{statement.GetType().Name}\")", statement.Position.After(), File)); }
         }
         else

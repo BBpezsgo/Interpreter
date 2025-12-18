@@ -13,6 +13,22 @@ public enum OptimizationSettings : uint
     TrimUnreachable = 0x8,
 }
 
+public readonly struct ExpressionVariable
+{
+    public readonly string Name;
+    public readonly int Address;
+    public readonly GeneralType Type;
+
+    public ExpressionVariable(string name, int address, GeneralType type)
+    {
+        Name = name;
+        Address = address;
+        Type = type;
+    }
+
+    public override string ToString() => $"{Type} {Name} ({Address})";
+}
+
 public struct CompilerSettings
 {
     public required OptimizationSettings Optimizations { get; set; }
@@ -30,6 +46,8 @@ public struct CompilerSettings
     public ImmutableArray<string> AdditionalImports { get; set; }
     public ImmutableArray<UserDefinedAttribute> UserDefinedAttributes { get; set; }
     public bool CompileEverything { get; set; }
+    public bool IsExpression { get; set; }
+    public ImmutableArray<ExpressionVariable> ExpressionVariables { get; set; }
 
     [SetsRequiredMembers]
     public CompilerSettings(CompilerSettings other)
@@ -49,5 +67,7 @@ public struct CompilerSettings
         SourceProviders = other.SourceProviders;
         TokenizerSettings = other.TokenizerSettings;
         CompileEverything = other.CompileEverything;
+        IsExpression = other.IsExpression;
+        ExpressionVariables = other.ExpressionVariables;
     }
 }

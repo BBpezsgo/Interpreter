@@ -25,6 +25,7 @@ public struct MainGeneratorSettings
     public int StackSize;
     public bool CleanupGlobalVaraibles;
     public ILGeneratorSettings? ILGeneratorSettings;
+    public bool IsExpression;
 
     public MainGeneratorSettings(MainGeneratorSettings other)
     {
@@ -35,6 +36,7 @@ public struct MainGeneratorSettings
         StackSize = other.StackSize;
         CleanupGlobalVaraibles = other.CleanupGlobalVaraibles;
         ILGeneratorSettings = other.ILGeneratorSettings;
+        IsExpression = other.IsExpression;
     }
 
     public static MainGeneratorSettings Default => new()

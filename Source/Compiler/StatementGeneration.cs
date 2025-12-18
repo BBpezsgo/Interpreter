@@ -1028,7 +1028,10 @@ public partial class StatementCompiler
             ExternalConstant? externalConstant = ExternalConstants.FirstOrDefault(v => v.Name == newVariable.ExternalConstantName);
             if (externalConstant is null)
             {
-                Diagnostics.Add(Diagnostic.Warning($"External constant \"{newVariable.ExternalConstantName}\" not found", newVariable));
+                if (type is null)
+                {
+                    Diagnostics.Add(Diagnostic.Warning($"External constant \"{newVariable.ExternalConstantName}\" not found", newVariable));
+                }
             }
             else
             {
@@ -2808,6 +2811,26 @@ public partial class StatementCompiler
             return true;
         }
 
+        if (!Settings.ExpressionVariables.IsDefault)
+        {
+            foreach (ExpressionVariable item in Settings.ExpressionVariables)
+            {
+                if (item.Name != variable.Content) continue;
+                variable.AnalyzedType = TokenAnalyzedType.VariableName;
+                SetStatementReference(variable, item);
+                SetStatementType(variable, item.Type);
+
+                compiledStatement = new CompiledExpressionVariableAccess()
+                {
+                    Variable = item,
+                    Location = variable.Location,
+                    SaveValue = variable.SaveValue,
+                    Type = item.Type,
+                };
+                return true;
+            }
+        }
+
         if (GetConstant(variable.Content, variable.File, out CompiledVariableConstant? constant, out PossibleDiagnostic? constantNotFoundError))
         {
             SetStatementType(variable, constant.Type);
@@ -4410,11 +4433,41 @@ public partial class StatementCompiler
                 compiledStatements = ImmutableArray<CompiledStatement>.Empty;
                 return false;
             }
-            if (compiledStatement is CompiledEmptyStatement) continue;
+            if (Settings.IsExpression)
+            {
+                res.Add(compiledStatement);
+            }
+            else
+            {
+                if (compiledStatement is CompiledEmptyStatement) continue;
 
-            ImmutableArray<CompiledStatement> reduced = ReduceStatements(compiledStatement, true);
-            res.AddRange(reduced);
+                ImmutableArray<CompiledStatement> reduced = ReduceStatements(compiledStatement, true);
+                res.AddRange(reduced);
+            }
         }
+
+        compiledStatements = res.ToImmutable();
+        return true;
+    }
+
+#if UNITY
+    static readonly Unity.Profiling.ProfilerMarker _m1 = new("LanguageCore.Compiler.TopLevelStatements");
+#endif
+    bool CompileExpression(Statement statement, Dictionary<string, int>? contextualVariables, [NotNullWhen(true)] out ImmutableArray<CompiledStatement> compiledStatements)
+    {
+#if UNITY
+        using var _1 = _m1.Auto();
+#endif
+
+        ImmutableArray<CompiledStatement>.Builder res = ImmutableArray.CreateBuilder<CompiledStatement>(1);
+
+        if (!CompileStatement(statement, out CompiledStatement? compiledStatement))
+        {
+            compiledStatements = ImmutableArray<CompiledStatement>.Empty;
+            return false;
+        }
+
+        res.Add(compiledStatement);
 
         compiledStatements = res.ToImmutable();
         return true;
@@ -4422,7 +4475,7 @@ public partial class StatementCompiler
 
     #endregion
 
-    void GenerateCode(ImmutableArray<ParsedFile> parsedFiles, Uri file)
+    void GenerateCode(ImmutableArray<ParsedFile> parsedFiles, Uri entryFile)
     {
         ImmutableArray<CompiledLabelDeclaration>.Builder globalInstructionLabels = ImmutableArray.CreateBuilder<CompiledLabelDeclaration>();
 
@@ -4467,10 +4520,22 @@ public partial class StatementCompiler
         {
             using (Frames.Last.Scopes.PushAuto(new Scope(ImmutableArray<CompiledVariableConstant>.Empty)))
             {
-                foreach ((ImmutableArray<Statement> Statements, Uri File) item in TopLevelStatements)
+                if (Settings.IsExpression)
                 {
-                    if (!CompileTopLevelStatements(item.Statements, out ImmutableArray<CompiledStatement> v)) continue;
-                    CompiledTopLevelStatements.AddRange(v);
+                    foreach ((ImmutableArray<Statement> statements, Uri file) in TopLevelStatements)
+                    {
+                        if (file != entryFile) continue;
+                        if (!CompileTopLevelStatements(statements, out ImmutableArray<CompiledStatement> v)) continue;
+                        CompiledTopLevelStatements.AddRange(v);
+                    }
+                }
+                else
+                {
+                    foreach ((ImmutableArray<Statement> statements, Uri file) in TopLevelStatements)
+                    {
+                        if (!CompileTopLevelStatements(statements, out ImmutableArray<CompiledStatement> v)) continue;
+                        CompiledTopLevelStatements.AddRange(v);
+                    }
                 }
 
                 while (true)
@@ -4613,6 +4678,7 @@ public partial class StatementCompiler
             case CompiledReinterpretation v: AnalyseFunction(v, ref flags, stack); break;
             case CompiledElementAccess v: AnalyseFunction(v, ref flags, stack); break;
             case CompiledVariableAccess v: AnalyseFunction(v, ref flags, stack); break;
+            case CompiledExpressionVariableAccess v: AnalyseFunction(v, ref flags, stack); break;
             case CompiledParameterAccess v: AnalyseFunction(v, ref flags, stack); break;
             case CompiledFieldAccess v: AnalyseFunction(v, ref flags, stack); break;
             case CompiledRegisterAccess v: AnalyseFunction(v, ref flags, stack); break;
@@ -4853,6 +4919,10 @@ public partial class StatementCompiler
     {
         AnalyseFunction(statement.Base, ref flags, stack);
         AnalyseFunction(statement.Index, ref flags, stack);
+    }
+    void AnalyseFunction(CompiledExpressionVariableAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
+    {
+
     }
     void AnalyseFunction(CompiledVariableAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
     {

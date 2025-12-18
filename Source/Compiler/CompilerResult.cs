@@ -19,7 +19,7 @@ public readonly struct CompilerResult
 
     public readonly ImmutableArray<IExternalFunction> ExternalFunctions;
     public readonly Uri File;
-    public readonly bool IsInteractive;
+    public readonly bool IsExpression;
 
     public readonly ImmutableArray<CompiledStatement> Statements;
     public readonly ImmutableArray<CompiledFunction> Functions;
@@ -120,7 +120,7 @@ public readonly struct CompilerResult
         ImmutableArray<CompiledStruct> structs,
         ImmutableArray<(ImmutableArray<Statement> Statements, Uri File)> topLevelStatements,
         Uri file,
-        bool isInteractive,
+        bool isExpression,
         ImmutableArray<CompiledStatement> compiledStatements,
         ImmutableArray<CompiledFunction> functions2)
     {
@@ -134,7 +134,7 @@ public readonly struct CompilerResult
         Structs = structs;
         RawStatements = topLevelStatements;
         File = file;
-        IsInteractive = isInteractive;
+        IsExpression = isExpression;
         Statements = compiledStatements;
         Functions = functions2;
     }

@@ -824,7 +824,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
     }
     void CompileSetter(Address address, CompiledExpression value)
     {
-        switch (address)
+        switch (address.Simplify())
         {
             case AddressAbsolute v: CompileSetter(v, value); break;
             case AddressOffset v: CompileSetter(v, value); break;
@@ -2366,7 +2366,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void PushFrom(Address address, int size)
     {
-        switch (address)
+        switch (address.Simplify())
         {
             case AddressAbsolute v: PushFrom(v, size); break;
             case AddressOffset v: PushFrom(v, size); break;

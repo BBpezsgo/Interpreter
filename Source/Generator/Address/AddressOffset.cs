@@ -15,16 +15,8 @@ public class AddressOffset : Address
 
     public AddressOffset(Address @base, int offset)
     {
-        if (@base is AddressOffset baseAddressOffset)
-        {
-            Base = baseAddressOffset.Base;
-            Offset = baseAddressOffset.Offset + offset;
-        }
-        else
-        {
-            Base = @base;
-            Offset = offset;
-        }
+        Base = @base;
+        Offset = offset;
     }
 
     [ExcludeFromCodeCoverage]

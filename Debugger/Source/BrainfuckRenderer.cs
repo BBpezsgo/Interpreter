@@ -183,6 +183,7 @@ public class BrainfuckRenderer
                     {
                         Tokenizing.TokenAnalyzedType.Attribute => AnsiColor.BrightGreen,
                         Tokenizing.TokenAnalyzedType.Type => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.TypeAlias => AnsiColor.BrightGreen,
                         Tokenizing.TokenAnalyzedType.Struct => AnsiColor.BrightGreen,
                         Tokenizing.TokenAnalyzedType.Keyword => AnsiColor.BrightBlue,
                         Tokenizing.TokenAnalyzedType.FunctionName => AnsiColor.BrightYellow,

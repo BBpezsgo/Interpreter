@@ -1,9 +1,11 @@
 <Solution>
+  <Project Path="../VSCodeExtension/syntax_generator/SyntaxGenerator.csproj" />
   <Project Path="Debugger/Debugger.csproj" />
   <Project Path="Examples/Examples.csproj" />
   <Project Path="Source/Core.csproj" />
   <Project Path="Tests/Tests.csproj" />
   <Project Path="Utility/Utility.csproj" />
+  <Folder Name="/Source/" />
   <Project Path="../DebugServer/DebugServer.csproj" />
   <Project Path="../LanguageServer/LanguageServer.csproj" />
   <Project Path="../SpeedTests/Benchmarks.csproj" />

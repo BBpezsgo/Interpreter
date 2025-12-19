@@ -6,14 +6,14 @@ namespace LanguageCore.Parser;
 public sealed class Parser
 {
     int CurrentTokenIndex;
-    readonly Token[] Tokens;
+    readonly List<Token> Tokens;
     readonly ImmutableArray<Token> OriginalTokens;
     readonly Uri File;
 
     Location CurrentLocation => new(CurrentPosition, File);
     Position CurrentPosition => CurrentToken?.Position ?? PreviousToken?.Position.After() ?? Position.UnknownPosition;
-    Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Length) ? Tokens[CurrentTokenIndex] : null;
-    Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Length) ? Tokens[CurrentTokenIndex - 1] : null;
+    Token? CurrentToken => (CurrentTokenIndex >= 0 && CurrentTokenIndex < Tokens.Count) ? Tokens[CurrentTokenIndex] : null;
+    Token? PreviousToken => (CurrentTokenIndex >= 1 && CurrentTokenIndex <= Tokens.Count) ? Tokens[CurrentTokenIndex - 1] : null;
 
     static readonly ImmutableArray<string> AllModifiers = ImmutableArray.Create
     (
@@ -137,7 +137,7 @@ public sealed class Parser
                 and not TokenType.PreprocessArgument
                 and not TokenType.PreprocessIdentifier
                 and not TokenType.PreprocessSkipped)
-            .ToArray();
+            .ToList();
         File = file;
         IsExpression = isExpression;
         Diagnostics = diagnostics;
@@ -371,7 +371,7 @@ public sealed class Parser
             return false;
         }
 
-        identifier.AnalyzedType = TokenAnalyzedType.Type;
+        identifier.AnalyzedType = TokenAnalyzedType.TypeAlias;
 
         if (!ExpectType(AllowedType.Any | AllowedType.FunctionPointer | AllowedType.StackArrayWithoutLength, out TypeInstance? type))
         {
@@ -2251,8 +2251,14 @@ public sealed class Parser
         Token? closureModifier = null;
         if (possibleType.Content.StartsWith('@'))
         {
+            int slicedIndex = CurrentTokenIndex - 1;
             closureModifier = possibleType[..1];
+            closureModifier.AnalyzedType = TokenAnalyzedType.TypeModifier;
             possibleType = possibleType[1..];
+            Tokens.RemoveAt(slicedIndex);
+            Tokens.Insert(slicedIndex, possibleType);
+            Tokens.Insert(slicedIndex, closureModifier);
+            CurrentTokenIndex++;
         }
 
         type = new TypeInstanceSimple(possibleType, File);

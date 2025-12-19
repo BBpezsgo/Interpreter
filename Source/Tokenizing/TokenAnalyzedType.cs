@@ -5,6 +5,7 @@ public enum TokenAnalyzedType
     None,
     Attribute,
     Type,
+    TypeAlias,
     Struct,
     Keyword,
     FunctionName,

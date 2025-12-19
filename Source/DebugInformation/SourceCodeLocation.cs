@@ -10,5 +10,5 @@ public struct SourceCodeLocation
         Instructions.Start <= instruction &&
         Instructions.End > instruction;
 
-    public override readonly string ToString() => $"({Instructions} -> {Location.Position.ToStringRange()})";
+    public override readonly string ToString() => $"({Instructions} -> {Location.Position})";
 }

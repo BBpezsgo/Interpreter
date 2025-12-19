@@ -90,6 +90,7 @@ public static class StatementKeywords
     public const string As = "as";
     public const string Var = "var";
     public const string Break = "break";
+    public const string Sizeof = "sizeof";
 }
 
 public static class LanguageConstants
@@ -128,7 +129,8 @@ public static class LanguageConstants
 
         StatementKeywords.As,
         StatementKeywords.New,
-        StatementKeywords.Delete
+        StatementKeywords.Delete,
+        StatementKeywords.Sizeof
     );
 }
 

@@ -44,7 +44,6 @@ public partial class StatementCompiler
             FieldDefinition field = @struct.Fields[i];
 
             if (!CompileType(field.Type, out GeneralType? fieldType, Diagnostics)) continue;
-            SetTypeType(field.Type, fieldType);
             compiledFields.Add(new CompiledField(fieldType, null! /* CompiledStruct constructor will set this */, field));
         }
 
@@ -83,7 +82,7 @@ public partial class StatementCompiler
 
                     if (!ExternalFunctions.TryGet(externalName, out IExternalFunction? externalFunction, out PossibleDiagnostic? exception))
                     {
-                        Diagnostics.Add(exception.ToWarning(attribute, function.File));
+                        //Diagnostics.Add(exception.ToWarning(attribute, function.File));
                         break;
                     }
 
@@ -298,13 +297,11 @@ public partial class StatementCompiler
         }
 
         if (!CompileType(function.Type, out GeneralType? type, Diagnostics)) return false;
-        SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
             if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
-            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -365,13 +362,11 @@ public partial class StatementCompiler
         result = null;
 
         if (!CompileType(function.Type, out GeneralType? type, Diagnostics)) return false;
-        SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
             if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
-            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -395,7 +390,6 @@ public partial class StatementCompiler
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
             if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
-            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -423,13 +417,11 @@ public partial class StatementCompiler
         }
 
         if (!CompileType(function.Type, out GeneralType? type, Diagnostics)) return false;
-        SetTypeType(function.Type, type);
 
         ImmutableArray<CompiledParameter>.Builder parameters = ImmutableArray.CreateBuilder<CompiledParameter>(function.Parameters.Count);
         foreach (ParameterDefinition item in function.Parameters.Parameters)
         {
             if (!CompileType(item.Type, out GeneralType? parameterType, Diagnostics)) return false;
-            SetTypeType(item.Type, parameterType);
             parameters.Add(new CompiledParameter(parameterType, item));
         }
 
@@ -788,13 +780,11 @@ public partial class StatementCompiler
             }
 
             if (!CompileType(aliasDefinition.Value, out GeneralType? aliasType, Diagnostics)) continue;
-            SetTypeType(aliasDefinition.Value, aliasType);
 
             CompiledAlias alias = new(
                 aliasType,
                 aliasDefinition
             );
-            SetTypeType(aliasDefinition.Value, alias.Value);
             CompiledAliases.Add(alias);
         }
 

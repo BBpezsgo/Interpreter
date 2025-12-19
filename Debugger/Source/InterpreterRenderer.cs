@@ -322,6 +322,7 @@ public class InterpreterRenderer
                     {
                         Tokenizing.TokenAnalyzedType.Attribute => AnsiColor.BrightGreen,
                         Tokenizing.TokenAnalyzedType.Type => AnsiColor.BrightGreen,
+                        Tokenizing.TokenAnalyzedType.TypeAlias => AnsiColor.BrightGreen,
                         Tokenizing.TokenAnalyzedType.Struct => AnsiColor.BrightGreen,
                         Tokenizing.TokenAnalyzedType.Keyword => AnsiColor.BrightBlue,
                         Tokenizing.TokenAnalyzedType.FunctionName => AnsiColor.BrightYellow,
@@ -518,7 +519,7 @@ public class InterpreterRenderer
         int end = Math.Max(position + (buffer.Height / 2), begin + buffer.Height);
 
         int offset = 0;
-        offset -= (CommentsBeforehand(position) - CommentsBeforehand(begin));
+        offset -= CommentsBeforehand(position) - CommentsBeforehand(begin);
 
         begin = Math.Max(0, begin);
         end = Math.Min(processor.Code.Length, end);

@@ -682,10 +682,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         GeneralType? constantType = null;
         if (variableDeclaration.Type != StatementKeywords.Var)
         {
-            if (!CompileType(variableDeclaration.Type, out constantType, out PossibleDiagnostic? typeError))
-            {
-                Diagnostics.Add(typeError.ToError(variableDeclaration.Type));
-            }
+            CompileType(variableDeclaration.Type, out constantType, Diagnostics);
         }
 
         CompiledValue constantValue;
@@ -744,7 +741,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 return false;
             }
         }
-        SetTypeType(variableDeclaration.Type, constantType);
 
         result = new CompiledVariableConstant(constantValue, constantType, variableDeclaration);
         return true;
@@ -1443,6 +1439,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 BuiltinType => TokenAnalyzedType.BuiltinType,
                 StructType => TokenAnalyzedType.Struct,
                 GenericType => TokenAnalyzedType.TypeParameter,
+                AliasType => TokenAnalyzedType.TypeAlias,
                 _ => TokenAnalyzedType.Type,
             };
             alias.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
@@ -1538,6 +1535,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
                 BuiltinType => TokenAnalyzedType.BuiltinType,
                 StructType => TokenAnalyzedType.Struct,
                 GenericType => TokenAnalyzedType.TypeParameter,
+                AliasType => TokenAnalyzedType.TypeAlias,
                 _ => TokenAnalyzedType.Type,
             };
             alias.References.Add(new Reference<TypeInstance>(new TypeInstanceSimple(name, relevantFile), relevantFile));
@@ -1659,56 +1657,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (!Frames.Last.IsTemplateInstance) statement.Reference = reference;
     }
-    void SetTypeType(TypeInstance typeInstance, GeneralType type)
-    {
-        if (Frames.Last.IsTemplateInstance) return;
-
-        switch (typeInstance)
-        {
-            case TypeInstanceFunction v:
-            {
-
-                if (!type.Is(out FunctionType? functionType)) return;
-
-                SetTypeType(v.FunctionReturnType, functionType.ReturnType);
-
-                if (v.FunctionParameterTypes.Length != functionType.Parameters.Length) return;
-
-                for (int i = 0; i < functionType.Parameters.Length; i++)
-                {
-                    SetTypeType(v.FunctionParameterTypes[i], functionType.Parameters[i]);
-                }
-                break;
-            }
-            case TypeInstancePointer v:
-            {
-                if (!type.Is(out PointerType? pointerType)) return;
-                SetTypeType(v.To, pointerType.To);
-                break;
-            }
-            case TypeInstanceSimple v:
-            {
-                v.Identifier.AnalyzedType = type.FinalValue switch
-                {
-                    StructType => TokenAnalyzedType.Struct,
-                    GenericType => TokenAnalyzedType.TypeParameter,
-                    BuiltinType => TokenAnalyzedType.BuiltinType,
-                    AliasType => TokenAnalyzedType.Type,
-                    _ => v.Identifier.AnalyzedType,
-                };
-                break;
-            }
-            case TypeInstanceStackArray v:
-            {
-                if (!type.Is(out ArrayType? arrayType)) return;
-
-                SetTypeType(v.StackArrayOf, arrayType.Of);
-                break;
-            }
-            default:
-                throw new UnreachableException(typeInstance.GetType().Name);
-        }
-    }
 
     bool FindStatementType(AnyCallExpression anyCall, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
@@ -1796,7 +1744,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     }
     bool FindStatementType(FunctionCallExpression functionCall, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
-        if (functionCall.Identifier.Content == "sizeof")
+        if (functionCall.Identifier.Content == StatementKeywords.Sizeof)
         {
             if (GetLiteralType(LiteralType.Integer, out GeneralType? integerType, out PossibleDiagnostic? internalTypeError))
             {
@@ -2320,7 +2268,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (!CompileType(newInstance.Type, out type, diagnostics)) return false;
 
-        SetTypeType(newInstance.Type, type);
         SetStatementType(newInstance, type);
         return true;
     }
@@ -2328,12 +2275,10 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (!CompileType(constructorCall.Type, out type, diagnostics)) return false;
 
-        SetTypeType(constructorCall.Type, type);
         FindStatementTypes(constructorCall.Arguments, out ImmutableArray<GeneralType> parameters, diagnostics);
 
         if (GetConstructor(type, parameters, constructorCall.File, out FunctionQueryResult<CompiledConstructorDefinition>? result, out PossibleDiagnostic? notFound))
         {
-            SetTypeType(constructorCall.Type, result.Function.Type);
             SetStatementType(constructorCall, type = result.Function.Type);
             return true;
         }
@@ -2385,7 +2330,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (!CompileType(@as.Type, out type, diagnostics)) return false;
 
-        SetTypeType(@as.Type, type);
         SetStatementType(@as, type);
         return true;
     }
@@ -2393,7 +2337,6 @@ public partial class StatementCompiler : IRuntimeInfoProvider
     {
         if (!CompileType(@as.Type, out type, diagnostics)) return false;
 
-        SetTypeType(@as.Type, type);
         SetStatementType(@as, type);
         return true;
     }

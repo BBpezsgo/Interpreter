@@ -273,7 +273,7 @@ public partial class StatementCompiler
         if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
         {
             result = new CompiledBuiltinTypeExpression(builtinType, type.Location);
-            //type.SetAnalyzedType(result);
+            type.Identifier.AnalyzedType = TokenAnalyzedType.BuiltinType;
             return true;
         }
 
@@ -282,6 +282,15 @@ public partial class StatementCompiler
             Diagnostics.Add(error.ToError(type));
             return false;
         }
+
+        type.Identifier.AnalyzedType = result.FinalValue switch
+        {
+            CompiledGenericTypeExpression => TokenAnalyzedType.TypeParameter,
+            CompiledStructTypeExpression => TokenAnalyzedType.Struct,
+            CompiledBuiltinTypeExpression => TokenAnalyzedType.BuiltinType,
+            CompiledAliasTypeExpression => TokenAnalyzedType.TypeAlias,
+            _ => TokenAnalyzedType.Type,
+        };
 
         if (result.Is(out CompiledStructTypeExpression? resultStructType) &&
             resultStructType.Struct.Template is not null)
@@ -943,9 +952,8 @@ public partial class StatementCompiler
         GeneralType? type = null;
         if (newVariable.Type != StatementKeywords.Var)
         {
-            if (!CompileType(newVariable.Type, out type, out PossibleDiagnostic? typeError))
+            if (!CompileType(newVariable.Type, out type, Diagnostics))
             {
-                Diagnostics.Add(typeError.ToError(newVariable.Type));
                 type = BuiltinType.Any;
             }
             else
@@ -1006,7 +1014,6 @@ public partial class StatementCompiler
                     }
                 }
 
-                SetTypeType(newVariable.Type, type);
                 if (!Frames.Last.IsTemplateInstance) newVariable.CompiledType = type;
             }
         }
@@ -1079,8 +1086,6 @@ public partial class StatementCompiler
         //{
         //    Diagnostics.Add(Diagnostic.Internal($"Failed to qualify all generics in variable \"{newVariable.Identifier}\" type \"{type}\" (what edge case is this???)", newVariable.Type, newVariable.File));
         //}
-
-        SetTypeType(newVariable.Type, type);
 
         CompiledCleanup? compiledCleanup = null;
         if (newVariable.Modifiers.Contains(ModifierKeywords.Temp))
@@ -1609,7 +1614,7 @@ public partial class StatementCompiler
         compiledStatement = null;
 
         if (anyCall.Expression is IdentifierExpression _identifier &&
-            _identifier.Content == "sizeof")
+            _identifier.Content == StatementKeywords.Sizeof)
         {
             _identifier.AnalyzedType = TokenAnalyzedType.Keyword;
 
@@ -1826,13 +1831,13 @@ public partial class StatementCompiler
                 return false;
             }
 
-            if (!FindBitWidth(leftType, out var leftBitWidth, out var e1, this))
+            if (!FindBitWidth(leftType, out BitWidth leftBitWidth, out PossibleDiagnostic? e1, this))
             {
                 Diagnostics.Add(e1.ToError(left));
                 return false;
             }
 
-            if (!FindBitWidth(rightType, out var rightBitWidth, out var e2, this))
+            if (!FindBitWidth(rightType, out BitWidth rightBitWidth, out PossibleDiagnostic? e2, this))
             {
                 Diagnostics.Add(e2.ToError(right));
                 return false;
@@ -2229,9 +2234,8 @@ public partial class StatementCompiler
 
         for (int i = 0; i < lambdaStatement.Parameters.Count; i++)
         {
-            if (!CompileType(lambdaStatement.Parameters[i].Type, out GeneralType? parameterType, out PossibleDiagnostic? typeError))
+            if (!CompileType(lambdaStatement.Parameters[i].Type, out GeneralType? parameterType, Diagnostics))
             {
-                Diagnostics.Add(typeError.ToError(lambdaStatement.Parameters[i].Type));
                 return false;
             }
 
@@ -3176,9 +3180,8 @@ public partial class StatementCompiler
     bool CompileExpression(ConstructorCallExpression constructorCall, [NotNullWhen(true)] out CompiledExpression? compiledStatement, GeneralType? expectedType = null)
     {
         compiledStatement = null;
-        if (!CompileType(constructorCall.Type, out GeneralType? instanceType, out PossibleDiagnostic? typeError))
+        if (!CompileType(constructorCall.Type, out GeneralType? instanceType, Diagnostics))
         {
-            Diagnostics.Add(typeError.ToError(constructorCall.Type));
             return false;
         }
 
@@ -3420,9 +3423,8 @@ public partial class StatementCompiler
     {
         compiledStatement = null;
 
-        if (!CompileType(typeCast.Type, out GeneralType? targetType, out PossibleDiagnostic? typeError))
+        if (!CompileType(typeCast.Type, out GeneralType? targetType, Diagnostics))
         {
-            Diagnostics.Add(typeError.ToError(typeCast.Type));
             return false;
         }
 
@@ -3437,7 +3439,6 @@ public partial class StatementCompiler
             return true;
         }
 
-        SetTypeType(typeCast.Type, targetType);
         SetStatementType(typeCast, targetType);
 
         compiledStatement = new CompiledReinterpretation()
@@ -3453,12 +3454,10 @@ public partial class StatementCompiler
     bool CompileExpression(ManagedTypeCastExpression typeCast, [NotNullWhen(true)] out CompiledExpression? compiledStatement, GeneralType? expectedType = null)
     {
         compiledStatement = null;
-        if (!CompileType(typeCast.Type, out GeneralType? targetType, out PossibleDiagnostic? typeError))
+        if (!CompileType(typeCast.Type, out GeneralType? targetType, Diagnostics))
         {
-            Diagnostics.Add(typeError.ToError(typeCast.Type));
             return false;
         }
-        SetTypeType(typeCast.Type, targetType);
         SetStatementType(typeCast, targetType);
 
         if (!CompileExpression(typeCast.Expression, out CompiledExpression? prev, targetType)) return false;
@@ -3977,8 +3976,6 @@ public partial class StatementCompiler
         return new Scope(localConstants.ToImmutable());
     }
 
-    #region CompileType
-
     public static bool CompileType(
         RuntimeType type,
         [NotNullWhen(true)] out GeneralType? result,
@@ -3997,144 +3994,6 @@ public partial class StatementCompiler
             default: throw new UnreachableException();
         }
     }
-
-    public bool CompileType(
-        TypeInstance type,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error) => type switch
-        {
-            TypeInstanceSimple simpleType => CompileType(simpleType, out result, out error),
-            TypeInstanceFunction functionType => CompileType(functionType, out result, out error),
-            TypeInstanceStackArray stackArrayType => CompileType(stackArrayType, out result, out error),
-            TypeInstancePointer pointerType => CompileType(pointerType, out result, out error),
-            _ => throw new UnreachableException(),
-        };
-
-    public bool CompileType(
-        TypeInstanceStackArray type,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        result = null;
-
-        if (!CompileType(type.StackArrayOf, out GeneralType? of, out error)) return false;
-
-        if (type.StackArraySize is not null)
-        {
-            CompileExpression(type.StackArraySize, out CompiledExpression? stackArraySizeStatement);
-            if (!TryCompute(stackArraySizeStatement, new(), out CompiledValue stackArraySize))
-            {
-                error = new PossibleDiagnostic($"Array length must be constant", type.StackArraySize);
-                return false;
-            }
-            result = new ArrayType(of, (int)stackArraySize);
-            SetTypeType(type, result);
-            return true;
-        }
-        else
-        {
-            result = new ArrayType(of, null);
-            SetTypeType(type, result);
-            return true;
-        }
-    }
-
-    public bool CompileType(
-        TypeInstanceFunction type,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        result = null;
-
-        if (!CompileType(type.FunctionReturnType, out GeneralType? returnType, out error)) return false;
-        if (!CompileTypes(type.FunctionParameterTypes, out ImmutableArray<GeneralType> parameters, out error)) return false;
-
-        result = new FunctionType(returnType, parameters, type.ClosureModifier is not null);
-        SetTypeType(type, result);
-
-        return true;
-    }
-
-    public bool CompileType(
-        TypeInstancePointer type,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        result = null;
-
-        if (!CompileType(type.To, out GeneralType? to, out error)) return false;
-
-        result = new PointerType(to);
-        SetTypeType(type, result);
-
-        return true;
-    }
-
-    public bool CompileType(
-        TypeInstanceSimple type,
-        [NotNullWhen(true)] out GeneralType? result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        error = null;
-
-        if (TypeKeywords.BasicTypes.TryGetValue(type.Identifier.Content, out BasicType builtinType))
-        {
-            result = new BuiltinType(builtinType);
-            SetTypeType(type, result);
-            return true;
-        }
-
-        if (!FindType(type.Identifier, type.File, out result, out error))
-        {
-            return false;
-        }
-
-        if (result.Is(out StructType? resultStructType) &&
-            resultStructType.Struct.Template is not null)
-        {
-            if (type.TypeArguments.HasValue)
-            {
-                if (!CompileTypes(type.TypeArguments.Value, out ImmutableArray<GeneralType> typeParameters, out error)) return false;
-                result = new StructType(resultStructType.Struct, type.File, typeParameters);
-            }
-            else
-            {
-                result = new StructType(resultStructType.Struct, type.File);
-            }
-        }
-        else
-        {
-            if (type.TypeArguments.HasValue)
-            {
-                error = new($"Asd", type);
-                return false;
-            }
-        }
-
-        SetTypeType(type, result);
-        return true;
-    }
-
-    public bool CompileTypes(
-        ImmutableArray<TypeInstance> types,
-        [NotNullWhen(true)] out ImmutableArray<GeneralType> result,
-        [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        error = null;
-        result = default;
-
-        ImmutableArray<GeneralType>.Builder _result = ImmutableArray.CreateBuilder<GeneralType>(types.Length);
-        foreach (TypeInstance item in types)
-        {
-            if (!CompileType(item, out GeneralType? _item, out error)) return false;
-            _result.Add(_item);
-        }
-
-        result = _result.MoveToImmutable();
-        return true;
-    }
-
-    #endregion
 
     #region GenerateCodeFor...
 

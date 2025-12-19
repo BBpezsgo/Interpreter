@@ -55,7 +55,7 @@ public readonly struct Position :
         AbsoluteRange = result.AbsoluteRange;
     }
 
-    public string ToStringRange()
+    public override string ToString()
     {
         if (Range.Start == Range.End) return Range.Start.ToStringMin();
         if (Range.Start.Line == Range.End.Line) return $"{Range.Start.Line + 1}:({Range.Start.Character}-{Range.End.Character})";

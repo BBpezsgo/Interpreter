@@ -110,8 +110,18 @@ public class Token :
             (int start, int length) = range.GetOffsetAndLength(Content.Length);
 
             Position position = new(
-                ((Position.Range.Start.Character + start, Position.Range.Start.Line), (Position.Range.Start.Character + start + length, Position.Range.Start.Line)),
-                (Position.AbsoluteRange.Start + start, Position.AbsoluteRange.Start + start + length)
+                new Range<SinglePosition>((
+                        Position.Range.Start.Line,
+                        Position.Range.Start.Character + start
+                    ), (
+                        Position.Range.Start.Line,
+                        Position.Range.Start.Character + start + length
+                    )
+                ),
+                new Range<int>(
+                    Position.AbsoluteRange.Start + start,
+                    Position.AbsoluteRange.Start + start + length
+                )
             );
 
             return new Token(TokenType, Content[range], IsAnonymous, position) { AnalyzedType = AnalyzedType };

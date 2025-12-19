@@ -5,6 +5,7 @@
 
 - [VSCode Extension](https://github.com/BBpezsgo/InterpreterVSCodeExtension)
 - [Language Server](https://github.com/BBpezsgo/BBCode-LanguageServer)
+- [Debugger Host](https://github.com/BBpezsgo/BBLang-DebugHost)
 
 ## About
 

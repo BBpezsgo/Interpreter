@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
-using LanguageCore.Parser;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.TUI;
@@ -256,31 +255,24 @@ public class InterpreterRenderer
         }
     }
 
-    public static void WriteFunction<TWriter>(ref TWriter t, FunctionThingDefinition? function, ImmutableDictionary<string, GeneralType>? typeArguments) where TWriter : IBufferWriter<TWriter>
+    public static void WriteFunction<TWriter>(ref TWriter t, ICompiledFunctionDefinition? function, ImmutableDictionary<string, GeneralType>? typeArguments) where TWriter : IBufferWriter<TWriter>
     {
-        if (function is ICompiledFunctionDefinition compiledFunction)
+        if (function is not null)
         {
-            t.Write(function.Identifier.Content, AnsiColor.Yellow);
-            t.Write('(');
-            for (int j = 0; j < compiledFunction.Parameters.Length; j++)
+            if (function is CompiledFunctionDefinition f)
             {
-                if (j > 0) t.Write(", ");
-                for (int k = 0; k < compiledFunction.Parameters[j].Modifiers.Length; k++)
-                {
-                    t.Write(compiledFunction.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
-                    t.Write(' ');
-                }
-                WriteType(ref t, GeneralType.InsertTypeParameters(compiledFunction.Parameters[j].Type, typeArguments) ?? compiledFunction.Parameters[j].Type);
-                t.Write(' ');
-                t.Write(compiledFunction.Parameters[j].Identifier.Content);
+                t.Write(f.Identifier.Content, AnsiColor.Yellow);
             }
-            t.Write(')');
-        }
-        else if (function is not null)
-        {
-            t.Write(function.Identifier.Content, AnsiColor.Yellow);
+            else if (function is CompiledLambda)
+            {
+                t.Write("<lambda>", AnsiColor.Yellow);
+            }
+            else
+            {
+                t.Write("<unknown function>", AnsiColor.Yellow);
+            }
             t.Write('(');
-            for (int j = 0; j < function.Parameters.Count; j++)
+            for (int j = 0; j < function.Parameters.Length; j++)
             {
                 if (j > 0) t.Write(", ");
                 for (int k = 0; k < function.Parameters[j].Modifiers.Length; k++)
@@ -288,7 +280,7 @@ public class InterpreterRenderer
                     t.Write(function.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
                     t.Write(' ');
                 }
-                t.Write(function.Parameters[j].Type.ToString(typeArguments), AnsiColor.Green);
+                WriteType(ref t, GeneralType.InsertTypeParameters(function.Parameters[j].Type, typeArguments) ?? function.Parameters[j].Type);
                 t.Write(' ');
                 t.Write(function.Parameters[j].Identifier.Content);
             }
@@ -296,7 +288,7 @@ public class InterpreterRenderer
         }
         else
         {
-            t.Write(function?.GetType().Name ?? "?");
+            t.Write("?");
         }
     }
 

@@ -122,16 +122,15 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
         }
     }
 
-    readonly struct DebugFunctionBlock<TFunction> : IDisposable
-        where TFunction : FunctionThingDefinition
+    readonly struct DebugFunctionBlock : IDisposable
     {
         readonly int InstructionStart;
         readonly CodeHelper Code;
         readonly DebugInformation? DebugInfo;
-        readonly FunctionThingDefinition Function;
+        readonly ICompiledFunctionDefinition Function;
         readonly Dictionary<string, GeneralType>? TypeArguments;
 
-        public DebugFunctionBlock(CodeHelper code, DebugInformation? debugInfo, FunctionThingDefinition function, Dictionary<string, GeneralType>? typeArguments)
+        public DebugFunctionBlock(CodeHelper code, DebugInformation? debugInfo, ICompiledFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments)
         {
             Code = code;
             DebugInfo = debugInfo;
@@ -352,25 +351,25 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
     DebugInfoBlock DebugBlock(ILocated location) => new(Code, DebugInfo, location.Location.Position, location.Location.File);
     DebugInfoBlock DebugBlock(IPositioned position, Uri file) => new(Code, DebugInfo, position, file);
 
-    DebugFunctionBlock<CompiledFunctionDefinition> FunctionBlock(CompiledFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock FunctionBlock(CompiledFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
         typeArguments);
 
-    DebugFunctionBlock<CompiledOperatorDefinition> FunctionBlock(CompiledOperatorDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock FunctionBlock(CompiledOperatorDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
         typeArguments);
 
-    DebugFunctionBlock<CompiledOperatorDefinition> FunctionBlock(CompiledGeneralFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock FunctionBlock(CompiledGeneralFunctionDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,
         typeArguments);
 
-    DebugFunctionBlock<CompiledOperatorDefinition> FunctionBlock(CompiledConstructorDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
+    DebugFunctionBlock FunctionBlock(CompiledConstructorDefinition function, Dictionary<string, GeneralType>? typeArguments) => new(
         Code,
         DebugInfo,
         function,

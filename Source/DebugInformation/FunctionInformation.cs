@@ -6,14 +6,28 @@ namespace LanguageCore.Runtime;
 public struct FunctionInformation
 {
     public bool IsValid;
-    public Parser.FunctionThingDefinition? Function;
+    public bool IsTopLevelStub;
+    public ICompiledFunctionDefinition? Function;
     public ImmutableDictionary<string, GeneralType>? TypeArguments;
     public MutableRange<int> Instructions;
 
-    public readonly Position SourcePosition => Function?.Identifier.Position ?? default;
-    public readonly string? Identifier => Function?.Identifier.Content;
+    public readonly Position SourcePosition => (Function as CompiledFunctionDefinition)?.Identifier.Position ?? default;
     public readonly Uri? File => Function?.File;
-    public readonly string? ReadableIdentifier => Function?.ToReadable();
+
+    public readonly string? ReadableIdentifier()
+    {
+        if (!IsValid) return null;
+        if (IsTopLevelStub) return "<top level statements>";
+        if (Function is CompiledLambda) return "<lambda>";
+        string? functionName = null;
+
+        if (Function is CompiledFunctionDefinition f) return f.ToReadable(TypeArguments);
+        functionName ??= Function?.ToReadable();
+
+        functionName ??= "<unknown function>";
+
+        return functionName;
+    }
 
     public readonly bool Contains(int instruction) =>
         Instructions.Start <= instruction &&
@@ -25,9 +39,9 @@ public struct FunctionInformation
 
         StringBuilder result = new();
 
-        result.Append(ReadableIdentifier);
+        result.Append(ReadableIdentifier());
 
-        result.Append(LanguageException.Format(ReadableIdentifier, SourcePosition, File));
+        result.Append(LanguageException.Format(ReadableIdentifier(), SourcePosition, File));
 
         return result.ToString();
     }

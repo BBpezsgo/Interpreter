@@ -2781,7 +2781,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForFunction_(CompiledFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
-        using DebugFunctionBlock<CompiledFunctionDefinition> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ExternalFunctionName == ExternalFunctionNames.StdOut)
         {
@@ -2962,7 +2962,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForFunction(CompiledOperatorDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
-        using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ExternalFunctionName == ExternalFunctionNames.StdOut)
         {
@@ -3143,7 +3143,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForFunction(CompiledGeneralFunctionDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, ILocated callerPosition)
     {
-        using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount != parameters.Length)
         {
@@ -3239,7 +3239,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
 
     void GenerateCodeForFunction(CompiledConstructorDefinition function, ImmutableArray<CompiledArgument> parameters, Dictionary<string, GeneralType>? typeArguments, CompiledConstructorCall callerPosition)
     {
-        using DebugFunctionBlock<CompiledOperatorDefinition> debugFunction = FunctionBlock(function, typeArguments);
+        using DebugFunctionBlock debugFunction = FunctionBlock(function, typeArguments);
 
         if (function.ParameterCount - 1 != parameters.Length)
         {

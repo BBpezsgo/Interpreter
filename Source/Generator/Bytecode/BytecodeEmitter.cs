@@ -63,7 +63,7 @@ public class BytecodeEmitter
                 subindent += 2;
                 if (f.Instructions.Start == i)
                 {
-                    writer.WriteLine(f.Function?.ToReadable() ?? f.ReadableIdentifier);
+                    writer.WriteLine(f.ReadableIdentifier());
                     writer.WriteLine('{');
                 }
             }

@@ -1862,7 +1862,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
             default: throw new NotImplementedException($"Unimplemented statement \"{statement.GetType().Name}\"");
         }
 
-        if (startInstruction != Code.Offset)
+        if (startInstruction != Code.Offset && statement is not CompiledWhileLoop and not CompiledForLoop and not CompiledBranch and not CompiledBlock and not CompiledDummyExpression)
         {
             DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
             {
@@ -1879,6 +1879,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
     }
     void GenerateCodeForCondition(CompiledExpression statement, InstructionLabel falseLabel, ref bool didJump)
     {
+        int startInstruction = Code.Offset;
+
         switch (statement)
         {
             case CompiledBinaryOperatorCall v:
@@ -1901,6 +1903,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 Code.Emit(Opcode.JumpIfEqual, falseLabel.Relative());
                 didJump = true;
             }
+        }
+
+        if (startInstruction != Code.Offset && statement is not CompiledDummyExpression)
+        {
+            DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
+            {
+                Instructions = (startInstruction, Code.Offset - 1),
+                Location = statement.Location,
+            });
         }
     }
     void GenerateCodeForCondition(CompiledUnaryOperatorCall @operator, InstructionLabel falseLabel, ref bool didJump)
@@ -2553,16 +2564,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         if (body != null) AddComment("}");
 
-        if (function is FunctionThingDefinition functionDefinition)
+        DebugInfo?.FunctionInformation.Add(new FunctionInformation()
         {
-            DebugInfo?.FunctionInformation.Add(new FunctionInformation()
-            {
-                IsValid = true,
-                Function = functionDefinition,
-                TypeArguments = TypeArguments.ToImmutableDictionary(),
-                Instructions = (instructionStart, Code.Offset),
-            });
-        }
+            IsValid = true,
+            Function = function,
+            TypeArguments = TypeArguments.ToImmutableDictionary(),
+            Instructions = (instructionStart, Code.Offset),
+        });
 
         while (CompiledInstructionLabels.Count > savedInstructionLabelCount)
         {
@@ -2583,6 +2591,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (statements.IsDefaultOrEmpty) return;
 
+        int codeStart = Code.Offset;
         CurrentScopeDebug.Push(new ScopeInformation()
         {
             Location = new SourceCodeLocation()
@@ -2638,6 +2647,15 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (ScopeSizes.Pop() != 0) { }
 
         AddComment("}");
+
+        DebugInfo?.FunctionInformation.Add(new FunctionInformation()
+        {
+            IsValid = true,
+            Function = null,
+            IsTopLevelStub = true,
+            TypeArguments = TypeArguments.ToImmutableDictionary(),
+            Instructions = (codeStart, Code.Offset),
+        });
 
         ScopeInformation scope = CurrentScopeDebug.Pop();
         scope.Location.Instructions.End = Code.Offset - 1;

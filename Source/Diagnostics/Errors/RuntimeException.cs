@@ -402,12 +402,23 @@ public class RuntimeException : LanguageExceptionWithoutContext
 
             ImmutableArray<ScopeInformation> scopes = DebugInformation.GetScopes(frame.Instructions.Start);
 
-            Parser.FunctionThingDefinition function = frame.Function;
+            ICompiledFunctionDefinition function = frame.Function;
             if (colored) result.SetGraphics(Ansi.BrightForegroundYellow);
-            result.Append(function.Identifier.ToString());
+            if (function is CompiledFunctionDefinition compiledFunctionDefinition1)
+            {
+                result.Append(compiledFunctionDefinition1.Identifier.ToString());
+            }
+            else if (function is CompiledLambda)
+            {
+                result.Append("<lambda>");
+            }
+            else
+            {
+                result.Append("<unknown function>");
+            }
             if (colored) result.ResetStyle();
             result.Append('(');
-            for (int j = 0; j < function.Parameters.Count; j++)
+            for (int j = 0; j < function.Parameters.Length; j++)
             {
                 if (j > 0) result.Append(", ");
                 if (function.Parameters[j].Modifiers.Length > 0)
@@ -453,9 +464,13 @@ public class RuntimeException : LanguageExceptionWithoutContext
             {
                 result.Append(LanguageException.Format(null, sourceLocation.Location));
             }
+            else if (function is CompiledFunctionDefinition compiledFunctionDefinition2)
+            {
+                result.Append(LanguageException.Format(null, compiledFunctionDefinition2.Identifier.Position, function.File));
+            }
             else
             {
-                result.Append(LanguageException.Format(null, function.Identifier.Position, function.File));
+                result.Append(LanguageException.Format(null, Position.UnknownPosition, function.File));
             }
 
             return true;
@@ -473,7 +488,7 @@ public class RuntimeException : LanguageExceptionWithoutContext
         // result.AppendLine($"Flags: {context.Registers.Flags}");
 
         result.AppendLine();
-        result.AppendLine("Call Stack (from last to recent):");
+        result.AppendLine("Call Stack (from oldest to recent):");
         if (CallTrace.Length == 0)
         {
             result.Append(' ', CallStackIndent);

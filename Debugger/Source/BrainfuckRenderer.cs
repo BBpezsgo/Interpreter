@@ -484,7 +484,18 @@ public class BrainfuckRenderer
 
             if (function.Function is ICompiledFunctionDefinition compiledFunction)
             {
-                t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
+                if (function.Function is CompiledFunctionDefinition f)
+                {
+                    t.Write(f.Identifier.Content, AnsiColor.Yellow);
+                }
+                else if (function.Function is CompiledLambda)
+                {
+                    t.Write("<lambda>", AnsiColor.Yellow);
+                }
+                else
+                {
+                    t.Write("<unknown function>", AnsiColor.Yellow);
+                }
                 t.Write('(');
                 for (int j = 0; j < compiledFunction.Parameters.Length; j++)
                 {
@@ -497,24 +508,6 @@ public class BrainfuckRenderer
                     WriteType(ref t, GeneralType.InsertTypeParameters(compiledFunction.Parameters[j].Type, function.TypeArguments) ?? compiledFunction.Parameters[j].Type);
                     t.Write(' ');
                     t.Write(compiledFunction.Parameters[j].Identifier.Content);
-                }
-                t.Write(')');
-            }
-            else if (function.Function is not null)
-            {
-                t.Write(function.Function.Identifier.Content, AnsiColor.Yellow);
-                t.Write('(');
-                for (int j = 0; j < function.Function.Parameters.Count; j++)
-                {
-                    if (j > 0) t.Write(", ");
-                    for (int k = 0; k < function.Function.Parameters[j].Modifiers.Length; k++)
-                    {
-                        t.Write(function.Function.Parameters[j].Modifiers[k].Content, AnsiColor.Blue);
-                        t.Write(' ');
-                    }
-                    t.Write(function.Function.Parameters[j].Type.ToString(function.TypeArguments), AnsiColor.Green);
-                    t.Write(' ');
-                    t.Write(function.Function.Parameters[j].Identifier.Content);
                 }
                 t.Write(')');
             }

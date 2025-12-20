@@ -28,9 +28,4 @@ public class InstructionLabelDeclaration : Statement
     }
 
     public override string ToString() => $"{Identifier}{Colon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-    }
 }

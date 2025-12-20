@@ -13,17 +13,6 @@ public class ListExpression : Expression
         Values = values;
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        for (int i = 0; i < Values.Length; i++)
-        {
-            foreach (Statement statement in Values[i].GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
-
     public override string ToString()
     {
         StringBuilder result = new();

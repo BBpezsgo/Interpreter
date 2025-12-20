@@ -21,15 +21,4 @@ public class WhileLoopStatement : StatementWithAnyBody
 
     public override string ToString()
         => $"{Keyword} ({Condition}) {Body}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-
-        foreach (Statement statement in Body.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

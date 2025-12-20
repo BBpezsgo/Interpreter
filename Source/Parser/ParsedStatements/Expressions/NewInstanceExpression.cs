@@ -22,9 +22,4 @@ public class NewInstanceExpression : Expression, IHaveType, IInFile, IReferencea
 
     public override string ToString()
         => $"{SurroundingBrackets?.Start}{Keyword} {Type}{SurroundingBrackets?.End}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-    }
 }

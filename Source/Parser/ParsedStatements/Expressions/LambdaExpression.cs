@@ -30,13 +30,4 @@ public class LambdaExpression : Expression
 
     public override string ToString()
         => $"{Parameters} {Arrow} {Body}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-        if (!flags.HasFlag(StatementWalkFlags.FrameOnly))
-        {
-            foreach (Statement v in Body.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis)) yield return v;
-        }
-    }
 }

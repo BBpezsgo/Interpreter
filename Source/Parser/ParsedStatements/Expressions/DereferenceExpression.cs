@@ -21,11 +21,4 @@ public class DereferenceExpression : Expression
     public override string ToString()
         => $"{SurroundingBrackets?.Start}{Operator}{Expression}{SurroundingBrackets?.End}{Semicolon}";
 
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Expression.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

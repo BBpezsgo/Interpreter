@@ -91,21 +91,4 @@ public class FunctionCallExpression : Expression, IReadable, IReferenceableTo<Co
         result.Append(')');
         return result.ToString();
     }
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        if (Object != null)
-        {
-            foreach (Statement statement in Object.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-
-        foreach (Expression argument in Arguments)
-        {
-            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
 }

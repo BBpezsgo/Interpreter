@@ -146,9 +146,4 @@ public class LiteralExpression : Expression
         value = value.EndsWith('f') ? value[..^1] : value;
         return float.Parse(value, NumberStyles.Float, CultureInfo.InvariantCulture);
     }
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-    }
 }

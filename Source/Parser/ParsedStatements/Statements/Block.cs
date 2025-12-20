@@ -36,17 +36,6 @@ public class Block : Statement
         return result.ToString();
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        for (int i = 0; i < Statements.Length; i++)
-        {
-            foreach (Statement statement in Statements[i].GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
-
     public static Block CreateIfNotBlock(Statement statement)
     {
         if (statement is Block block) return block;

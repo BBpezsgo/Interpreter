@@ -23,12 +23,4 @@ public class ReinterpretExpression : Expression, IHaveType
 
     public override string ToString()
         => $"{SurroundingBrackets?.Start}{PrevStatement} {Keyword} {Type}{SurroundingBrackets?.End}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in PrevStatement.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

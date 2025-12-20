@@ -70,18 +70,4 @@ public class AnyCallExpression : Expression, IReadable, IReferenceableTo<Compile
         result.Append(')');
         return result.ToString();
     }
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Expression.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-
-        foreach (Expression argument in Arguments)
-        {
-            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
 }

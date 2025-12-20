@@ -23,12 +23,4 @@ public class FieldExpression : Expression, IReferenceableTo
 
     public override string ToString()
         => $"{SurroundingBrackets?.Start}{Object}.{Identifier}{SurroundingBrackets?.End}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Object.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

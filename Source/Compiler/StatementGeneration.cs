@@ -1486,14 +1486,14 @@ public partial class StatementCompiler
         {
             if (evaluatedCondition.Value)
             {
-                if (@if.NextLink is null || !@if.NextLink.GetStatementsRecursively(StatementWalkFlags.FrameOnly).OfType<InstructionLabelDeclaration>().Any())
+                if (!StatementWalker.Visit(@if.NextLink, StatementWalkerFilter.FrameOnlyFilter).OfType<InstructionLabelDeclaration>().Any())
                 {
                     return CompileStatement(@if.Body, out compiledStatement);
                 }
             }
             else
             {
-                if (!@if.GetStatementsRecursively(StatementWalkFlags.FrameOnly).OfType<InstructionLabelDeclaration>().Any())
+                if (!StatementWalker.Visit(@if, StatementWalkerFilter.FrameOnlyFilter).OfType<InstructionLabelDeclaration>().Any())
                 {
                     if (@if.NextLink is not null)
                     {
@@ -2244,7 +2244,7 @@ public partial class StatementCompiler
 
         ImmutableArray<CompiledLabelDeclaration>.Builder localInstructionLabels = ImmutableArray.CreateBuilder<CompiledLabelDeclaration>();
 
-        foreach (Statement item in lambdaStatement.Body.GetStatementsRecursively(StatementWalkFlags.IncludeThis | StatementWalkFlags.FrameOnly))
+        foreach (Statement item in StatementWalker.Visit(lambdaStatement.Body, StatementWalkerFilter.FrameOnlyFilter))
         {
             if (item is InstructionLabelDeclaration instructionLabel)
             {
@@ -4154,7 +4154,7 @@ public partial class StatementCompiler
 
         ImmutableArray<CompiledLabelDeclaration>.Builder localInstructionLabels = ImmutableArray.CreateBuilder<CompiledLabelDeclaration>();
 
-        foreach (Statement item in function.Block.GetStatementsRecursively(StatementWalkFlags.IncludeThis | StatementWalkFlags.FrameOnly))
+        foreach (Statement item in StatementWalker.Visit(function.Block, StatementWalkerFilter.FrameOnlyFilter))
         {
             if (item is InstructionLabelDeclaration instructionLabel)
             {
@@ -4353,7 +4353,7 @@ public partial class StatementCompiler
 
         foreach (InstructionLabelDeclaration instructionLabel in TopLevelStatements
             .SelectMany(v => v.Statements)
-            .SelectMany(v => v.GetStatementsRecursively(StatementWalkFlags.IncludeThis))
+            .SelectMany(v => StatementWalker.Visit(v, StatementWalkerFilter.FrameOnlyFilter))
             .OfType<InstructionLabelDeclaration>())
         {
             globalInstructionLabels.Add(new CompiledLabelDeclaration()
@@ -4454,381 +4454,36 @@ public partial class StatementCompiler
         }
     }
 
-    void AnalyseFunction(CompiledFunction function, HashSet<CompiledFunction> stack)
+    FunctionFlags AnalyseFunction(CompiledStatement statement, HashSet<CompiledFunction> visited)
     {
-        if (stack.Contains(function)) return;
-        stack.Add(function);
+        FunctionFlags flags = default;
+        StatementWalker.VisitWithFunctions(GeneratedFunctions, statement, statement =>
+        {
+            switch (statement)
+            {
+                case CompiledLambda v:
+                    v.Flags = AnalyseFunction(v.Block, visited);
+                    break;
+                case CompiledVariableAccess v:
+                    if (v.Variable.IsGlobal)
+                    {
+                        flags |= FunctionFlags.CapturesGlobalVariables;
+                    }
+                    break;
+            }
+            return true;
+        }, function =>
+        {
+            AnalyseFunction(function, visited);
+            flags |= function.Flags;
+        });
+        return flags;
+    }
+
+    void AnalyseFunction(CompiledFunction function, HashSet<CompiledFunction> visited)
+    {
+        if (!visited.Add(function)) return;
         function.Flags = default;
-        AnalyseFunction(function.Body, ref function.Flags, stack);
-    }
-    void AnalyseFunction(IEnumerable<CompiledStatement> statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        foreach (CompiledStatement item in statement)
-        {
-            AnalyseFunction(item, ref flags, stack);
-        }
-    }
-    void AnalyseFunction(CompiledStatement statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        switch (statement)
-        {
-            case CompiledExpression v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledEmptyStatement: break;
-            case CompiledBlock v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledIf v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledElse v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledVariableDefinition v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledCrash v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledDelete v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledReturn v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledBreak v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledGoto v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledLabelDeclaration v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledWhileLoop v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledForLoop v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledSetter v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledCleanup v: AnalyseFunction(v, ref flags, stack); break;
-            default: throw new UnreachableException(statement.GetType().Name);
-        }
-    }
-    void AnalyseFunction(CompiledCleanup statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        if (statement.Deallocator is not null)
-        {
-            CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Deallocator);
-            if (f is not null)
-            {
-                AnalyseFunction(f, stack);
-                flags |= f.Flags;
-            }
-        }
-
-        if (statement.Destructor is not null)
-        {
-            CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Destructor);
-            if (f is not null)
-            {
-                AnalyseFunction(f, stack);
-                flags |= f.Flags;
-            }
-        }
-    }
-    void AnalyseFunction(CompiledExpression statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        switch (statement)
-        {
-            case CompiledDummyExpression v: AnalyseFunction(v.Statement, ref flags, stack); break;
-            case CompiledList v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledRuntimeCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledFunctionCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledExternalFunctionCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledSizeof v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledArgument v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledBinaryOperatorCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledUnaryOperatorCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledConstantValue v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledGetReference v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledDereference v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledStackAllocation v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledHeapAllocation v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledConstructorCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledDesctructorCall v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledCast v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledReinterpretation v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledElementAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledVariableAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledExpressionVariableAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledParameterAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledFieldAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledRegisterAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledString v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledStackString v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledFunctionReference v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledLabelReference v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledCompilerVariableAccess v: AnalyseFunction(v, ref flags, stack); break;
-            case CompiledLambda v: AnalyseFunction(v, ref flags, stack); break;
-            default: throw new UnreachableException();
-        }
-    }
-    void AnalyseFunction(CompiledLambda statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        if (statement.Allocator is not null) AnalyseFunction(statement.Allocator, ref flags, stack);
-        FunctionFlags _flags = default;
-        AnalyseFunction(statement.Block, ref _flags, stack);
-        statement.Flags = _flags;
-        flags |= _flags;
-    }
-    void AnalyseFunction(GeneralType statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        switch (statement)
-        {
-            case AliasType v:
-                AnalyseFunction(v.Value, ref flags, stack);
-                break;
-            case ArrayType v:
-                AnalyseFunction(v.Of, ref flags, stack);
-                break;
-            case FunctionType v:
-                AnalyseFunction(v.ReturnType, ref flags, stack);
-                foreach (GeneralType i in v.Parameters) AnalyseFunction(i, ref flags, stack);
-                break;
-            case PointerType v:
-                AnalyseFunction(v.To, ref flags, stack);
-                break;
-            case StructType v:
-                foreach (KeyValuePair<string, GeneralType> i in v.TypeArguments) AnalyseFunction(i.Value, ref flags, stack);
-                break;
-            case BuiltinType:
-            case GenericType:
-                break;
-            default:
-                throw new UnreachableException();
-        }
-    }
-    void AnalyseFunction(CompiledTypeExpression statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        switch (statement)
-        {
-            case CompiledAliasTypeExpression v:
-                AnalyseFunction(v.Value, ref flags, stack);
-                break;
-            case CompiledArrayTypeExpression v:
-                AnalyseFunction(v.Of, ref flags, stack);
-                if (v.Length is not null) AnalyseFunction(v.Length, ref flags, stack);
-                break;
-            case CompiledFunctionTypeExpression v:
-                AnalyseFunction(v.ReturnType, ref flags, stack);
-                foreach (CompiledTypeExpression i in v.Parameters) AnalyseFunction(i, ref flags, stack);
-                break;
-            case CompiledPointerTypeExpression v:
-                AnalyseFunction(v.To, ref flags, stack);
-                break;
-            case CompiledStructTypeExpression v:
-                foreach (KeyValuePair<string, CompiledTypeExpression> i in v.TypeArguments) AnalyseFunction(i.Value, ref flags, stack);
-                break;
-            case CompiledBuiltinTypeExpression:
-            case CompiledGenericTypeExpression:
-                break;
-            default:
-                throw new UnreachableException();
-        }
-    }
-    void AnalyseFunction(CompiledBlock statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Statements, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledSetter statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Target, ref flags, stack);
-        AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledIf statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Condition, ref flags, stack);
-        AnalyseFunction(statement.Body, ref flags, stack);
-        if (statement.Next is not null) AnalyseFunction(statement.Next, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledElse statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Body, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledVariableDefinition statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        if (statement.InitialValue is not null) AnalyseFunction(statement.InitialValue, ref flags, stack);
-        if (statement.Cleanup is not null) AnalyseFunction(statement.Cleanup, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledCrash statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledDelete statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledReturn statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        if (statement.Value is not null) AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledBreak statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledGoto statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledLabelDeclaration statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledWhileLoop statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Condition, ref flags, stack);
-        AnalyseFunction(statement.Body, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledForLoop statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        if (statement.Initialization is not null) AnalyseFunction(statement.Initialization, ref flags, stack);
-        if (statement.Condition is not null) AnalyseFunction(statement.Condition, ref flags, stack);
-        if (statement.Step is not null) AnalyseFunction(statement.Step, ref flags, stack);
-        AnalyseFunction(statement.Body, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledList statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Values, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledRuntimeCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Function, ref flags, stack);
-        AnalyseFunction(statement.Arguments, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledFunctionCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Arguments, ref flags, stack);
-        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
-        if (f is not null)
-        {
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
-        }
-    }
-    void AnalyseFunction(CompiledExternalFunctionCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Arguments, ref flags, stack);
-        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Declaration);
-        if (f is not null)
-        {
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
-        }
-    }
-    void AnalyseFunction(CompiledSizeof statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Of, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledArgument statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-        AnalyseFunction(statement.Cleanup, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledBinaryOperatorCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Left, ref flags, stack);
-        AnalyseFunction(statement.Right, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledUnaryOperatorCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Left, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledConstantValue statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledGetReference statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Of, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledDereference statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Address, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledStackAllocation statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledHeapAllocation statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Allocator);
-        if (f is not null)
-        {
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
-        }
-    }
-    void AnalyseFunction(CompiledConstructorCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Object, ref flags, stack);
-        AnalyseFunction(statement.Arguments, ref flags, stack);
-        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
-        if (f is not null)
-        {
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
-        }
-    }
-    void AnalyseFunction(CompiledDesctructorCall statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
-        if (f is not null)
-        {
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
-        }
-    }
-    void AnalyseFunction(CompiledCast statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledReinterpretation statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Value, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledElementAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Base, ref flags, stack);
-        AnalyseFunction(statement.Index, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledExpressionVariableAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledVariableAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        if (statement.Variable.IsGlobal)
-        {
-            flags |= FunctionFlags.CapturesGlobalVariables;
-        }
-    }
-    void AnalyseFunction(CompiledParameterAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledFieldAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Object, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledRegisterAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledString statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        AnalyseFunction(statement.Allocator, ref flags, stack);
-    }
-    void AnalyseFunction(CompiledStackString statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledFunctionReference statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-        CompiledFunction? f = GeneratedFunctions.FirstOrDefault(v => v.Function == statement.Function);
-        if (f is not null)
-        {
-            AnalyseFunction(f, stack);
-            flags |= f.Flags;
-            if (f.Flags.HasFlag(FunctionFlags.CapturesGlobalVariables))
-            {
-                Diagnostics.Add(Diagnostic.Error($"This is not supported for now", statement));
-            }
-        }
-    }
-    void AnalyseFunction(CompiledLabelReference statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
-    }
-    void AnalyseFunction(CompiledCompilerVariableAccess statement, ref FunctionFlags flags, HashSet<CompiledFunction> stack)
-    {
-
+        function.Flags = AnalyseFunction(function.Body, visited);
     }
 }

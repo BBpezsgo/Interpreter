@@ -10,12 +10,4 @@ public class ElseBranchStatement : BranchStatementBase
         Uri file)
         : base(keyword, IfPart.Else, body, file)
     { }
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Body.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

@@ -29,30 +29,4 @@ public class ForLoopStatement : StatementWithBlock
 
     public override string ToString()
         => $"{KeywordToken} (...) {Block}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        if (Initialization is not null)
-        {
-            foreach (Statement statement in Initialization.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-
-        if (Condition is not null)
-        {
-            foreach (Statement statement in Condition.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-
-        if (Step is not null)
-        {
-            foreach (Statement statement in Step.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-
-        foreach (Statement statement in Block.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

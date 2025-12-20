@@ -1,6 +1,5 @@
 using LanguageCore.Parser.Statements;
 using LanguageCore.Runtime;
-using LanguageCore.Tokenizing;
 
 namespace LanguageCore.Compiler;
 
@@ -137,57 +136,5 @@ public readonly struct CompilerResult
         IsExpression = isExpression;
         Statements = compiledStatements;
         Functions = functions2;
-    }
-
-    public static bool GetThingAt<TThing, TIdentifier>(IEnumerable<TThing> things, Uri file, SinglePosition position, [NotNullWhen(true)] out TThing? result)
-        where TThing : IInFile, IIdentifiable<TIdentifier>
-        where TIdentifier : IPositioned
-    {
-        foreach (TThing? thing in things)
-        {
-            if (thing.File != file)
-            { continue; }
-
-            if (!thing.Identifier.Position.Range.Contains(position))
-            { continue; }
-
-            result = thing;
-            return true;
-        }
-
-        result = default;
-        return false;
-    }
-
-    public bool GetFunctionAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledFunctionDefinition? result)
-        => GetThingAt<CompiledFunctionDefinition, Token>(FunctionDefinitions, file, position, out result);
-
-    public bool GetGeneralFunctionAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledGeneralFunctionDefinition? result)
-        => GetThingAt<CompiledGeneralFunctionDefinition, Token>(GeneralFunctionDefinitions, file, position, out result);
-
-    public bool GetOperatorAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledOperatorDefinition? result)
-        => GetThingAt<CompiledOperatorDefinition, Token>(OperatorDefinitions, file, position, out result);
-
-    public bool GetStructAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledStruct? result)
-        => GetThingAt<CompiledStruct, Token>(Structs, file, position, out result);
-
-    public bool GetFieldAt(Uri file, SinglePosition position, [NotNullWhen(true)] out CompiledField? result)
-    {
-        foreach (CompiledStruct @struct in Structs)
-        {
-            if (@struct.File != file) continue;
-
-            foreach (CompiledField field in @struct.Fields)
-            {
-                if (field.Identifier.Position.Range.Contains(position))
-                {
-                    result = field;
-                    return true;
-                }
-            }
-        }
-
-        result = null;
-        return false;
     }
 }

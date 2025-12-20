@@ -65,14 +65,6 @@ public class ShortOperatorCall : AssignmentStatement, IReadable, IReferenceableT
         return new SimpleAssignmentStatement(assignmentToken, Expression, operatorCall, File);
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Expression.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
-
     public BinaryOperatorCallExpression GetOperatorCall()
     {
         switch (Operator.Content)

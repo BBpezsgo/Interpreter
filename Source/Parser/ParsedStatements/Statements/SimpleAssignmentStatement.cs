@@ -45,15 +45,4 @@ public class SimpleAssignmentStatement : AssignmentStatement
         return result.ToString();
     }
     public override SimpleAssignmentStatement ToAssignment() => this;
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Target.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-
-        foreach (Statement statement in Value.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

@@ -64,15 +64,4 @@ public class KeywordCallStatement : Statement, IReadable, IReferenceableTo<Compi
 
         return result.ToString();
     }
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Expression argument in Arguments)
-        {
-            foreach (Statement statement in argument.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
 }

@@ -27,9 +27,4 @@ public class IdentifierExpression : Expression, IReferenceableTo
     }
 
     public override string ToString() => Identifier.Content;
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-    }
 }

@@ -13,17 +13,6 @@ public class IfContainer : Statement
         Branches = parts;
     }
 
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (BranchStatementBase branch in Branches)
-        {
-            foreach (Statement statement in branch.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
-
     public override string ToString()
     {
         if (Branches.Length == 0) return "null";

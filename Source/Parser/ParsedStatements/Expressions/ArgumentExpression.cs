@@ -20,11 +20,5 @@ public class ArgumentExpression : Expression
 
     public static ArgumentExpression Wrap(Expression expression) => expression is ArgumentExpression v ? v : new ArgumentExpression(null, expression, expression.File);
 
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-        foreach (Statement v in Value.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis)) yield return v;
-    }
-
     public override string ToString() => Value.ToString();
 }

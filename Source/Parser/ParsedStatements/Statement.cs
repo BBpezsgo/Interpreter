@@ -27,6 +27,4 @@ public abstract class Statement : IPositioned, IInFile, ILocated
 
     public override string ToString()
         => $"{GetType().Name}{Semicolon}";
-
-    public abstract IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags);
 }

@@ -58,15 +58,4 @@ public class VariableDefinition : Statement,
 
     public override string ToString()
         => $"{string.Join(' ', Modifiers)} {Type} {Identifier}{((InitialValue != null) ? " = ..." : string.Empty)}{Semicolon}".TrimStart();
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        if (InitialValue != null)
-        {
-            foreach (Statement statement in InitialValue.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-            { yield return statement; }
-        }
-    }
 }

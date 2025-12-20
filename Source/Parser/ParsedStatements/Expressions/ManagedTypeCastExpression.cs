@@ -21,12 +21,4 @@ public class ManagedTypeCastExpression : Expression, IHaveType
 
     public override string ToString()
         => $"{SurroundingBrackets?.Start}({Type}){Expression}{SurroundingBrackets?.End}{Semicolon}";
-
-    public override IEnumerable<Statement> GetStatementsRecursively(StatementWalkFlags flags)
-    {
-        if (flags.HasFlag(StatementWalkFlags.IncludeThis)) yield return this;
-
-        foreach (Statement statement in Expression.GetStatementsRecursively(flags | StatementWalkFlags.IncludeThis))
-        { yield return statement; }
-    }
 }

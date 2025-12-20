@@ -201,6 +201,7 @@ public sealed class Parser
         if (CurrentToken.TokenType == TokenType.LiteralString)
         {
             tokens.Add(CurrentToken);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
             CurrentTokenIndex++;
         }
         else
@@ -875,6 +876,7 @@ public sealed class Parser
             v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
             LiteralExpression literal = new(LiteralType.Float, v, CurrentToken, File);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
             CurrentTokenIndex++;
 
@@ -886,6 +888,7 @@ public sealed class Parser
             v = v.Replace("_", string.Empty, StringComparison.Ordinal);
 
             LiteralExpression literal = new(LiteralType.Integer, v, CurrentToken, File);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
             CurrentTokenIndex++;
 
@@ -912,6 +915,7 @@ public sealed class Parser
             }
 
             LiteralExpression literal = new(LiteralType.Integer, value.ToString(CultureInfo.InvariantCulture), CurrentToken, File);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
             CurrentTokenIndex++;
 
@@ -939,6 +943,7 @@ public sealed class Parser
             int value = Convert.ToInt32(v, 2);
 
             LiteralExpression literal = new(LiteralType.Integer, value.ToString(CultureInfo.InvariantCulture), CurrentToken, File);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
             CurrentTokenIndex++;
 
@@ -948,6 +953,7 @@ public sealed class Parser
         else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralString)
         {
             LiteralExpression literal = new(LiteralType.String, v, CurrentToken, File);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
             CurrentTokenIndex++;
 
@@ -957,6 +963,7 @@ public sealed class Parser
         else if (CurrentToken != null && CurrentToken.TokenType == TokenType.LiteralCharacter)
         {
             LiteralExpression literal = new(LiteralType.Char, v, CurrentToken, File);
+            CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
             CurrentTokenIndex++;
 
@@ -2163,6 +2170,7 @@ public sealed class Parser
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Identifier) return false;
         if (name.Length > 0 && CurrentToken.Content != name) return false;
+        CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
         result = CurrentToken;
         CurrentTokenIndex++;
@@ -2188,6 +2196,7 @@ public sealed class Parser
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Operator) return false;
         if (!name.Contains(CurrentToken.Content)) return false;
+        CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
         result = CurrentToken;
         CurrentTokenIndex++;
@@ -2201,6 +2210,7 @@ public sealed class Parser
         if (CurrentToken == null) return false;
         if (CurrentToken.TokenType != TokenType.Operator) return false;
         if (name.Length > 0 && CurrentToken.Content != name) return false;
+        CurrentToken.AnalyzedType = TokenAnalyzedType.None;
 
         result = CurrentToken;
         CurrentTokenIndex++;

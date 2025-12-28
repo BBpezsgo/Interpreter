@@ -1,6 +1,6 @@
 namespace LanguageCore;
 
-public class MemorySourceProvider : ISourceProviderSync
+public class MemorySourceProvider : ISourceProviderSync, IVersionProvider
 {
     readonly FrozenDictionary<string, string> Sources;
 
@@ -25,5 +25,11 @@ public class MemorySourceProvider : ISourceProviderSync
         {
             return SourceProviderResultSync.NotFound(uri);
         }
+    }
+
+    public bool TryGetVersion(Uri uri, out ulong version)
+    {
+        version = 1;
+        return uri.Scheme is "memory" && Sources.ContainsKey(uri.LocalPath);
     }
 }

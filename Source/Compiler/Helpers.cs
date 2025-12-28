@@ -1686,6 +1686,38 @@ public partial class StatementCompiler : IRuntimeInfoProvider
         SetStatementType(anyCall, functionType.ReturnType);
         return true;
     }
+    bool FindStatementType(LambdaExpression lambdaExpression, GeneralType? expectedType, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
+    {
+        type = null;
+
+        if (expectedType is null || !expectedType.Is(out FunctionType? functionType))
+        {
+            diagnostics.Add(Diagnostic.Internal($"No bro please no", lambdaExpression));
+            return false;
+        }
+
+        if (functionType.Parameters.Length != lambdaExpression.Parameters.Parameters.Length)
+        {
+            diagnostics.Add(Diagnostic.Error($"Idk how to explain this", lambdaExpression));
+            return false;
+        }
+
+        GeneralType[] parameterTypes = new GeneralType[lambdaExpression.Parameters.Parameters.Length];
+        for (int i = 0; i < lambdaExpression.Parameters.Parameters.Length; i++)
+        {
+            GeneralType expectedParameterType = functionType.Parameters[i];
+            if (!CompileType(lambdaExpression.Parameters.Parameters[i].Type, out GeneralType? definedParameterType, diagnostics)) return false;
+            if (!expectedParameterType.SameAs(definedParameterType))
+            {
+                diagnostics.Add(Diagnostic.Error($"Expected `{expectedParameterType}` defined `{definedParameterType}` ", lambdaExpression));
+                return false;
+            }
+            parameterTypes[i] = definedParameterType;
+        }
+
+        type = new FunctionType(functionType.ReturnType, parameterTypes.AsImmutableUnsafe(), functionType.HasClosure);
+        return true;
+    }
     bool FindStatementType(ListExpression list, [NotNullWhen(true)] out GeneralType? type, DiagnosticsCollection diagnostics)
     {
         GeneralType? itemType = null;
@@ -2366,6 +2398,7 @@ public partial class StatementCompiler : IRuntimeInfoProvider
             case ArgumentExpression v: return FindStatementType(v, expectedType, out type, diagnostics);
             case AnyCallExpression v: return FindStatementType(v, out type, diagnostics);
             case ListExpression v: return FindStatementType(v, out type, diagnostics);
+            case LambdaExpression v: return FindStatementType(v, expectedType, out type, diagnostics);
             default:
                 type = null;
                 diagnostics.Add(Diagnostic.Critical($"Statement \"{statement.GetType().Name}\" does not have a type", statement));

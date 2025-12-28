@@ -2,7 +2,7 @@ using System.IO;
 
 namespace LanguageCore;
 
-public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider
+public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider, IVersionProvider
 {
     public static readonly FileSourceProvider Instance = new();
     public static string DefaultHomeDirectory => Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
@@ -83,11 +83,21 @@ public class FileSourceProvider : ISourceProviderSync, ISourceQueryProvider
 
         if (lastUri is not null)
         {
-            return SourceProviderResultSync.NotFound(lastUri!);
+            return SourceProviderResultSync.NotFound(lastUri);
         }
         else
         {
             return SourceProviderResultSync.NextHandler();
         }
+    }
+
+    public bool TryGetVersion(Uri uri, out ulong version)
+    {
+        version = default;
+        if (uri.Scheme is not "file") return false;
+        if (!File.Exists(uri.LocalPath)) return false;
+
+        version = (ulong)File.GetLastWriteTimeUtc(uri.LocalPath).Ticks;
+        return true;
     }
 }

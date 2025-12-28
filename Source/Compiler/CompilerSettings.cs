@@ -48,6 +48,7 @@ public struct CompilerSettings
     public bool CompileEverything { get; set; }
     public bool IsExpression { get; set; }
     public ImmutableArray<ExpressionVariable> ExpressionVariables { get; set; }
+    public Dictionary<Uri, CacheItem>? Cache { get; set; }
 
     [SetsRequiredMembers]
     public CompilerSettings(CompilerSettings other)
@@ -59,7 +60,6 @@ public struct CompilerSettings
         PointerSize = other.PointerSize;
         BooleanType = other.BooleanType;
         SizeofStatementType = other.SizeofStatementType;
-
         ArrayLengthType = other.ArrayLengthType;
         PreprocessorVariables = other.PreprocessorVariables;
         AdditionalImports = other.AdditionalImports;
@@ -69,5 +69,6 @@ public struct CompilerSettings
         CompileEverything = other.CompileEverything;
         IsExpression = other.IsExpression;
         ExpressionVariables = other.ExpressionVariables;
+        Cache = other.Cache;
     }
 }

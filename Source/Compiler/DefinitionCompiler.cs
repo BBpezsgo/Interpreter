@@ -1064,7 +1064,7 @@ public partial class StatementCompiler
 
     CompilerResult CompileMainFile(string file)
     {
-        SourceCodeManagerResult res = SourceCodeManager.Collect(file, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings);
+        SourceCodeManagerResult res = SourceCodeManager.Collect(file, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings, Settings.Cache);
 
         foreach (ParsedFile parsedFile in res.ParsedFiles)
         { AddAST(parsedFile, parsedFile.File != res.ResolvedEntry); }
@@ -1082,7 +1082,7 @@ public partial class StatementCompiler
 
     CompilerResult CompileFiles(ReadOnlySpan<string> files)
     {
-        SourceCodeManagerResult res = SourceCodeManager.CollectMultiple(files, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings);
+        SourceCodeManagerResult res = SourceCodeManager.CollectMultiple(files, Diagnostics, PreprocessorVariables, Settings.AdditionalImports, Settings.SourceProviders, Settings.TokenizerSettings, Settings.Cache);
 
         foreach (ParsedFile parsedFile in res.ParsedFiles)
         { AddAST(parsedFile, parsedFile.File != res.ResolvedEntry); }

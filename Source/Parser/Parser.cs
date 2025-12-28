@@ -2259,7 +2259,16 @@ public sealed class Parser
         { return false; }
 
         Token? closureModifier = null;
-        if (possibleType.Content.StartsWith('@'))
+
+        if (CurrentToken is not null
+            && CurrentToken.TokenType == TokenType.Identifier
+            && CurrentToken.Position.AbsoluteRange.Start == possibleType.Position.AbsoluteRange.End)
+        {
+            closureModifier = possibleType;
+            possibleType = CurrentToken;
+            CurrentTokenIndex++;
+        }
+        else if (possibleType.Content.StartsWith('@'))
         {
             int slicedIndex = CurrentTokenIndex - 1;
             closureModifier = possibleType[..1];

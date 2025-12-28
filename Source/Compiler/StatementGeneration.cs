@@ -4310,12 +4310,12 @@ public partial class StatementCompiler
     }
 
 #if UNITY
-    static readonly Unity.Profiling.ProfilerMarker _m1 = new("LanguageCore.Compiler.TopLevelStatements");
+    static readonly Unity.Profiling.ProfilerMarker _m4 = new("LanguageCore.Compiler.CompileExpression");
 #endif
     bool CompileExpression(Statement statement, Dictionary<string, int>? contextualVariables, [NotNullWhen(true)] out ImmutableArray<CompiledStatement> compiledStatements)
     {
 #if UNITY
-        using var _1 = _m1.Auto();
+        using var _1 = _m4.Auto();
 #endif
 
         ImmutableArray<CompiledStatement>.Builder res = ImmutableArray.CreateBuilder<CompiledStatement>(1);

@@ -12,10 +12,10 @@ const BlockHeader SizeMask = 0x7fffffff as BlockHeader;
 
 #if BRAINFUCK
 [External("heap_size")]
-const int HeapSize = 127;
+export const int HeapSize = 127;
 #else
 [External("heap_size")]
-const int HeapSize = 512;
+export const int HeapSize = 512;
 #endif
 
 const int HeaderSize = sizeof(BlockHeader);
@@ -92,6 +92,33 @@ bool join_free_blocks()
         headerPointer += blockSize + HeaderSize;
     }
     return false;
+}
+
+[Expose("free_memory")]
+[MSILIncompatible]
+export int free_memory()
+{
+#if IL
+    crash "The function `alloc` is not compatible with MSIL";
+#else
+    BlockHeader* headerPointer = HeapStart as BlockHeader*;
+    int res = 0;
+    while (headerPointer < HeapSize)
+    {
+        int blockSize;
+        bool blockUsed;
+        get_header(headerPointer, &blockSize, &blockUsed);
+        any* dataPointer = (headerPointer + HeaderSize) as any*;
+
+        if (!blockUsed)
+        {
+            res += blockSize;
+        }
+
+        headerPointer += blockSize + HeaderSize;
+    }
+    return res;
+#endif
 }
 
 [Expose("alloc")]
@@ -177,6 +204,8 @@ export bool resize(any* ptr, int size)
         }
 
         set_header_used(headerPointer, size);
+
+        join_free_blocks();
     }
     else if (size < blockSize)
     {
@@ -188,6 +217,8 @@ export bool resize(any* ptr, int size)
         }
 
         set_header_used(headerPointer, size);
+
+        join_free_blocks();
     }
 
     return true;

@@ -13,7 +13,7 @@ namespace LanguageCore.Native.Generator;
 [ reg + reg*scale + number ] 
 */
 
-enum Registers
+public enum Registers
 {
     RAX, EAX, AX, AH, AL,
     RBX, EBX, BX, BH, BL,
@@ -33,7 +33,7 @@ enum Registers
     R15, R15D, R15W, R15B,
 }
 
-enum RegisterIdentifier : byte
+public enum RegisterIdentifier : byte
 {
     AX,
     BX,
@@ -53,7 +53,7 @@ enum RegisterIdentifier : byte
     _15,
 }
 
-enum RegisterSlice : byte
+public enum RegisterSlice : byte
 {
     R,
     D,
@@ -62,12 +62,14 @@ enum RegisterSlice : byte
     L,
 }
 
-readonly struct Register : IEquatable<Register>
+public readonly struct Register : IEquatable<Register>
 {
     public static readonly Register EAX = new(RegisterIdentifier.AX, RegisterSlice.D);
     public static readonly Register EBX = new(RegisterIdentifier.BX, RegisterSlice.D);
     public static readonly Register ECX = new(RegisterIdentifier.CX, RegisterSlice.D);
     public static readonly Register EDX = new(RegisterIdentifier.DX, RegisterSlice.D);
+    public static readonly Register EBP = new(RegisterIdentifier.BP, RegisterSlice.D);
+    public static readonly Register ESP = new(RegisterIdentifier.SP, RegisterSlice.D);
 
     public readonly RegisterIdentifier Identifier;
     public readonly RegisterSlice Slice;
@@ -256,33 +258,63 @@ readonly struct Register : IEquatable<Register>
     }
 }
 
+public readonly struct InstructionOperand
+{
+    readonly string _v;
+
+    InstructionOperand(string v) => _v = v;
+
+    public static implicit operator InstructionOperand(string v) => new(v);
+    public static implicit operator InstructionOperand(Register v) => new(v.ToString());
+    public static implicit operator InstructionOperand(int v) => new(v.ToString());
+    public static implicit operator InstructionOperand(CompiledValue v) => new(v.ToStringValue() ?? throw new NullReferenceException());
+
+    public static implicit operator string(InstructionOperand operand) => operand._v;
+
+    public override string ToString() => _v;
+}
+
+abstract class ValueLocation
+{
+
+}
+
+sealed class ValueRegisterLocation : ValueLocation
+{
+    public Register Register;
+
+    public ValueRegisterLocation(Register register)
+    {
+        Register = register;
+    }
+}
+
+sealed class ValueStackLocation : ValueLocation
+{
+
+}
+
+sealed class ValueVirtualLocation : ValueLocation
+{
+    public CompiledValue Value;
+
+    public ValueVirtualLocation(CompiledValue value)
+    {
+        Value = value;
+    }
+}
+
 public partial class CodeGeneratorForNative : CodeGenerator
 {
-    public override int PointerSize => 4;
-    public override BuiltinType BooleanType => BuiltinType.U8;
-    public override BuiltinType SizeofStatementType => BuiltinType.I32;
-    public override BuiltinType ArrayLengthType => BuiltinType.I32;
-
+    protected override RuntimeInfo RuntimeInfo => new()
+    {
+        PointerSize = 4,
+    };
     readonly TextSectionBuilder Code = new();
-
-    protected override bool FindSize(PointerType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = PointerSize;
-        error = null;
-        return true;
-    }
-
-    protected override bool FindSize(FunctionType type, out int size, [NotNullWhen(false)] out PossibleDiagnostic? error)
-    {
-        size = PointerSize;
-        error = null;
-        return true;
-    }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     public delegate int JitFn();
 
-    readonly List<(Register Register, CompiledExpression Expression)> ExpressionInRegisters = new();
     readonly HashSet<Register> UsedRegisters = new();
     bool DidReturn;
 
@@ -314,20 +346,6 @@ public partial class CodeGeneratorForNative : CodeGenerator
         public static implicit operator Register(AllocatedRegister reg) => reg.Register;
     }
 
-    void SaveExpression(CompiledExpression value, Register register)
-    {
-        for (int i = 0; i < ExpressionInRegisters.Count; i++)
-        {
-            if (ExpressionInRegisters[i].Register.Overlaps(register))
-            {
-                ExpressionInRegisters[i] = (register, value);
-                return;
-            }
-        }
-
-        ExpressionInRegisters.Add((register, value));
-    }
-
     AllocatedRegister AllocateRegister(BitWidth bitWidth)
     {
         if (TryAllocateRegister(bitWidth, out AllocatedRegister register))
@@ -336,6 +354,15 @@ public partial class CodeGeneratorForNative : CodeGenerator
         }
 
         throw new InvalidOperationException("No registers available");
+    }
+    AllocatedRegister AllocateRegister(Register reg)
+    {
+        if (TryAllocateRegister(reg, out AllocatedRegister register))
+        {
+            return register;
+        }
+
+        throw new InvalidOperationException($"Failed to allocate register {reg}");
     }
 
     bool TryAllocateRegister(BitWidth bitWidth, out AllocatedRegister register)
@@ -366,26 +393,8 @@ public partial class CodeGeneratorForNative : CodeGenerator
     }
     bool TryAllocateRegister(Register reg, out AllocatedRegister register)
     {
-        bool isUsed = false;
-
-        foreach ((Register usedRegister, _) in ExpressionInRegisters)
+        if (UsedRegisters.Add(reg))
         {
-            if (reg.Overlaps(usedRegister))
-            {
-                isUsed = true;
-                break;
-            }
-        }
-
-        if (!isUsed && UsedRegisters.Add(reg))
-        {
-            for (int i = 0; i < ExpressionInRegisters.Count; i++)
-            {
-                if (ExpressionInRegisters[i].Register.Overlaps(reg))
-                {
-                    ExpressionInRegisters.RemoveAt(i--);
-                }
-            }
             register = new AllocatedRegister(UsedRegisters, reg);
             return true;
         }
@@ -394,112 +403,175 @@ public partial class CodeGeneratorForNative : CodeGenerator
         return false;
     }
 
-    AllocatedRegister PutExpressionIntoRegister(CompiledExpression expression)
+    ValueRegisterLocation PutValueIntoRegister(ValueLocation value, Register register)
     {
-        foreach ((Register register, CompiledExpression? _expression) in ExpressionInRegisters)
+        if (value is ValueRegisterLocation registerLocation)
         {
-            if (expression == _expression)
+            if (registerLocation.Register != register)
             {
-                return new AllocatedRegister(UsedRegisters, register);
+                Code.AppendInstruction("mov", register, registerLocation.Register);
             }
+            return new ValueRegisterLocation(register);
         }
-
-        if (!expression.Type.Is(out BuiltinType? builtinType))
+        else if (value is ValueStackLocation)
         {
-            throw new NotImplementedException("Only builtin types are supported");
+            Code.AppendInstruction("pop", register);
+            return new ValueRegisterLocation(register);
         }
-
-        AllocatedRegister result = AllocateRegister(builtinType.GetBitWidth(this));
-        Code.AppendInstruction("pop", result.ToString());
-        return result;
-    }
-
-    void PutExpressionIntoRegister(CompiledExpression expression, Register register)
-    {
-        foreach ((Register _register, CompiledExpression? _expression) in ExpressionInRegisters)
+        else if (value is ValueVirtualLocation virtualLocation)
         {
-            if (expression == _expression)
-            {
-                if (_register != register)
-                {
-                    Code.AppendInstruction("mov", register.ToString(), _register.ToString());
-                }
-                return;
-            }
-        }
-
-        Code.AppendInstruction("pop", register.ToString());
-    }
-
-    void PushExpressionOnStack(CompiledExpression expression)
-    {
-        foreach ((Register _register, CompiledExpression? _expression) in ExpressionInRegisters)
-        {
-            if (expression == _expression)
-            {
-                Code.AppendInstruction("push", _register.ToString());
-                return;
-            }
-        }
-    }
-
-    void EmitExpression(CompiledConstantValue statement)
-    {
-        if (TryAllocateRegister(statement.Value.BitWidth, out AllocatedRegister reg))
-        {
-            using (reg)
-            {
-                Code.AppendInstruction("mov", reg.ToString(), statement.Value.ToStringValue()!);
-                SaveExpression(statement, reg);
-            }
+            Code.AppendInstruction("mov", register, virtualLocation.Value.ToStringValue()!);
+            return new ValueRegisterLocation(register);
         }
         else
         {
-            Code.AppendInstruction("push", statement.Value.ToStringValue()!);
+            throw new UnreachableException();
         }
     }
 
-    void EmitExpression(CompiledVariableAccess statement)
+    ValueStackLocation PushValue(ValueLocation value)
     {
-        var variable = Frames.Last.Variables.FirstOrDefault(v => v.Variable == statement.Variable);
+        if (value is ValueRegisterLocation registerLocation)
+        {
+            Code.AppendInstruction("push", registerLocation.Register);
+            return new ValueStackLocation();
+        }
+        else if (value is ValueStackLocation)
+        {
+            return new ValueStackLocation();
+        }
+        else if (value is ValueVirtualLocation virtualLocation)
+        {
+            Code.AppendInstruction("push", virtualLocation.Value.ToStringValue()!);
+            return new ValueStackLocation();
+        }
+        else
+        {
+            throw new UnreachableException();
+        }
+    }
+
+    ValueLocation EmitExpression(CompiledConstantValue statement, Register? dest)
+    {
+        if (dest.HasValue)
+        {
+            Code.AppendInstruction("mov", dest.Value, statement.Value);
+            return new ValueRegisterLocation(dest.Value);
+        }
+        return new ValueVirtualLocation(statement.Value);
+
+        //else if (TryAllocateRegister(statement.Value.BitWidth, out AllocatedRegister reg))
+        //{
+        //    using (reg)
+        //    {
+        //        Code.AppendInstruction("mov", reg, statement.Value);
+        //        return new ValueRegisterLocation(reg);
+        //    }
+        //}
+        //else
+        //{
+        //    Code.AppendInstruction("push", statement.Value);
+        //    return new ValueStackLocation();
+        //}
+    }
+    ValueLocation EmitExpression(CompiledVariableAccess statement, Register? dest)
+    {
+        (CompiledVariableDefinition Variable, int Offset) variable = Frames.Last.Variables.FirstOrDefault(v => Utils.ReferenceEquals(v.Variable, statement.Variable));
 
         if (variable.Variable is null)
         {
             throw new InternalExceptionWithoutContext();
         }
 
-        int bpRelativeAddress = variable.Offset + 8 + variable.Variable.Type.GetSize(this);
+        int variableSize = FindSize(variable.Variable.Type, variable.Variable.TypeExpression);
+        int bpRelativeAddress = variable.Offset + 8 + variableSize;
 
-        Code.AppendInstruction("push", $"{variable.Variable.Type.GetSize(this) switch
+        if (dest.HasValue)
         {
-            1 => "byte",
-            2 => "word",
-            4 => "dword",
-            8 => "qword",
-            _ => throw new NotImplementedException(),
-        }} [ebp-{bpRelativeAddress}]");
-    }
-
-    void EmitExpression(CompiledExpression statement)
-    {
-        switch (statement)
+            Code.AppendInstruction("mov", dest.Value, $"{variableSize switch
+            {
+                1 => "byte",
+                2 => "word",
+                4 => "dword",
+                8 => "qword",
+                _ => throw new NotImplementedException(),
+            }} [ebp-{bpRelativeAddress}]");
+            return new ValueRegisterLocation(dest.Value);
+        }
+        else
         {
-            case CompiledConstantValue v: EmitExpression(v); break;
-            case CompiledVariableAccess v: EmitExpression(v); break;
-            default:
-                throw new NotImplementedException($"Expression of type {statement.GetType().Name} is not implemented");
+            Code.AppendInstruction("push", $"{variableSize switch
+            {
+                1 => "byte",
+                2 => "word",
+                4 => "dword",
+                8 => "qword",
+                _ => throw new NotImplementedException(),
+            }} [ebp-{bpRelativeAddress}]");
+            return new ValueStackLocation();
         }
     }
+    ValueLocation EmitExpression(CompiledBinaryOperatorCall statement, Register? dest)
+    {
+        Register left;
+        Register right;
+
+        if (dest.HasValue)
+        {
+            EmitExpression(statement.Left, dest.Value);
+
+            using AllocatedRegister r = AllocateRegister(FindBitWidth(statement.Right.Type, statement.Left));
+            EmitExpression(statement.Right, r);
+
+            left = dest.Value;
+            right = r;
+        }
+        else
+        {
+            using AllocatedRegister l = AllocateRegister(FindBitWidth(statement.Left.Type, statement.Left));
+            EmitExpression(statement.Left, l);
+
+            using AllocatedRegister r = AllocateRegister(FindBitWidth(statement.Right.Type, statement.Left));
+            EmitExpression(statement.Right, r);
+
+            left = l;
+            right = r;
+        }
+
+        switch (statement.Operator)
+        {
+            case CompiledBinaryOperatorCall.Addition:
+                Code.AppendInstruction("add", left, right);
+                return new ValueRegisterLocation(left);
+            case CompiledBinaryOperatorCall.Subtraction:
+                Code.AppendInstruction("sub", left, right);
+                return new ValueRegisterLocation(left);
+            case CompiledBinaryOperatorCall.Multiplication:
+                Code.AppendInstruction("mul", left, right);
+                return new ValueRegisterLocation(left);
+            default:
+                throw new NotImplementedException($"Binary operator `{statement.Operator}` not implemented");
+        }
+    }
+
+    ValueLocation EmitExpression(CompiledExpression statement, Register? dest = null) => statement switch
+    {
+        CompiledConstantValue v => EmitExpression(v, dest),
+        CompiledVariableAccess v => EmitExpression(v, dest),
+        CompiledBinaryOperatorCall v => EmitExpression(v, dest),
+        _ => throw new NotImplementedException($"Expression of type {statement.GetType().Name} is not implemented"),
+    };
 
     void EmitStatement(CompiledReturn statement)
     {
         if (statement.Value is not null)
         {
-            EmitExpression(statement.Value);
-            PutExpressionIntoRegister(statement.Value, Register.EAX);
+            using AllocatedRegister dest = AllocateRegister(Register.EAX);
+            ValueLocation value = EmitExpression(statement.Value, dest);
+            PutValueIntoRegister(value, dest);
         }
         CleanupFrame(Frames.Last);
-        Code.AppendInstruction("pop", "ebp");
+        Code.AppendInstruction("pop", Register.EBP);
         Code.AppendInstruction("ret");
         DidReturn = true;
     }
@@ -509,12 +581,12 @@ public partial class CodeGeneratorForNative : CodeGenerator
         int offset = Frames.Last.Variables.Sum(v => v.Offset);
         if (statement.InitialValue is not null)
         {
-            EmitExpression(statement.InitialValue);
-            PushExpressionOnStack(statement.InitialValue);
+            ValueLocation valueLocation = EmitExpression(statement.InitialValue);
+            PushValue(valueLocation);
         }
         else
         {
-            Code.AppendInstruction("sub", "EBP", statement.Type.GetSize(this).ToString());
+            Code.AppendInstruction("sub", Register.EBP, FindSize(statement.Type, statement));
         }
         Frames.Last.Variables.Add((statement, offset));
     }
@@ -536,7 +608,7 @@ public partial class CodeGeneratorForNative : CodeGenerator
         while (frame.Variables.Count > 0)
         {
             (CompiledVariableDefinition v, _) = frame.Variables.Pop();
-            Code.AppendInstruction("add", "esp", v.Type.GetSize(this).ToString());
+            Code.AppendInstruction("add", Register.ESP, FindSize(v.Type, v.TypeExpression));
         }
     }
 
@@ -546,8 +618,8 @@ public partial class CodeGeneratorForNative : CodeGenerator
     NativeFunction GenerateImpl(DiagnosticsCollection diagnostics)
     {
         Frames.Push(new());
-        Code.AppendInstruction("push", "ebp");
-        Code.AppendInstruction("mov", "ebp", "esp");
+        Code.AppendInstruction("push", Register.EBP);
+        Code.AppendInstruction("mov", Register.EBP, Register.ESP);
 
         foreach (CompiledStatement item in TopLevelStatements)
         {
@@ -556,9 +628,9 @@ public partial class CodeGeneratorForNative : CodeGenerator
 
         if (!DidReturn)
         {
-            Code.AppendInstruction("mov", Registers.EAX.ToString(), "0");
+            Code.AppendInstruction("mov", Register.EAX, 0);
             CleanupFrame(Frames.Last);
-            Code.AppendInstruction("pop", "ebp");
+            Code.AppendInstruction("pop", Register.EBP);
             Code.AppendInstruction("ret");
         }
 

@@ -88,7 +88,7 @@ public class TextSectionBuilder : SectionBuilder
         AppendText(Environment.NewLine);
     }
 
-    public void AppendInstructionNoEOL(string keyword, params string[] operands)
+    public void AppendInstructionNoEOL(string keyword, params InstructionOperand[] operands)
     {
         AppendInstructionNoEOL(keyword);
         if (operands.Length > 0)
@@ -96,15 +96,13 @@ public class TextSectionBuilder : SectionBuilder
             AppendText(' ');
             for (int i = 0; i < operands.Length; i++)
             {
-                string operand = operands[i];
-                if (i > 0)
-                { AppendText(", "); }
-                AppendText(operand);
+                if (i > 0) AppendText(", ");
+                AppendText(operands[i].ToString());
             }
         }
     }
 
-    public void AppendInstruction(string keyword, params string[] operands)
+    public void AppendInstruction(string keyword, params InstructionOperand[] operands)
     {
         AppendInstructionNoEOL(keyword, operands);
         AppendText(Environment.NewLine);

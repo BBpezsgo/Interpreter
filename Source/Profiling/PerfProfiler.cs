@@ -1,5 +1,4 @@
 using System.IO;
-using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 
 namespace LanguageCore.Profiling;
@@ -55,27 +54,22 @@ public class PerfProfiler : Profiler
 
     public override void Sample(in ProcessorState state, ulong tick)
     {
-        CompiledDebugInformation debugInformation = _debugInformation;
+        if (_debugInformation.TryGetFunctionInformation(state.Registers.CodePointer, out FunctionInformation f) && (state.Registers.CodePointer < f.FrameInstructions.Start || state.Registers.CodePointer >= f.FrameInstructions.End)) return;
 
-        List<CallTraceItem> callTrace = new();
-        DebugUtils.TraceStack(state.Memory, state.Registers.BasePointer, debugInformation.StackOffsets, callTrace);
+        List<CallTraceItem> stacktrace = new();
+        DebugUtils.TraceStack(state.Memory, state.Registers.BasePointer, _debugInformation.StackOffsets, stacktrace);
+        stacktrace.Reverse();
+        stacktrace.Add(new CallTraceItem(state.Registers.BasePointer, state.Registers.CodePointer));
 
-        List<ProfilerStackTraceItem> profilerStackTraceItems = new(callTrace.Count);
-        foreach (CallTraceItem item in callTrace)
+        List<ProfilerStackTraceItem> profilerStackTraceItems = new(stacktrace.Count);
+        foreach (CallTraceItem frame in stacktrace)
         {
-            string name = "[unknown]";
-            string? source = null;
+            if (frame.InstructionPointer <= 0 || frame.InstructionPointer >= state.Code.Length) continue;
 
-            if (debugInformation.TryGetFunctionInformation(item.InstructionPointer, out FunctionInformation f))
-            {
-                if (f.IsTopLevelStub) name = "[top level statements]";
-                else if (f.Function is CompiledLambda) name = "[lambda]";
-                else if (f.Function is CompiledFunctionDefinition w) name = w.Identifier;
+            string name = GetFrameName(frame, true);
+            string? source = GetLocation(frame).ToString();
 
-                source = f.File is null ? null : new Location(f.SourcePosition, f.File).ToString();
-            }
-
-            profilerStackTraceItems.Add(new(item.InstructionPointer, name, source));
+            profilerStackTraceItems.Add(new(frame.InstructionPointer, name, source));
         }
 
         if (_samples.Count > 0 && _samples[^1].Equals(new(_samples[^1].Tick, profilerStackTraceItems.ToImmutableArray()))) return;
@@ -90,10 +84,10 @@ public class PerfProfiler : Profiler
 
         foreach (ProfilerSample sample in _samples)
         {
-            writer.WriteLine($"bblang 621/621 {TickToTimestamp(sample.Tick).TotalMilliseconds.ToString("0.000000", CultureInfo.InvariantCulture)}: 0 cpu/cycles/Pu:");
+            writer.WriteLine($"bblang 0/0 {TickToTimestamp(sample.Tick).TotalMilliseconds.ToString("0.000000", CultureInfo.InvariantCulture)}: 1 cpu/cycles/Pu:");
             foreach (ProfilerStackTraceItem item in sample.Trace)
             {
-                writer.WriteLine($"	    {Convert.ToString(item.Instruction, 16)} {item.FunctionName} ({item.Source})");
+                writer.WriteLine($"	    0x{Convert.ToString(item.Instruction, 16)} {item.FunctionName} ({item.Source})");
             }
             writer.WriteLine();
         }

@@ -2042,7 +2042,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
             {
-                Instructions = (startInstruction, Code.Offset - 1),
+                Instructions = (startInstruction, Code.Offset),
                 Location = statement.Location,
             });
         }
@@ -2089,7 +2089,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
             {
-                Instructions = (startInstruction, Code.Offset - 1),
+                Instructions = (startInstruction, Code.Offset),
                 Location = statement.Location,
                 IsSubtle = statement is CompiledConstantValue,
             });
@@ -2133,7 +2133,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             DebugInfo?.SourceCodeLocations.Add(new SourceCodeLocation()
             {
-                Instructions = (startInstruction, Code.Offset - 1),
+                Instructions = (startInstruction, Code.Offset),
                 Location = statement.Location,
             });
         }
@@ -2542,7 +2542,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         {
             Location = new SourceCodeLocation()
             {
-                Instructions = (Code.Offset, Code.Offset),
+                Instructions = (Code.Offset, Code.Offset + 1),
                 Location = new Location(position, file),
             },
             Stack = new List<StackElementInformation>(),
@@ -2567,7 +2567,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         CleanupVariables(scope.Variables, new Location(position, file), false);
 
         ScopeInformation scopeDebug = CurrentScopeDebug.Pop();
-        scopeDebug.Location.Instructions.End = Code.Offset - 1;
+        scopeDebug.Location.Instructions.End = Code.Offset;
         DebugInfo?.ScopeInformation.Add(scopeDebug);
     }
 
@@ -2733,8 +2733,6 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (typeArguments is not null) TypeArguments.AddRange(typeArguments);
         CompiledParameters.AddRange(function.Parameters);
 
-        int instructionStart = Code.Offset;
-
         if (function is IHaveCompiledType functionWithType)
         { CurrentReturnType = functionWithType.Type; }
         else
@@ -2746,9 +2744,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
             return;
         }
 
+        int instructionsStart = Code.Offset;
+
         AddComment("Create stack frame");
         Push(Register.BasePointer);
         Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
+
+        int frameInstructionsStart = Code.Offset;
 
         CompiledScope scope = OnScopeEnter(body, true);
 
@@ -2846,6 +2848,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
         Code.MarkLabel(returnLabel);
         ReturnInstructions.Pop();
 
+        int frameInstructionsEnd = Code.Offset;
+
         AddComment("Return");
         Return();
 
@@ -2856,7 +2860,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
             IsValid = true,
             Function = function,
             TypeArguments = TypeArguments.ToImmutableDictionary(),
-            Instructions = (instructionStart, Code.Offset),
+            Instructions = (instructionsStart, Code.Offset),
+            FrameInstructions = (frameInstructionsStart, frameInstructionsEnd),
         });
 
         while (CompiledInstructionLabels.Count > savedInstructionLabelCount)
@@ -2879,12 +2884,11 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         if (statements.IsDefaultOrEmpty) return;
 
-        int codeStart = Code.Offset;
         CurrentScopeDebug.Push(new ScopeInformation()
         {
             Location = new SourceCodeLocation()
             {
-                Instructions = (Code.Offset, Code.Offset),
+                Instructions = (Code.Offset, Code.Offset + 1),
                 Location = statements.Select(v => v.Location).Aggregate((a, b) => a.Union(b)),
             },
             Stack = new List<StackElementInformation>(),
@@ -2894,9 +2898,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         AddComment("TopLevelStatements {");
 
+        int instructionsStart = Code.Offset;
+
         AddComment("Create stack frame");
         Push(Register.BasePointer);
         Code.Emit(Opcode.Move, Register.BasePointer, Register.StackPointer);
+
+        int frameInstructionsStart = Code.Offset;
 
         CurrentScopeDebug.Last.Stack.Add(new StackElementInformation()
         {
@@ -2926,6 +2934,8 @@ public partial class CodeGeneratorForMain : CodeGenerator
 
         CurrentReturnType = null;
 
+        int frameInstructionsEnd = Code.Offset;
+
         if (!Settings.IsExpression)
         {
             AddComment("Pop stack frame");
@@ -2942,11 +2952,12 @@ public partial class CodeGeneratorForMain : CodeGenerator
             Function = null,
             IsTopLevelStub = true,
             TypeArguments = TypeArguments.ToImmutableDictionary(),
-            Instructions = (codeStart, Code.Offset),
+            Instructions = (instructionsStart, Code.Offset),
+            FrameInstructions = (frameInstructionsStart, frameInstructionsEnd),
         });
 
         ScopeInformation scope = CurrentScopeDebug.Pop();
-        scope.Location.Instructions.End = Code.Offset - 1;
+        scope.Location.Instructions.End = frameInstructionsEnd;
         DebugInfo?.ScopeInformation.Add(scope);
     }
 
@@ -2956,6 +2967,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
     {
         ScopeSizes.Push(0);
 
+        /*
         if (false)
         {
             AddComment("Create stack frame");
@@ -3020,12 +3032,13 @@ public partial class CodeGeneratorForMain : CodeGenerator
                 ILGeneratorBuilders = ILGenerator?.Builders?.ToImmutableArray() ?? ImmutableArray<string>.Empty,
             };
         }
+        */
 
         CurrentScopeDebug.Push(new ScopeInformation()
         {
             Location = new SourceCodeLocation()
             {
-                Instructions = (Code.Offset, Code.Offset),
+                Instructions = (Code.Offset, Code.Offset + 1),
                 Location = new Location(Position.UnknownPosition, compilerResult.File),
             },
             Stack = new List<StackElementInformation>(),
@@ -3135,7 +3148,7 @@ public partial class CodeGeneratorForMain : CodeGenerator
         if (ScopeSizes.Pop() != 4) { } // throw new InternalException("Bruh");
 
         ScopeInformation topLevelScope = CurrentScopeDebug.Pop();
-        topLevelScope.Location.Instructions.End = Code.Offset - 1;
+        topLevelScope.Location.Instructions.End = Code.Offset;
 
         foreach (CompiledFunction function in compilerResult.Functions)
         {

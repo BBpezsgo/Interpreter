@@ -9,6 +9,7 @@ public struct FunctionInformation
     public bool IsTopLevelStub;
     public ICompiledFunctionDefinition? Function;
     public ImmutableDictionary<string, GeneralType>? TypeArguments;
+    public MutableRange<int> FrameInstructions;
     public MutableRange<int> Instructions;
 
     public readonly Position SourcePosition => (Function as CompiledFunctionDefinition)?.Definition.Identifier.Position ?? default;

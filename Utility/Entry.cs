@@ -606,15 +606,28 @@ public static class Entry
                         if (!string.IsNullOrEmpty(arguments.ProfilerExport))
                         {
                             ProcessorState state = interpreter.GetState();
-                            Profiling.GoogleProfiler profiler = new(interpreter.DebugInformation);
+                            Profiling.Profiler profiler = Path.GetExtension(arguments.ProfilerExport).Equals(".cpuprofile") ? new Profiling.GoogleProfiler(interpreter.DebugInformation) : new Profiling.PerfProfiler(interpreter.DebugInformation);
                             ulong tick = 0;
-                            while (!state.IsDone)
+                            try
                             {
-                                state.Tick();
-                                state.ThrowIfCrashed(interpreter.DebugInformation);
-                                profiler.Sample(in state, ++tick);
+                                while (!state.IsDone)
+                                {
+                                    state.Tick();
+                                    state.ThrowIfCrashed(interpreter.DebugInformation);
+                                    profiler.Sample(in state, ++tick);
+                                }
+                            }
+                            catch (RuntimeException ex)
+                            {
+                                ex.DebugInformation = interpreter.DebugInformation;
+                                ex.Context ??= state.GetContext();
+                                throw;
                             }
                             profiler.WriteTo(arguments.ProfilerExport);
+                            if (profiler is Profiling.GoogleProfiler googleProfiler)
+                            {
+                                googleProfiler.WriteHeapProfileTo(Path.ChangeExtension(arguments.ProfilerExport, "heapprofile"));
+                            }
                             interpreter.Registers = state.Registers;
                         }
                         else
@@ -629,15 +642,28 @@ public static class Entry
                             if (!string.IsNullOrEmpty(arguments.ProfilerExport))
                             {
                                 ProcessorState state = interpreter.GetState();
-                                Profiling.GoogleProfiler profiler = new(interpreter.DebugInformation);
+                                Profiling.Profiler profiler = Path.GetExtension(arguments.ProfilerExport).Equals(".cpuprofile") ? new Profiling.GoogleProfiler(interpreter.DebugInformation) : new Profiling.PerfProfiler(interpreter.DebugInformation);
                                 ulong tick = 0;
-                                while (!state.IsDone)
+                                try
                                 {
-                                    state.Tick();
-                                    state.ThrowIfCrashed(interpreter.DebugInformation);
-                                    profiler.Sample(in state, ++tick);
+                                    while (!state.IsDone)
+                                    {
+                                        state.Tick();
+                                        state.ThrowIfCrashed(interpreter.DebugInformation);
+                                        profiler.Sample(in state, ++tick);
+                                    }
+                                }
+                                catch (RuntimeException ex)
+                                {
+                                    ex.DebugInformation = interpreter.DebugInformation;
+                                    ex.Context ??= state.GetContext();
+                                    throw;
                                 }
                                 profiler.WriteTo(arguments.ProfilerExport);
+                                if (profiler is Profiling.GoogleProfiler googleProfiler)
+                                {
+                                    googleProfiler.WriteHeapProfileTo(Path.ChangeExtension(arguments.ProfilerExport, "heapprofile"));
+                                }
                                 interpreter.Registers = state.Registers;
                             }
                             else

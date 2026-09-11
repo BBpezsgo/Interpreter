@@ -84,7 +84,7 @@ public readonly struct CompiledDebugInformation
         for (int i = 0; i < sourceCodeLocations.Length; i++)
         {
             SourceCodeLocation _sourceLocation = sourceCodeLocations[i];
-            if (!_sourceLocation.Contains(instruction))
+            if (!_sourceLocation.Instructions.Contains(instruction))
             { continue; }
             if (success && sourceLocation.Instructions.Size() < _sourceLocation.Instructions.Size())
             { continue; }
@@ -98,11 +98,11 @@ public readonly struct CompiledDebugInformation
         for (int i = 0; i < sourceCodeLocations.Length; i++)
         {
             SourceCodeLocation _sourceLocation = sourceCodeLocations[i];
-            if (_sourceLocation.Contains(instruction - 1))
+            if (_sourceLocation.Instructions.Contains(instruction - 1))
             {
                 sourceLocation = new SourceCodeLocation()
                 {
-                    Instructions = new(instruction),
+                    Instructions = (instruction, instruction + 1),
                     Location = _sourceLocation.Location.After(),
                 };
                 return true;

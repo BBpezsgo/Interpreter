@@ -14,25 +14,25 @@ public static class RangeExtensions
     public static bool Contains(this MutableRange<int> range, int value)
     {
         range = range.Fix();
-        return range.Start <= value && range.End >= value;
+        return range.Start <= value && value < range.End;
     }
 
     public static bool Contains(this MutableRange<SinglePosition> range, SinglePosition value)
     {
         range = range.Fix();
-        return range.Start <= value && range.End >= value;
+        return range.Start <= value && value < range.End;
     }
 
     public static bool Contains(this Range<int> range, int value)
     {
         range = range.Fix();
-        return range.Start <= value && range.End >= value;
+        return range.Start <= value && value < range.End;
     }
 
     public static bool Contains(this Range<SinglePosition> range, SinglePosition value)
     {
         range = range.Fix();
-        return range.Start <= value && range.End >= value;
+        return range.Start <= value && value < range.End;
     }
 
     public static Range<int> Fix(this Range<int> v)

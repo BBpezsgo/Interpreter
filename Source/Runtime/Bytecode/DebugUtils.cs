@@ -20,6 +20,9 @@ public static class DebugUtils
         int savedCodePointer = stack[savedCodePointerAddress..].To<int>();
         int savedBasePointer = stack[savedBasePointerAddress..].To<int>();
 
+        if (savedCodePointer < 0) return;
+        if (savedBasePointer < 0 || savedBasePointer >= stack.Length) return;
+
         CallTraceItem scope = new(savedBasePointer, savedCodePointer);
 
         if (savedBasePointer == basePointer || callTrace.Contains(scope)) return;

@@ -1176,6 +1176,11 @@ public partial class StatementCompiler
                 Diagnostics.Add(castError.ToError(value));
             }
 
+            if (parameter.Definition.Modifiers.Contains(ModifierKeywords.Temp))
+            {
+                Diagnostics.Add(DiagnosticAt.Warning($"Please don't assign a temp parameter. Thanks", target));
+            }
+
             compiledStatement = new CompiledSetter()
             {
                 Target = new CompiledParameterAccess()
@@ -1205,6 +1210,11 @@ public partial class StatementCompiler
 
             if (variable.IsGlobal)
             { Diagnostics.Add(DiagnosticAt.Internal($"Trying to set local variable \"{variable.Identifier}\" but it was compiled as a global variable.", target)); }
+
+            if (variable.Definition.Modifiers.Contains(ModifierKeywords.Temp))
+            {
+                Diagnostics.Add(DiagnosticAt.Warning($"Please don't assign a temp variable. Thanks", target));
+            }
 
             compiledStatement = new CompiledSetter()
             {
@@ -1236,6 +1246,11 @@ public partial class StatementCompiler
 
             if (!globalVariable.IsGlobal)
             { Diagnostics.Add(DiagnosticAt.Internal($"Trying to set global variable \"{globalVariable.Identifier}\" but it was compiled as a local variable.", target)); }
+
+            if (globalVariable.Definition.Modifiers.Contains(ModifierKeywords.Temp))
+            {
+                Diagnostics.Add(DiagnosticAt.Warning($"Please don't assign a temp variable. Thanks", target));
+            }
 
             compiledStatement = new CompiledSetter()
             {

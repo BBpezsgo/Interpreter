@@ -2174,7 +2174,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             Location = new Runtime.SourceCodeLocation()
             {
-                Instructions = (Code.Length, Code.Length),
+                Instructions = (Code.Length, Code.Length + 1),
                 Location = block.Location,
             },
             Stack = new List<Runtime.StackElementInformation>(),
@@ -2976,7 +2976,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             Location = new Runtime.SourceCodeLocation()
             {
-                Instructions = (Code.Length, Code.Length),
+                Instructions = (Code.Length, Code.Length + 1),
                 Location = f.Body.Location,
             },
             Stack = new List<Runtime.StackElementInformation>(),
@@ -3048,7 +3048,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
 
-        scopeInformation.Location.Instructions.End = Code.Length - 1;
+        scopeInformation.Location.Instructions.End = Code.Length;
         DebugInfo?.ScopeInformation.Add(scopeInformation);
 
         PopStackFrame(frame);
@@ -3163,7 +3163,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
         {
             Location = new Runtime.SourceCodeLocation()
             {
-                Instructions = (Code.Length, Code.Length),
+                Instructions = (Code.Length, Code.Length + 1),
                 Location = f.Body.Location,
             },
             Stack = new List<Runtime.StackElementInformation>(),
@@ -3235,7 +3235,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator
             }
         }
 
-        scopeInformation.Location.Instructions.End = Code.Length - 1;
+        scopeInformation.Location.Instructions.End = Code.Length;
         DebugInfo?.ScopeInformation.Add(scopeInformation);
 
         PopStackFrame(frame);

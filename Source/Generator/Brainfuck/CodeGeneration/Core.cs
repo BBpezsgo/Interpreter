@@ -159,6 +159,7 @@ public partial class CodeGeneratorForBrainfuck : CodeGenerator, IBrainfuckGenera
             {
                 Function = Function,
                 Instructions = (InstructionStart, Code.Length),
+                FrameInstructions = (InstructionStart, Code.Length),
                 IsValid = true,
                 TypeArguments = TypeArguments,
             });
